@@ -32,6 +32,9 @@ COPY --from=builder /root/.local /home/appuser/.local
 # Copy application code
 COPY . .
 
+# Generate BAML client (before changing to non-root user)
+RUN /home/appuser/.local/bin/baml-cli generate
+
 # Copy and make entrypoint script executable
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
