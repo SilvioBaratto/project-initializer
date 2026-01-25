@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "project-initializer"
-version = "0.1.0"
+version = "0.1.1"
 description = "CLI tool to scaffold full-stack projects with FastAPI, Angular, and Docker"
 readme = "README.md"
 license = {text = "MIT"}
