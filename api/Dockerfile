@@ -33,6 +33,7 @@ COPY --from=builder /root/.local /home/appuser/.local
 COPY . .
 
 # Generate BAML client (before changing to non-root user)
+ENV PYTHONPATH=/home/appuser/.local/lib/python3.12/site-packages
 RUN /home/appuser/.local/bin/baml-cli generate
 
 # Copy and make entrypoint script executable

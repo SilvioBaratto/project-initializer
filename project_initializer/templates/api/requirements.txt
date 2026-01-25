@@ -32,4 +32,3 @@ pytest-asyncio>=1.2.0
 
 # AI/ML
 baml-py>=0.217.0
-baml-cli>=0.1.0
