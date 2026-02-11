@@ -1,30 +1,30 @@
 import { Routes } from '@angular/router';
-// import { authGuard, guestGuard } from './guards/auth.guard';
+import { authGuard, guestGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
-  // Public login route
   {
     path: 'login',
     loadComponent: () => import('./auth/login/login').then((m) => m.LoginComponent),
-    // canActivate: [guestGuard],
+    canActivate: [guestGuard],
     title: 'Login',
   },
-
-  // Application routes
   {
     path: '',
     loadComponent: () => import('./shared/layout/layout').then((m) => m.LayoutComponent),
-    // canActivate: [authGuard],
+    canActivate: [authGuard],
     children: [
       {
         path: '',
         loadComponent: () => import('./pages/home/home').then((m) => m.HomeComponent),
-        title: 'Home',
+        title: 'Dashboard',
+      },
+      {
+        path: 'settings',
+        loadComponent: () => import('./pages/settings/settings').then((m) => m.SettingsComponent),
+        title: 'Settings',
       },
     ],
   },
-
-  // Wildcard redirect
   {
     path: '**',
     redirectTo: '',
