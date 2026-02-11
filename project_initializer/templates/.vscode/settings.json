@@ -1,4 +1,5 @@
 {
+  "cSpell.enabled": false,
   "python.testing.pytestArgs": [
     "tests",
     "--no-cov",

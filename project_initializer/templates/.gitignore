@@ -205,3 +205,79 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# ===================
+# Node.js / Angular
+# ===================
+
+# Dependencies
+node_modules/
+.npm
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+tmp/
+out-tsc/
+.angular/
+
+# Cache
+.sass-cache/
+.eslintcache
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# IDE - Angular specific
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+coverage/
+.nyc_output/
+
+# Misc
+.DS_Store
+Thumbs.db
+
+# ===================
+# Project Specific
+# ===================
+
+# BAML generated client (regenerate with baml-cli generate)
+baml_client/
+
+# macOS duplicate files
+*\ 2.py
+*\ 2.ts
+*\ 2.json
+*\ 2.html
+*\ 2.css
+*\ 2.scss
+
+# Docker volumes (if mounted locally)
+postgres_data/
+
+# Local environment overrides
+.env.local
+.env.*.local
+
+# Editor directories
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db

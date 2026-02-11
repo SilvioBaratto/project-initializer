@@ -1,0 +1,16 @@
+<div>
+  <h1 class="text-xl font-semibold tracking-tight text-text">Settings</h1>
+  <p class="mt-1 text-sm text-text-secondary">Manage your application preferences.</p>
+
+  <div class="mt-8 border border-border rounded-lg divide-y divide-border">
+    @for (item of settings(); track item.label) {
+      <div class="flex items-center justify-between px-4 py-3">
+        <div>
+          <p class="text-sm font-medium text-text">{{ item.label }}</p>
+          <p class="text-xs text-text-tertiary">{{ item.description }}</p>
+        </div>
+        <span class="text-sm text-text-secondary">{{ item.value }}</span>
+      </div>
+    }
+  </div>
+</div>

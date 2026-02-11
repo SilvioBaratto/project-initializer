@@ -56,6 +56,20 @@ services:
     networks:
       - app_network
 
+  # Database Admin UI
+  adminer:
+    image: adminer:latest
+    container_name: app_adminer
+    restart: always
+    depends_on:
+      - db
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    ports:
+      - "8080:8080"
+    networks:
+      - app_network
+
 volumes:
   postgres_data:
 
