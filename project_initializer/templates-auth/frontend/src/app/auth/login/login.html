@@ -1,0 +1,40 @@
+<div class="min-h-screen bg-surface flex items-center justify-center px-4">
+  <div class="w-full max-w-sm">
+    <!-- Header -->
+    <div class="mb-8">
+      <h1 class="text-xl font-semibold tracking-tight text-text">Sign in</h1>
+      <p class="mt-1 text-sm text-text-secondary">Enter your token to continue.</p>
+    </div>
+
+    <!-- Form -->
+    <div class="border border-border rounded-lg p-6 bg-surface-raised">
+      <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4">
+        <div>
+          <label for="token" class="block text-sm font-medium text-text mb-1.5">Token</label>
+          <input id="token" type="password" formControlName="token" placeholder="Enter your token"
+            class="w-full px-3 py-2 text-sm border border-border rounded-md bg-surface-raised text-text placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-zinc-300 transition-colors"
+            [class.border-danger]="errorMessage()"
+            autocomplete="current-password">
+        </div>
+
+        @if (errorMessage()) {
+          <p class="text-sm text-danger">{{ errorMessage() }}</p>
+        }
+
+        <button type="submit" [disabled]="form.invalid || isLoading()"
+          class="w-full px-3 py-2 text-sm font-medium text-white bg-accent hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed rounded-md transition-colors">
+          @if (isLoading()) {
+            <span class="flex items-center justify-center gap-2">
+              <span class="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              Signing in...
+            </span>
+          } @else {
+            Sign in
+          }
+        </button>
+      </form>
+    </div>
+
+    <p class="mt-6 text-xs text-text-tertiary text-center">Secure authentication</p>
+  </div>
+</div>

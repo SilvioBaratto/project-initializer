@@ -56,6 +56,9 @@ class Settings(BaseSettings):
             ]
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
+    # Authentication
+    auth_token: str = Field(default="changeme")
+
     # Security (optional for production)
 
     # Rate Limiting

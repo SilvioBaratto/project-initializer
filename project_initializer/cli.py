@@ -1,7 +1,6 @@
 """CLI entry point for project-initializer."""
 
 import argparse
-import os
 import shutil
 import sys
 from pathlib import Path
@@ -14,7 +13,12 @@ def get_templates_dir() -> Path:
     return Path(__file__).parent / "templates"
 
 
-def copy_template(dest_dir: Path, project_name: str | None = None) -> None:
+def get_auth_templates_dir() -> Path:
+    """Get the path to the auth overlay templates directory."""
+    return Path(__file__).parent / "templates-auth"
+
+
+def copy_template(dest_dir: Path, project_name: str | None = None, auth: bool = False) -> None:
     """Copy template files to destination directory."""
     templates_dir = get_templates_dir()
 
@@ -61,10 +65,20 @@ def copy_template(dest_dir: Path, project_name: str | None = None) -> None:
 
     copy_tree(templates_dir, dest_dir)
 
+    if auth:
+        auth_templates_dir = get_auth_templates_dir()
+        if not auth_templates_dir.exists():
+            print(f"Error: Auth templates directory not found at {auth_templates_dir}")
+            sys.exit(1)
+        print("  Applying auth overlay...")
+        copy_tree(auth_templates_dir, dest_dir)
+
     print("-" * 40)
     print(f"Project created successfully!")
     print(f"\nNext steps:")
     print(f"  cd {dest_dir.name}")
+    if auth:
+        print(f"  # Auth is enabled — set AUTH_TOKEN in api/.env")
     print(f"  docker-compose up -d")
 
 
@@ -90,6 +104,11 @@ def main() -> None:
         action="store_true",
         help="Overwrite existing files without prompting",
     )
+    parser.add_argument(
+        "--auth",
+        action="store_true",
+        help="Include authentication scaffolding (login page, guards, auth endpoint)",
+    )
 
     args = parser.parse_args()
 
@@ -106,7 +125,7 @@ def main() -> None:
             print("Aborted.")
             sys.exit(0)
 
-    copy_template(dest_dir, args.project_name)
+    copy_template(dest_dir, args.project_name, auth=args.auth)
 
 
 if __name__ == "__main__":

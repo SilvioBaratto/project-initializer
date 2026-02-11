@@ -41,4 +41,4 @@ where = ["."]
 include = ["project_initializer*"]
 
 [tool.setuptools.package-data]
-"project_initializer" = ["templates/**/*", "templates/**/.*"]
+"project_initializer" = ["templates/**/*", "templates/**/.*", "templates-auth/**/*", "templates-auth/**/.*"]
