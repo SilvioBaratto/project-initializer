@@ -262,6 +262,9 @@ baml_client/
 *\ 2.css
 *\ 2.scss
 
+# Stale nested template copies
+frontend/project_initializer/
+
 # Docker volumes (if mounted locally)
 postgres_data/
 
