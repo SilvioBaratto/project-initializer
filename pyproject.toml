@@ -5,14 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "project-initializer"
 version = "0.1.1"
-description = "CLI tool to scaffold full-stack projects with FastAPI, Angular, and Docker"
+description = "CLI tool to scaffold full-stack projects with FastAPI or NestJS, Angular, and Docker"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
 authors = [
     {name = "Silvio Baratto"}
 ]
-keywords = ["cli", "scaffold", "fastapi", "angular", "docker", "project-generator"]
+keywords = ["cli", "scaffold", "fastapi", "nestjs", "angular", "docker", "project-generator"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
@@ -41,4 +41,11 @@ where = ["."]
 include = ["project_initializer*"]
 
 [tool.setuptools.package-data]
-"project_initializer" = ["templates/**/*", "templates/**/.*", "templates-auth/**/*", "templates-auth/**/.*"]
+"project_initializer" = [
+    "templates/**/*", "templates/**/.*",
+    "templates-api-fastapi/**/*", "templates-api-fastapi/**/.*",
+    "templates-api-nestjs/**/*", "templates-api-nestjs/**/.*",
+    "templates-auth-fastapi/**/*", "templates-auth-fastapi/**/.*",
+    "templates-auth-nestjs/**/*", "templates-auth-nestjs/**/.*",
+    "templates-auth-frontend/**/*", "templates-auth-frontend/**/.*",
+]
