@@ -181,12 +181,8 @@ cython_debug/
 # Learn more at https://abstra.io/docs
 .abstra/
 
-# Visual Studio Code
-#  Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore 
-#  that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
-#  and can be added to the global gitignore or merged into this file. However, if you prefer, 
-#  you could uncomment the following to ignore the entire vscode folder
-# .vscode/
+# Visual Studio Code (root only — template .vscode folders are tracked)
+/.vscode/
 
 # Ruff stuff:
 .ruff_cache/
@@ -251,8 +247,8 @@ Thumbs.db
 # Project Specific
 # ===================
 
-# BAML generated client (regenerate with baml-cli generate)
-baml_client/
+# BAML generated client — only ignore in scaffolded output dirs, NOT in templates
+/test-*/api/baml_client/
 
 # macOS duplicate files
 *\ 2.py
@@ -262,8 +258,15 @@ baml_client/
 *\ 2.css
 *\ 2.scss
 
-# Stale nested template copies
-frontend/project_initializer/
+# Dev sandbox outputs (scaffolded by project-initializer)
+test-fastapi/
+test-fastapi-token/
+test-fastapi-supabase/
+test-nestjs/
+test-nestjs-token/
+test-nestjs-supabase/
+test-output/
+/frontend/
 
 # Docker volumes (if mounted locally)
 postgres_data/

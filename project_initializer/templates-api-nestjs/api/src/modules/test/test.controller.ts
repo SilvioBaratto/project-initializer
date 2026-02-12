@@ -11,7 +11,8 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { TestService } from './test.service';
-import { CreateItemDto, UpdateItemDto, ItemResponseDto, EchoRequestDto, EchoResponseDto } from './dto/item.dto';
+import { CreateItemDto, UpdateItemDto, ItemResponseDto } from './dto/item.dto';
+import { EchoRequestDto, EchoResponseDto } from './dto/echo.dto';
 
 @ApiTags('Test')
 @Controller('test')

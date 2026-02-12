@@ -4,7 +4,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 interface NavItem {
   name: string;
   route: string;
-  icon: 'home' | 'settings';
+  icon: 'chat';
 }
 
 @Component({
@@ -21,8 +21,7 @@ export class SidebarComponent {
   closeSidebar = output<void>();
 
   navItems: NavItem[] = [
-    { name: 'Dashboard', route: '/', icon: 'home' },
-    { name: 'Settings', route: '/settings', icon: 'settings' },
+    { name: 'Chatbot', route: '/', icon: 'chat' },
   ];
 
   showSidebar = computed(() => !this.isMobile() || this.isOpen());

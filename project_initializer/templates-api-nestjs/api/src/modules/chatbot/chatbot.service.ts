@@ -9,11 +9,7 @@ export class ChatbotService {
     try {
       // Import BAML client dynamically
       const { b } = await import('../../../baml_client');
-      const conversationHistory = request.conversation_history
-        ? { messages: request.conversation_history }
-        : undefined;
-
-      const result = await b.Chat(request.user_question, conversationHistory);
+      const result = await b.Chat(request.user_question, request.conversation_history);
       return { answer: result.answer };
     } catch (error) {
       this.logger.error(`Chat error: ${error}`);
@@ -26,13 +22,9 @@ export class ChatbotService {
   ): AsyncGenerator<StreamChunkDto> {
     try {
       const { b } = await import('../../../baml_client');
-      const conversationHistory = request.conversation_history
-        ? { messages: request.conversation_history }
-        : undefined;
-
       const stream = b.stream.StreamChat(
         request.user_question,
-        conversationHistory,
+        request.conversation_history,
       );
 
       for await (const event of stream) {

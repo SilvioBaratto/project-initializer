@@ -2,46 +2,67 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "API (Development)",
+      "name": "API: FastAPI",
       "type": "debugpy",
       "request": "launch",
       "module": "uvicorn",
-      "cwd": "${workspaceFolder}/api",
-      "args": [
-        "app.main:app",
-        "--reload",
-        "--port",
-        "8000",
-        "--host",
-        "0.0.0.0",
-        "--log-level",
-        "debug"
-      ],
-      "python": "/Users/silviobaratto/anaconda3/envs/app/bin/python",
-      "jinja": true,
-      "envFile": "${workspaceFolder}/.env.dev",
-      "console": "integratedTerminal"
+      "args": ["app.main:app", "--reload", "--port", "8000"],
+      "cwd": "${workspaceFolder}/test-fastapi/api",
+      "python": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\python.exe",
+      "console": "integratedTerminal",
+      "preLaunchTask": "pre-launch-fastapi"
     },
     {
-      "name": "API (Production)",
+      "name": "API: FastAPI + Token Auth",
       "type": "debugpy",
       "request": "launch",
       "module": "uvicorn",
-      "cwd": "${workspaceFolder}/api",
-      "args": [
-        "app.main:app",
-        "--reload",
-        "--port",
-        "8000",
-        "--host",
-        "0.0.0.0",
-        "--log-level",
-        "info"
-      ],
-      "python": "/Users/silviobaratto/anaconda3/envs/app/bin/python",
-      "jinja": true,
-      "envFile": "${workspaceFolder}/.env.prod",
-      "console": "integratedTerminal"
+      "args": ["app.main:app", "--reload", "--port", "8000"],
+      "cwd": "${workspaceFolder}/test-fastapi-token/api",
+      "python": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\python.exe",
+      "console": "integratedTerminal",
+      "preLaunchTask": "pre-launch-fastapi-token"
+    },
+    {
+      "name": "API: FastAPI + Supabase Auth",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["app.main:app", "--reload", "--port", "8000"],
+      "cwd": "${workspaceFolder}/test-fastapi-supabase/api",
+      "python": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\python.exe",
+      "console": "integratedTerminal",
+      "preLaunchTask": "pre-launch-fastapi-supabase"
+    },
+    {
+      "name": "API: NestJS",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "start:debug"],
+      "cwd": "${workspaceFolder}/test-nestjs/api",
+      "console": "integratedTerminal",
+      "preLaunchTask": "pre-launch-nestjs"
+    },
+    {
+      "name": "API: NestJS + Token Auth",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "start:debug"],
+      "cwd": "${workspaceFolder}/test-nestjs-token/api",
+      "console": "integratedTerminal",
+      "preLaunchTask": "pre-launch-nestjs-token"
+    },
+    {
+      "name": "API: NestJS + Supabase Auth",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "start:debug"],
+      "cwd": "${workspaceFolder}/test-nestjs-supabase/api",
+      "console": "integratedTerminal",
+      "preLaunchTask": "pre-launch-nestjs-supabase"
     }
   ]
 }

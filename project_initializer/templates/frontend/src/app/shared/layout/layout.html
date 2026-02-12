@@ -19,9 +19,7 @@
   <app-sidebar [isOpen]="isSidebarOpen()" [isMobile]="isMobile()" (closeSidebar)="closeSidebar()"></app-sidebar>
 
   <!-- Main content -->
-  <main class="md:pl-64">
-    <div class="max-w-5xl mx-auto px-4 py-6 md:px-8 md:py-8">
-      <router-outlet></router-outlet>
-    </div>
+  <main class="md:pl-64 h-[calc(100vh-3.5rem)] md:h-screen flex flex-col">
+    <router-outlet></router-outlet>
   </main>
 </div>

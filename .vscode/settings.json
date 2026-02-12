@@ -1,14 +1,10 @@
 {
   "cSpell.enabled": false,
-  "python.testing.pytestArgs": [
-    "tests",
-    "--no-cov",
-    "--tb=short"
-  ],
+  "python.testing.pytestArgs": ["tests", "--no-cov", "--tb=short"],
   "python.testing.unittestEnabled": false,
   "python.testing.pytestEnabled": true,
-  "python.testing.cwd": "${workspaceFolder}/api",
-  "python.defaultInterpreterPath": "/Users/silviobaratto/anaconda3/envs/app/bin/python",
+  "python.testing.cwd": "${workspaceFolder}",
+  "python.defaultInterpreterPath": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\python.exe",
   "python.testing.autoTestDiscoverOnSaveEnabled": true,
   "python.analysis.typeCheckingMode": "standard",
   "editor.formatOnSave": true,
@@ -23,5 +19,5 @@
   },
   "[json]": {
     "editor.defaultFormatter": "vscode.json-language-features"
-  }
+  },
 }

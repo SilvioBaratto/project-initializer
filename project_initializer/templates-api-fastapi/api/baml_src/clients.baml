@@ -40,15 +40,14 @@ client<llm> CustomSonnet45 {
   }
 }
 
-client<llm> AzureOpenAIGpt5 {
+client<llm> AzureOpenAI {
   provider azure-openai
   options {
-    resource_name env.AZURE_OPENAI_RESOURCE_NAME
-    deployment_id env.AZURE_OPENAI_GPT5_DEPLOYMENT_ID
+    base_url env.AZURE_OPENAI_BASE_URL
     api_version env.AZURE_OPENAI_API_VERSION
-    api_key env.AZURE_OPENAI_KEY
+    api_key env.AZURE_OPENAI_API_KEY
     max_tokens null
-    }
+  }
 }
 
 // Main Ollama client for Briscola
@@ -70,7 +69,7 @@ client<llm> OpenaiFallback {
   provider fallback
   options {
     // This will try the clients in order until one succeeds
-    strategy [CustomGPT5, AzureOpenAIGpt5]
+    strategy [AzureOpenAI, CustomGPT5]
   }
 }
 

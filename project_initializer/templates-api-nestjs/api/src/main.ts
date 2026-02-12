@@ -1,14 +1,17 @@
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { cleanupOpenApiDoc } from 'nestjs-zod';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { PrismaClientExceptionFilter } from './common/filters/prisma-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
-import { LoggingMiddleware } from './common/middleware/logging.middleware';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Enable graceful shutdown hooks (for Prisma disconnect)
+  app.enableShutdownHooks();
 
   // Security
   app.use(helmet());
@@ -39,18 +42,12 @@ async function bootstrap() {
   // Global prefix
   app.setGlobalPrefix('api/v1');
 
-  // Global pipes
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      transformOptions: { enableImplicitConversion: true },
-    }),
+  // Global filters (ZodValidationPipe is registered in AppModule)
+  const { httpAdapter } = app.get(HttpAdapterHost);
+  app.useGlobalFilters(
+    new HttpExceptionFilter(),
+    new PrismaClientExceptionFilter(httpAdapter),
   );
-
-  // Global filters
-  app.useGlobalFilters(new HttpExceptionFilter());
 
   // Global interceptors
   app.useGlobalInterceptors(new TransformInterceptor());
@@ -63,7 +60,7 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
+  SwaggerModule.setup('docs', app, cleanupOpenApiDoc(document));
 
   // Health endpoint at root (outside /api/v1 prefix)
   const expressApp = app.getHttpAdapter().getInstance();

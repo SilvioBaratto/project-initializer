@@ -1,0 +1,31 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+generator zod {
+  provider = "prisma-zod-generator"
+  output   = "../generated/zod"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// -----------------------------------------------
+// Models
+// -----------------------------------------------
+
+/// User profile linked to Supabase auth.users via UUID
+model Profile {
+  id          String  @id @db.Uuid // matches Supabase auth.users UUID
+  displayName String  @map("display_name") @db.VarChar(255)
+  avatarUrl   String? @map("avatar_url") @db.VarChar(500)
+  bio         String? @db.Text
+  preferences Json    @default("{}")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("profiles")
+}

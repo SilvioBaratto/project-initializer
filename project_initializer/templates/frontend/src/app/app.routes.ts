@@ -7,13 +7,8 @@ export const routes: Routes = [
     children: [
       {
         path: '',
-        loadComponent: () => import('./pages/home/home').then((m) => m.HomeComponent),
-        title: 'Dashboard',
-      },
-      {
-        path: 'settings',
-        loadComponent: () => import('./pages/settings/settings').then((m) => m.SettingsComponent),
-        title: 'Settings',
+        loadComponent: () => import('./pages/chatbot/chatbot').then((m) => m.ChatbotComponent),
+        title: 'Chatbot',
       },
     ],
   },

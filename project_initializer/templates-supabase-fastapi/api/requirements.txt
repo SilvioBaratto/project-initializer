@@ -1,0 +1,33 @@
+# Core Framework
+fastapi>=0.121.0
+uvicorn>=0.38.0
+python-dotenv>=1.2.1
+
+# Database - Local PostgreSQL
+SQLAlchemy>=2.0.41
+psycopg2-binary>=2.9.11
+alembic>=1.17.1
+
+# Data Validation
+pydantic>=2.12.3
+pydantic-settings>=2.11.0
+
+# File Handling
+python-multipart>=0.0.20
+
+# Monitoring
+psutil>=7.1.3
+prometheus-client>=0.23.0
+
+# HTTP Client
+httpx>=0.28.1
+
+# Authentication - Supabase
+supabase>=2.15.0
+
+# Testing
+pytest>=8.4.2
+pytest-asyncio>=1.2.0
+
+# AI/ML
+baml-py>=0.218.0

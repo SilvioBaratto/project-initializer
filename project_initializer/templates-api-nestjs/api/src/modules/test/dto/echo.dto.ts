@@ -1,14 +1,13 @@
-import { IsString, IsNotEmpty } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
 
-export class EchoRequestDto {
-  @ApiProperty({ description: 'Message to echo' })
-  @IsString()
-  @IsNotEmpty()
-  message: string;
-}
+export const EchoRequestSchema = z.object({
+  message: z.string().min(1, 'Message is required'),
+});
 
-export class EchoResponseDto {
-  @ApiProperty({ description: 'Echoed message' })
-  message: string;
-}
+export const EchoResponseSchema = z.object({
+  message: z.string(),
+});
+
+export class EchoRequestDto extends createZodDto(EchoRequestSchema) {}
+export class EchoResponseDto extends createZodDto(EchoResponseSchema) {}

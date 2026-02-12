@@ -1,43 +1,21 @@
-import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
 
-export class CreateItemDto {
-  @ApiProperty({ description: 'Item name' })
-  @IsString()
-  @IsNotEmpty()
-  name: string;
+export const CreateItemSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  description: z.string().optional(),
+});
 
-  @ApiPropertyOptional({ description: 'Item description' })
-  @IsString()
-  @IsOptional()
-  description?: string;
-}
+export const UpdateItemSchema = CreateItemSchema.partial();
 
-export class UpdateItemDto {
-  @ApiPropertyOptional({ description: 'Item name' })
-  @IsString()
-  @IsOptional()
-  name?: string;
+export const ItemResponseSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  description: z.string().optional(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
 
-  @ApiPropertyOptional({ description: 'Item description' })
-  @IsString()
-  @IsOptional()
-  description?: string;
-}
-
-export class ItemResponseDto {
-  @ApiProperty()
-  id: string;
-
-  @ApiProperty()
-  name: string;
-
-  @ApiPropertyOptional()
-  description?: string;
-
-  @ApiProperty()
-  created_at: string;
-
-  @ApiProperty()
-  updated_at: string;
-}
+export class CreateItemDto extends createZodDto(CreateItemSchema) {}
+export class UpdateItemDto extends createZodDto(UpdateItemSchema) {}
+export class ItemResponseDto extends createZodDto(ItemResponseSchema) {}

@@ -1,31 +1,20 @@
-import { IsString, IsNotEmpty, IsOptional, IsArray } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
 
-export class ChatRequestDto {
-  @ApiProperty({ description: 'User question' })
-  @IsString()
-  @IsNotEmpty()
-  user_question: string;
+export const ChatRequestSchema = z.object({
+  user_question: z.string().min(1, 'Question is required'),
+  conversation_history: z.object({ messages: z.array(z.string()) }).optional(),
+});
 
-  @ApiPropertyOptional({
-    description: 'Conversation history as list of messages',
-    type: [String],
-  })
-  @IsArray()
-  @IsString({ each: true })
-  @IsOptional()
-  conversation_history?: string[];
-}
+export const ChatResponseSchema = z.object({
+  answer: z.string(),
+});
 
-export class ChatResponseDto {
-  @ApiProperty({ description: 'Chatbot answer' })
-  answer: string;
-}
+export const StreamChunkSchema = z.object({
+  content: z.string(),
+  done: z.boolean(),
+});
 
-export class StreamChunkDto {
-  @ApiProperty({ description: 'Content chunk' })
-  content: string;
-
-  @ApiProperty({ description: 'Whether the stream is done' })
-  done: boolean;
-}
+export class ChatRequestDto extends createZodDto(ChatRequestSchema) {}
+export class ChatResponseDto extends createZodDto(ChatResponseSchema) {}
+export class StreamChunkDto extends createZodDto(StreamChunkSchema) {}

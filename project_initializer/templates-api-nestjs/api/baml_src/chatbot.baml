@@ -13,7 +13,7 @@ function Chat(
   user_question: string,
   conversation_history: ConversationHistory?
 ) -> ChatResponse {
-  client CustomSonnet45
+  client AzureOpenAI
 
   prompt #"
     {{ _.role("system") }}
@@ -38,7 +38,7 @@ function StreamChat(
   user_question: string,
   conversation_history: ConversationHistory?
 ) -> ChatResponse {
-  client CustomSonnet45
+  client AzureOpenAI
 
   prompt #"
     {{ _.role("system") }}

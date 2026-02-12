@@ -6,38 +6,37 @@ import sys
 from pathlib import Path
 
 from . import __version__
+from .env_generator import generate_env, parse_env
 
 FRAMEWORKS = ("fastapi", "nestjs")
+AUTH_MODES = ("token", "supabase")
+
+TEMPLATES_ROOT = Path(__file__).parent
 
 
 def get_templates_dir() -> Path:
-    """Get the path to the shared base templates directory."""
-    return Path(__file__).parent / "templates"
+    return TEMPLATES_ROOT / "templates"
 
 
 def get_api_templates_dir(framework: str) -> Path:
-    """Get the path to the framework-specific API templates directory."""
-    return Path(__file__).parent / f"templates-api-{framework}"
+    return TEMPLATES_ROOT / f"templates-api-{framework}"
 
 
-def get_auth_api_templates_dir(framework: str) -> Path:
-    """Get the path to the framework-specific auth API overlay directory."""
-    return Path(__file__).parent / f"templates-auth-{framework}"
+def get_auth_overlay_dir(auth_mode: str, framework: str) -> Path:
+    return TEMPLATES_ROOT / f"templates-{auth_mode}-{framework}"
 
 
-def get_auth_frontend_templates_dir() -> Path:
-    """Get the path to the shared frontend auth overlay directory."""
-    return Path(__file__).parent / "templates-auth-frontend"
+def get_auth_frontend_overlay_dir(auth_mode: str) -> Path:
+    return TEMPLATES_ROOT / f"templates-{auth_mode}-frontend"
 
 
 def copy_template(
     dest_dir: Path,
     project_name: str | None = None,
-    auth: bool = False,
+    auth: str | None = None,
     framework: str = "fastapi",
 ) -> None:
     """Copy template files to destination directory."""
-    # Files and directories to skip
     skip_patterns = {
         "__pycache__",
         ".pyc",
@@ -71,46 +70,53 @@ def copy_template(
                 shutil.copy2(item, dest_item)
                 print(f"  Created: {dest_item.relative_to(dest_dir)}")
 
+    def require_dir(path: Path) -> None:
+        if not path.exists():
+            print(f"Error: Templates directory not found at {path}")
+            sys.exit(1)
+
+    auth_label = f" + {auth} auth" if auth else ""
     print(f"Creating project in: {dest_dir}")
-    print(f"Framework: {framework}")
+    print(f"Framework: {framework}{auth_label}")
     print("-" * 40)
 
     # Layer 1: Shared base (frontend, root configs)
     templates_dir = get_templates_dir()
-    if not templates_dir.exists():
-        print(f"Error: Templates directory not found at {templates_dir}")
-        sys.exit(1)
+    require_dir(templates_dir)
     copy_tree(templates_dir, dest_dir)
 
     # Layer 2: Framework-specific API + docker-compose + nginx.conf
     api_templates_dir = get_api_templates_dir(framework)
-    if not api_templates_dir.exists():
-        print(f"Error: API templates directory not found at {api_templates_dir}")
-        sys.exit(1)
+    require_dir(api_templates_dir)
     copy_tree(api_templates_dir, dest_dir)
 
-    # Layer 3: Auth overlays (if requested)
+    # Layer 3: Auth overlay (token or supabase)
     if auth:
-        auth_api_dir = get_auth_api_templates_dir(framework)
-        if not auth_api_dir.exists():
-            print(f"Error: Auth API templates not found at {auth_api_dir}")
-            sys.exit(1)
-        print("  Applying auth API overlay...")
+        auth_api_dir = get_auth_overlay_dir(auth, framework)
+        require_dir(auth_api_dir)
+        print(f"  Applying {auth} auth API overlay...")
         copy_tree(auth_api_dir, dest_dir)
 
-        auth_frontend_dir = get_auth_frontend_templates_dir()
-        if not auth_frontend_dir.exists():
-            print(f"Error: Auth frontend templates not found at {auth_frontend_dir}")
-            sys.exit(1)
-        print("  Applying auth frontend overlay...")
+        auth_frontend_dir = get_auth_frontend_overlay_dir(auth)
+        require_dir(auth_frontend_dir)
+        print(f"  Applying {auth} auth frontend overlay...")
         copy_tree(auth_frontend_dir, dest_dir)
+
+    # Generate .env for the API
+    env_example_path = TEMPLATES_ROOT / "env_defaults.env"
+    source = parse_env(env_example_path) if env_example_path.exists() else {}
+    env_content = generate_env(framework, auth, source, use_placeholders=True)
+    api_env_path = dest_dir / "api" / ".env"
+    api_env_path.write_text(env_content, encoding="utf-8")
+    print(f"  Created: {api_env_path.relative_to(dest_dir)}")
 
     print("-" * 40)
     print("Project created successfully!")
     print(f"\nNext steps:")
     print(f"  cd {dest_dir.name}")
-    if auth:
-        print("  # Auth is enabled — set AUTH_TOKEN in api/.env")
+    print("  # Edit api/.env with your real keys")
+    if auth == "supabase":
+        print("  # Configure SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in api/.env")
     print("  docker-compose up -d")
     if framework == "nestjs":
         print("\n  # NestJS API development:")
@@ -144,8 +150,11 @@ def main() -> None:
     )
     parser.add_argument(
         "--auth",
-        action="store_true",
-        help="Include authentication scaffolding (login page, guards, auth endpoint)",
+        nargs="?",
+        const="token",
+        default=None,
+        choices=AUTH_MODES,
+        help="Auth mode: 'token' (simple token, default) or 'supabase'",
     )
 
     framework_group = parser.add_mutually_exclusive_group()
