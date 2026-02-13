@@ -182,7 +182,9 @@ cython_debug/
 .abstra/
 
 # Visual Studio Code (root only — template .vscode folders are tracked)
-/.vscode/
+# tasks.json is tracked for shared launch/scaffold tasks
+/.vscode/*
+!/.vscode/tasks.json
 
 # Ruff stuff:
 .ruff_cache/

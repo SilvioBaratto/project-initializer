@@ -1,0 +1,221 @@
+{
+  "version": "2.0.0",
+  "options": {
+    "env": {
+      "CONDA_DEFAULT_ENV": "app"
+    }
+  },
+  "tasks": [
+    {
+      "label": "scaffold-fastapi",
+      "type": "process",
+      "command": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\python.exe",
+      "args": ["-c", "import os,sys,subprocess;sys.exit(0) if os.path.isdir('test-fastapi/api') else subprocess.run([sys.executable,'-m','project_initializer.cli','test-fastapi','--fastapi','--force'],check=True)"],
+      "presentation": { "reveal": "silent", "close": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "generate-env-fastapi",
+      "type": "process",
+      "command": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\python.exe",
+      "args": ["-m", "project_initializer.env_generator", "fastapi", "--dest", "test-fastapi/api/.env"],
+      "presentation": { "reveal": "silent", "close": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "baml-generate-fastapi",
+      "type": "process",
+      "command": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\Scripts\\baml-cli.exe",
+      "args": ["generate"],
+      "options": { "cwd": "${workspaceFolder}/test-fastapi/api" },
+      "presentation": { "reveal": "silent", "close": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "pre-launch-fastapi",
+      "dependsOn": ["scaffold-fastapi", "generate-env-fastapi", "baml-generate-fastapi"],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "scaffold-fastapi-token",
+      "type": "process",
+      "command": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\python.exe",
+      "args": ["-c", "import os,sys,subprocess;sys.exit(0) if os.path.isdir('test-fastapi-token/api') else subprocess.run([sys.executable,'-m','project_initializer.cli','test-fastapi-token','--fastapi','--auth','token','--force'],check=True)"],
+      "presentation": { "reveal": "silent", "close": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "generate-env-fastapi-token",
+      "type": "process",
+      "command": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\python.exe",
+      "args": ["-m", "project_initializer.env_generator", "fastapi", "--auth", "token", "--dest", "test-fastapi-token/api/.env"],
+      "presentation": { "reveal": "silent", "close": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "baml-generate-fastapi-token",
+      "type": "process",
+      "command": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\Scripts\\baml-cli.exe",
+      "args": ["generate"],
+      "options": { "cwd": "${workspaceFolder}/test-fastapi-token/api" },
+      "presentation": { "reveal": "silent", "close": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "pre-launch-fastapi-token",
+      "dependsOn": ["scaffold-fastapi-token", "generate-env-fastapi-token", "baml-generate-fastapi-token"],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "scaffold-fastapi-supabase",
+      "type": "process",
+      "command": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\python.exe",
+      "args": ["-c", "import os,sys,subprocess;sys.exit(0) if os.path.isdir('test-fastapi-supabase/api') else subprocess.run([sys.executable,'-m','project_initializer.cli','test-fastapi-supabase','--fastapi','--auth','supabase','--force'],check=True)"],
+      "presentation": { "reveal": "silent", "close": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "generate-env-fastapi-supabase",
+      "type": "process",
+      "command": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\python.exe",
+      "args": ["-m", "project_initializer.env_generator", "fastapi", "--auth", "supabase", "--dest", "test-fastapi-supabase/api/.env"],
+      "presentation": { "reveal": "silent", "close": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "baml-generate-fastapi-supabase",
+      "type": "process",
+      "command": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\Scripts\\baml-cli.exe",
+      "args": ["generate"],
+      "options": { "cwd": "${workspaceFolder}/test-fastapi-supabase/api" },
+      "presentation": { "reveal": "silent", "close": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "pre-launch-fastapi-supabase",
+      "dependsOn": ["scaffold-fastapi-supabase", "generate-env-fastapi-supabase", "baml-generate-fastapi-supabase"],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "scaffold-nestjs",
+      "type": "process",
+      "command": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\python.exe",
+      "args": ["-c", "import os,sys,subprocess;sys.exit(0) if os.path.isdir('test-nestjs/api') else subprocess.run([sys.executable,'-m','project_initializer.cli','test-nestjs','--nestjs','--force'],check=True)"],
+      "presentation": { "reveal": "silent", "close": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "npm-install-nestjs-api",
+      "type": "process",
+      "command": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\python.exe",
+      "args": ["-c", "import os,sys,subprocess;sys.exit(0) if os.path.isdir('test-nestjs/api/node_modules') else subprocess.run(['npm','install'],cwd='test-nestjs/api',shell=True,check=True)"],
+      "presentation": { "reveal": "silent", "close": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "generate-env-nestjs",
+      "type": "process",
+      "command": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\python.exe",
+      "args": ["-m", "project_initializer.env_generator", "nestjs", "--dest", "test-nestjs/api/.env"],
+      "presentation": { "reveal": "silent", "close": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "baml-generate-nestjs",
+      "type": "process",
+      "command": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\Scripts\\baml-cli.exe",
+      "args": ["generate"],
+      "options": { "cwd": "${workspaceFolder}/test-nestjs/api" },
+      "presentation": { "reveal": "silent", "close": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "pre-launch-nestjs",
+      "dependsOn": ["scaffold-nestjs", "generate-env-nestjs", "npm-install-nestjs-api", "baml-generate-nestjs"],
+      "detail": "generate-env before npm-install so Prisma has valid DATABASE_URL",
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "scaffold-nestjs-token",
+      "type": "process",
+      "command": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\python.exe",
+      "args": ["-c", "import os,sys,subprocess;sys.exit(0) if os.path.isdir('test-nestjs-token/api') else subprocess.run([sys.executable,'-m','project_initializer.cli','test-nestjs-token','--nestjs','--auth','token','--force'],check=True)"],
+      "presentation": { "reveal": "silent", "close": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "npm-install-nestjs-token-api",
+      "type": "process",
+      "command": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\python.exe",
+      "args": ["-c", "import os,sys,subprocess;sys.exit(0) if os.path.isdir('test-nestjs-token/api/node_modules') else subprocess.run(['npm','install'],cwd='test-nestjs-token/api',shell=True,check=True)"],
+      "presentation": { "reveal": "silent", "close": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "generate-env-nestjs-token",
+      "type": "process",
+      "command": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\python.exe",
+      "args": ["-m", "project_initializer.env_generator", "nestjs", "--auth", "token", "--dest", "test-nestjs-token/api/.env"],
+      "presentation": { "reveal": "silent", "close": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "baml-generate-nestjs-token",
+      "type": "process",
+      "command": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\Scripts\\baml-cli.exe",
+      "args": ["generate"],
+      "options": { "cwd": "${workspaceFolder}/test-nestjs-token/api" },
+      "presentation": { "reveal": "silent", "close": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "pre-launch-nestjs-token",
+      "dependsOn": ["scaffold-nestjs-token", "generate-env-nestjs-token", "npm-install-nestjs-token-api", "baml-generate-nestjs-token"],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "scaffold-nestjs-supabase",
+      "type": "process",
+      "command": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\python.exe",
+      "args": ["-c", "import os,sys,subprocess;sys.exit(0) if os.path.isdir('test-nestjs-supabase/api') else subprocess.run([sys.executable,'-m','project_initializer.cli','test-nestjs-supabase','--nestjs','--auth','supabase','--force'],check=True)"],
+      "presentation": { "reveal": "silent", "close": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "npm-install-nestjs-supabase-api",
+      "type": "process",
+      "command": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\python.exe",
+      "args": ["-c", "import os,sys,subprocess;sys.exit(0) if os.path.isdir('test-nestjs-supabase/api/node_modules') else subprocess.run(['npm','install'],cwd='test-nestjs-supabase/api',shell=True,check=True)"],
+      "presentation": { "reveal": "silent", "close": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "generate-env-nestjs-supabase",
+      "type": "process",
+      "command": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\python.exe",
+      "args": ["-m", "project_initializer.env_generator", "nestjs", "--auth", "supabase", "--dest", "test-nestjs-supabase/api/.env"],
+      "presentation": { "reveal": "silent", "close": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "baml-generate-nestjs-supabase",
+      "type": "process",
+      "command": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\Scripts\\baml-cli.exe",
+      "args": ["generate"],
+      "options": { "cwd": "${workspaceFolder}/test-nestjs-supabase/api" },
+      "presentation": { "reveal": "silent", "close": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "pre-launch-nestjs-supabase",
+      "dependsOn": ["scaffold-nestjs-supabase", "generate-env-nestjs-supabase", "npm-install-nestjs-supabase-api", "baml-generate-nestjs-supabase"],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    }
+  ]
+}
