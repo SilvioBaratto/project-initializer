@@ -25,8 +25,9 @@ WORKDIR /app
 RUN addgroup -g 1001 -S appgroup && \
     adduser -S appuser -u 1001 -G appgroup
 
-# Copy package files and install production dependencies only
+# Copy package files and Prisma schema (needed by postinstall)
 COPY package.json package-lock.json* ./
+COPY --from=builder /app/prisma ./prisma
 RUN npm ci --omit=dev
 
 # Copy built application from builder
