@@ -185,6 +185,9 @@ cython_debug/
 # tasks.json is tracked for shared launch/scaffold tasks
 /.vscode/*
 !/.vscode/tasks.json
+!/.vscode/launch.json
+!/.vscode/settings.json
+!/.vscode/extensions.json
 
 # Ruff stuff:
 .ruff_cache/

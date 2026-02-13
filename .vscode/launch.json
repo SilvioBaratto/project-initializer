@@ -8,7 +8,6 @@
       "module": "uvicorn",
       "args": ["app.main:app", "--reload", "--port", "8000"],
       "cwd": "${workspaceFolder}/test-fastapi/api",
-      "python": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\python.exe",
       "console": "integratedTerminal",
       "preLaunchTask": "pre-launch-fastapi"
     },
@@ -19,7 +18,6 @@
       "module": "uvicorn",
       "args": ["app.main:app", "--reload", "--port", "8000"],
       "cwd": "${workspaceFolder}/test-fastapi-token/api",
-      "python": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\python.exe",
       "console": "integratedTerminal",
       "preLaunchTask": "pre-launch-fastapi-token"
     },
@@ -30,7 +28,6 @@
       "module": "uvicorn",
       "args": ["app.main:app", "--reload", "--port", "8000"],
       "cwd": "${workspaceFolder}/test-fastapi-supabase/api",
-      "python": "C:\\Users\\CM495AE\\AppData\\Local\\miniconda3\\envs\\app\\python.exe",
       "console": "integratedTerminal",
       "preLaunchTask": "pre-launch-fastapi-supabase"
     },

@@ -1,5 +1,22 @@
 recursive-include project_initializer/templates *
 recursive-include project_initializer/templates .*
+recursive-include project_initializer/templates-api-fastapi *
+recursive-include project_initializer/templates-api-fastapi .*
+recursive-include project_initializer/templates-api-nestjs *
+recursive-include project_initializer/templates-api-nestjs .*
+recursive-include project_initializer/templates-token-fastapi *
+recursive-include project_initializer/templates-token-fastapi .*
+recursive-include project_initializer/templates-token-nestjs *
+recursive-include project_initializer/templates-token-nestjs .*
+recursive-include project_initializer/templates-supabase-fastapi *
+recursive-include project_initializer/templates-supabase-fastapi .*
+recursive-include project_initializer/templates-supabase-nestjs *
+recursive-include project_initializer/templates-supabase-nestjs .*
+recursive-include project_initializer/templates-token-frontend *
+recursive-include project_initializer/templates-token-frontend .*
+recursive-include project_initializer/templates-supabase-frontend *
+recursive-include project_initializer/templates-supabase-frontend .*
+include project_initializer/py.typed
 include project_initializer/templates/.gitignore
 include project_initializer/templates/.env.example
 include project_initializer/templates/api/.env.example
