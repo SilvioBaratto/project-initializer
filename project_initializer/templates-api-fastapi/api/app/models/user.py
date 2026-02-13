@@ -52,7 +52,6 @@ class User(Base):
 
     # Table constraints and indexes
     __table_args__ = (
-        Index("idx_users_email", "email"),
         Index("idx_users_username", "username"),
         Index("idx_users_is_active", "is_active"),
     )

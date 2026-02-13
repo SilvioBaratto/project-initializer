@@ -19,8 +19,8 @@ Create a generic base repository for common CRUD operations:
 ```python
 # repositories/base.py
 from typing import Generic, TypeVar, Optional, Sequence, Any
-from sqlalchemy import select, update, delete, func
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
+from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.models.base import Base
@@ -43,24 +43,24 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     - count(): Count total records
     \"\"\"
 
-    def __init__(self, model: type[ModelType], session: AsyncSession):
+    def __init__(self, model: type[ModelType], session: Session):
         self.model = model
         self.session = session
 
-    async def get(self, id: Any) -> Optional[ModelType]:
+    def get(self, id: Any) -> Optional[ModelType]:
         \"\"\"Get a single record by ID.\"\"\"
         stmt = select(self.model).where(self.model.id == id)
-        result = await self.session.execute(stmt)
+        result = self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_by_field(self, field: str, value: Any) -> Optional[ModelType]:
+    def get_by_field(self, field: str, value: Any) -> Optional[ModelType]:
         \"\"\"Get a single record by any field.\"\"\"
         column = getattr(self.model, field)
         stmt = select(self.model).where(column == value)
-        result = await self.session.execute(stmt)
+        result = self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_multi(
+    def get_multi(
         self,
         skip: int = 0,
         limit: int = 100,
@@ -71,25 +71,25 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         column = getattr(self.model, order_by)
         order = column.desc() if desc else column.asc()
         stmt = select(self.model).order_by(order).offset(skip).limit(limit)
-        result = await self.session.execute(stmt)
+        result = self.session.execute(stmt)
         return result.scalars().all()
 
-    async def create(self, obj_in: CreateSchemaType) -> ModelType:
+    def create(self, obj_in: CreateSchemaType) -> ModelType:
         \"\"\"Create a new record.\"\"\"
         obj_data = obj_in.model_dump()
         db_obj = self.model(**obj_data)
         self.session.add(db_obj)
-        await self.session.flush()
-        await self.session.refresh(db_obj)
+        self.session.flush()
+        self.session.refresh(db_obj)
         return db_obj
 
-    async def update(
+    def update(
         self,
         id: Any,
         obj_in: UpdateSchemaType
     ) -> Optional[ModelType]:
         \"\"\"Update an existing record.\"\"\"
-        db_obj = await self.get(id)
+        db_obj = self.get(id)
         if not db_obj:
             return None
 
@@ -97,23 +97,23 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         for field, value in update_data.items():
             setattr(db_obj, field, value)
 
-        await self.session.flush()
-        await self.session.refresh(db_obj)
+        self.session.flush()
+        self.session.refresh(db_obj)
         return db_obj
 
-    async def delete(self, id: Any) -> bool:
+    def delete(self, id: Any) -> bool:
         \"\"\"Delete a record by ID.\"\"\"
-        db_obj = await self.get(id)
+        db_obj = self.get(id)
         if not db_obj:
             return False
-        await self.session.delete(db_obj)
-        await self.session.flush()
+        self.session.delete(db_obj)
+        self.session.flush()
         return True
 
-    async def count(self) -> int:
+    def count(self) -> int:
         \"\"\"Count total records.\"\"\"
         stmt = select(func.count()).select_from(self.model)
-        result = await self.session.execute(stmt)
+        result = self.session.execute(stmt)
         return result.scalar_one()
 ```
 
@@ -125,8 +125,7 @@ Extend base repository for entity-specific operations:
 # repositories/user_repository.py
 from typing import Optional, Sequence
 from sqlalchemy import select, or_
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.user import User
 from app.schemas.user import UserCreate, UserUpdate
@@ -136,26 +135,26 @@ from app.repositories.base import BaseRepository
 class UserRepository(BaseRepository[User, UserCreate, UserUpdate]):
     \"\"\"Repository for User-specific database operations.\"\"\"
 
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: Session):
         super().__init__(User, session)
 
-    async def get_by_email(self, email: str) -> Optional[User]:
+    def get_by_email(self, email: str) -> Optional[User]:
         \"\"\"Get user by email address.\"\"\"
         stmt = select(User).where(User.email == email)
-        result = await self.session.execute(stmt)
+        result = self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_with_items(self, user_id: str) -> Optional[User]:
+    def get_with_items(self, user_id: str) -> Optional[User]:
         \"\"\"Get user with eagerly loaded items.\"\"\"
         stmt = (
             select(User)
             .where(User.id == user_id)
             .options(selectinload(User.items))
         )
-        result = await self.session.execute(stmt)
+        result = self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def search(
+    def search(
         self,
         query: str,
         skip: int = 0,
@@ -174,13 +173,13 @@ class UserRepository(BaseRepository[User, UserCreate, UserUpdate]):
             .offset(skip)
             .limit(limit)
         )
-        result = await self.session.execute(stmt)
+        result = self.session.execute(stmt)
         return result.scalars().all()
 
-    async def get_active_users(self) -> Sequence[User]:
+    def get_active_users(self) -> Sequence[User]:
         \"\"\"Get all active users.\"\"\"
         stmt = select(User).where(User.is_active == True)
-        result = await self.session.execute(stmt)
+        result = self.session.execute(stmt)
         return result.scalars().all()
 ```
 
@@ -189,18 +188,18 @@ Using Repositories in Services
 ```python
 # services/user_service.py
 class UserService:
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: Session):
         self.repository = UserRepository(session)
 
-    async def get_user(self, user_id: str) -> Optional[User]:
-        return await self.repository.get(user_id)
+    def get_user(self, user_id: str) -> Optional[User]:
+        return self.repository.get(user_id)
 ```
 
 Best Practices
 --------------
 1. **Single Responsibility**: One repository per entity/aggregate
 2. **Generic Base**: Use generics for type-safe CRUD operations
-3. **Async Operations**: Use async/await for all database operations
+3. **Synchronous Operations**: Use synchronous SQLAlchemy with psycopg2
 4. **Session Injection**: Inject session via constructor, don't create it
 5. **Flush vs Commit**: Use flush() in repos, commit() in service/route layer
 6. **Eager Loading**: Use selectinload/joinedload for relationships

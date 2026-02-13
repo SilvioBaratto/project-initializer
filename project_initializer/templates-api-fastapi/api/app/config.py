@@ -2,7 +2,7 @@
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
-from typing import List, Optional
+from typing import List
 
 
 class Settings(BaseSettings):
@@ -38,7 +38,6 @@ class Settings(BaseSettings):
     database_pool_reset_on_return: str = Field(default="rollback")
     cache_ttl_default: int = Field(default=300)
     cache_ttl_users: int = Field(default=600)
-    cache_ttl_leagues: int = Field(default=1800)
 
     # CORS
     cors_origins: str = Field(

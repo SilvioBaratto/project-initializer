@@ -1,162 +1,108 @@
-"""Global dependencies for the application"""
+"""Global dependencies for the application — token-based authentication"""
 
+import secrets
 import time
-from typing import Optional, Annotated, Any
-from fastapi import Depends, Header, Request
-from sqlalchemy.orm import Session
 import logging
+from typing import Optional, Annotated, Any
+
+from fastapi import Depends, Header, HTTPException, Request, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.orm import Session
+
+from app.config import settings
+from app.database import get_db
 
 logger = logging.getLogger(__name__)
 
-# Database session dependencies - imported from database module
-from app.database import get_db
+# Warn on insecure token at import time
+if settings.auth_token == "changeme" or len(settings.auth_token) < 16:
+    logger.warning(
+        "AUTH_TOKEN is insecure (default or too short). "
+        "Set a strong AUTH_TOKEN (>= 16 chars) before deploying."
+    )
+
+# Bearer token scheme
+_bearer_scheme = HTTPBearer(auto_error=False)
 
 
-# ===========================
-# Simple User Authentication
-# ===========================
-# Cache for default user to avoid repeated database queries
-_DEFAULT_USER_CACHE: Optional[dict] = None
-
-
-def get_default_user_from_db(db: Session) -> dict:
-    """
-    Get the first available user from the database as the default user.
-
-    Args:
-        db: Database session
-
-    Returns:
-        User data dictionary
-    """
-    global _DEFAULT_USER_CACHE
-
-    # Return cached user if available
-    if _DEFAULT_USER_CACHE is not None:
-        return _DEFAULT_USER_CACHE.copy()
-
-    # Query for the first user in the database
-    from app.models import User
-    from sqlalchemy import select
-
-    stmt = select(User).limit(1)
-    result = db.execute(stmt)
-    user = result.scalar_one_or_none()
-
-    if user is None:
-        # If no users exist, create a default one
-        logger.warning("No users found in database, creating default user")
-        import uuid
-        user_id = str(uuid.uuid4())
-        default_user = User(
-            id=user_id,
-            email="admin@app.local"
+def _validate_token(credentials: Optional[HTTPAuthorizationCredentials]) -> None:
+    """Validate Bearer token against configured AUTH_TOKEN."""
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing authorization header",
+            headers={"WWW-Authenticate": "Bearer"},
         )
-        db.add(default_user)
-        db.commit()
-        db.refresh(default_user)
-        user = default_user
+    if not secrets.compare_digest(credentials.credentials, settings.auth_token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
-    # Cache the user
-    _DEFAULT_USER_CACHE = {
-        "id": user.id,
-        "email": user.email,
-        "username": user.email.split("@")[0],
-        "is_active": True
-    }
 
-    logger.debug(f"Using default user from database: {user.email} ({user.id})")
-    return _DEFAULT_USER_CACHE.copy()
+# ===========================
+# User Authentication
+# ===========================
 
 
 def get_current_user(
-    x_user_id: Annotated[Optional[str], Header()] = None,
-    db: Session = Depends(get_db)
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
 ) -> dict:
     """
-    Get current user - simplified for local development.
+    Validate Bearer token and return a user context dict.
 
-    Args:
-        x_user_id: Optional user ID from X-User-Id header
-        db: Database session
-
-    Returns:
-        User data dictionary (defaults to first user in database)
+    Returns a minimal user dict. Extend this to look up a real user
+    from the database if needed.
     """
-    # If user ID is provided in header, use it
-    if x_user_id:
-        logger.debug(f"Using user ID from header: {x_user_id}")
-        return {
-            "id": x_user_id,
-            "email": f"user_{x_user_id}@app.local",
-            "username": f"user_{x_user_id}",
-            "is_active": True
-        }
-
-    # Otherwise get default user from database
-    return get_default_user_from_db(db)
+    _validate_token(credentials)
+    return {
+        "id": "token-user",
+        "email": "token-user@app.local",
+        "username": "token-user",
+        "is_active": True,
+        "auth_method": "bearer_token",
+    }
 
 
 def get_optional_user(
-    x_user_id: Annotated[Optional[str], Header()] = None,
-    db: Session = Depends(get_db)
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
 ) -> Optional[dict]:
     """
-    Get optional user (returns None if no user context).
-
-    Args:
-        x_user_id: Optional user ID from X-User-Id header
-        db: Database session
-
-    Returns:
-        User data if provided, None otherwise
+    Return user context if a valid Bearer token is present, None otherwise.
     """
-    if x_user_id:
-        return get_current_user(x_user_id=x_user_id, db=db)
-    return None
-
-
-def require_user(
-    current_user: dict = Depends(get_current_user)
-) -> dict:
-    """
-    Require authenticated user (alias for get_current_user).
-
-    Args:
-        current_user: Current user from get_current_user
-
-    Returns:
-        User data dictionary
-    """
-    return current_user
+    if credentials is None:
+        return None
+    try:
+        _validate_token(credentials)
+        return {
+            "id": "token-user",
+            "email": "token-user@app.local",
+            "username": "token-user",
+            "is_active": True,
+            "auth_method": "bearer_token",
+        }
+    except HTTPException:
+        return None
 
 
 def get_user_id(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ) -> str:
-    """
-    Get current user's ID.
-
-    Args:
-        current_user: Current user from get_current_user
-
-    Returns:
-        User ID as string
-    """
+    """Get current user's ID."""
     return str(current_user["id"])
 
 
 # Type aliases for dependency injection
 CurrentUser = Annotated[dict, Depends(get_current_user)]
 OptionalUser = Annotated[Optional[dict], Depends(get_optional_user)]
-RequireAuth = Depends(require_user)
 UserId = Annotated[str, Depends(get_user_id)]
-AdminUser = Annotated[dict, Depends(get_current_user)]  # No admin distinction in simple mode
+DBSession = Annotated[Session, Depends(get_db)]
 
 
 class RateLimiter:
     """
-    In-memory rate limiting dependency for local development
+    In-memory rate limiting dependency
 
     Features:
     - Sliding window rate limiting
@@ -168,15 +114,13 @@ class RateLimiter:
         self.requests = requests
         self.window = window
         self.per_user = per_user
-        self._in_memory_cache = {}
+        self._in_memory_cache: dict[str, list[float]] = {}
 
     def __call__(self, request: Request, current_user: Optional[dict] = None):
         """Check rate limit for the request"""
         return self._check_memory_rate_limit(request, current_user)
 
     def _check_memory_rate_limit(self, request: Request, current_user: Optional[dict] = None) -> bool:
-        """In-memory rate limiting"""
-        # Determine rate limit key
         if self.per_user and current_user:
             key = f"user:{current_user['id']}"
         else:
@@ -185,30 +129,24 @@ class RateLimiter:
         current_time = time.time()
         window_start = current_time - self.window
 
-        # Clean old entries and check current count
         if key not in self._in_memory_cache:
             self._in_memory_cache[key] = []
 
-        # Remove old entries
         self._in_memory_cache[key] = [
             timestamp for timestamp in self._in_memory_cache[key]
             if timestamp > window_start
         ]
 
-        # Check rate limit
         if len(self._in_memory_cache[key]) >= self.requests:
             from app.exceptions import RateLimitError
             raise RateLimitError(
                 message=f"Rate limit exceeded: {len(self._in_memory_cache[key])}/{self.requests} requests per {self.window}s"
             )
 
-        # Add current request
         self._in_memory_cache[key].append(current_time)
         return True
 
     def _get_client_ip(self, request: Request) -> str:
-        """Extract client IP from request headers"""
-        # Check for forwarded headers (load balancer, proxy)
         forwarded_for = request.headers.get("X-Forwarded-For")
         if forwarded_for:
             return forwarded_for.split(",")[0].strip()
@@ -217,7 +155,6 @@ class RateLimiter:
         if real_ip:
             return real_ip
 
-        # Fallback to direct client IP
         return request.client.host if request.client else "unknown"
 
 
@@ -226,21 +163,11 @@ def get_rate_limiter(requests: int = 100, window: int = 60) -> RateLimiter:
     return RateLimiter(requests=requests, window=window)
 
 
-# Common dependency injections
-DBSession = Annotated[Session, Depends(get_db)]
-# CurrentUser, OptionalUser, RequireAuth imported from auth module above
-
-
 class PaginationParams:
     """
-    Advanced pagination parameters with cursor support for better performance
-    
-    Features:
-    - Traditional offset/limit pagination
-    - Cursor-based pagination for large datasets (17x faster performance)
-    - Configurable limits with safety bounds
+    Advanced pagination parameters with cursor support
     """
-    
+
     def __init__(
         self,
         skip: int = 0,
@@ -251,29 +178,26 @@ class PaginationParams:
         use_cursor: bool = False
     ):
         self.skip = max(0, skip)
-        self.limit = min(max(1, limit), 1000)  # Max 1000 items for safety
+        self.limit = min(max(1, limit), 1000)
         self.order_by = order_by
         self.order_desc = order_desc
         self.cursor = cursor
         self.use_cursor = use_cursor or cursor is not None
-        
-        # Performance warning for large offsets
+
         if self.skip > 10000 and not self.use_cursor:
             logger.warning(f"Large offset detected ({self.skip}). Consider using cursor-based pagination for better performance.")
-    
+
     def encode_cursor(self, value: Any) -> str:
-        """Encode cursor value for pagination"""
         import base64
         import json
         cursor_data = {"value": str(value), "order_desc": self.order_desc}
         cursor_json = json.dumps(cursor_data)
         return base64.urlsafe_b64encode(cursor_json.encode()).decode()
-    
+
     def decode_cursor(self) -> tuple[Any, bool]:
-        """Decode cursor value from pagination"""
         if not self.cursor:
             return None, self.order_desc
-        
+
         try:
             import base64
             import json
@@ -287,7 +211,7 @@ class PaginationParams:
 
 class FilterParams:
     """Common filter parameters"""
-    
+
     def __init__(
         self,
         search: Optional[str] = None,

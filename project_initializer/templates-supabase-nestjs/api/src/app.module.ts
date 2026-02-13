@@ -9,7 +9,7 @@ import { HealthModule } from './modules/health/health.module';
 import { TestModule } from './modules/test/test.module';
 import { ChatbotModule } from './modules/chatbot/chatbot.module';
 import { AuthModule } from './modules/auth/auth.module';
-import { AuthGuard } from './modules/auth/auth.guard';
+import { SupabaseAuthGuard } from './modules/auth/auth.guard';
 
 @Module({
   imports: [
@@ -42,7 +42,7 @@ import { AuthGuard } from './modules/auth/auth.guard';
     },
     {
       provide: APP_GUARD,
-      useClass: AuthGuard,
+      useClass: SupabaseAuthGuard,
     },
     {
       provide: APP_PIPE,

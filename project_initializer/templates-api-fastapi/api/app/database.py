@@ -453,7 +453,8 @@ def execute_raw_sql(sql: str, parameters: Optional[Dict[str, Any]] = None) -> An
         else:
             result = session.execute(text(sql))
 
-        session.commit()
+        if not sql.strip().upper().startswith(("SELECT", "SHOW", "EXPLAIN")):
+            session.commit()
         return result
 
 
@@ -489,7 +490,6 @@ def database_transaction() -> Generator[Session, None, None]:
     """
     with database_manager.get_session() as session:
         try:
-            session.begin()
             yield session
             session.commit()
         except Exception:

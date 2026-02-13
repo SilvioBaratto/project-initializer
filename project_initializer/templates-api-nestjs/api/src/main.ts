@@ -1,4 +1,5 @@
 import { NestFactory, HttpAdapterHost } from '@nestjs/core';
+import { Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { cleanupOpenApiDoc } from 'nestjs-zod';
 import helmet from 'helmet';
@@ -7,7 +8,11 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { PrismaClientExceptionFilter } from './common/filters/prisma-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { version } = require('../package.json');
+
 async function bootstrap() {
+  const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
 
   // Enable graceful shutdown hooks (for Prisma disconnect)
@@ -56,7 +61,7 @@ async function bootstrap() {
   const config = new DocumentBuilder()
     .setTitle('NestJS API Template')
     .setDescription('Modern API')
-    .setVersion('1.0.0')
+    .setVersion(version)
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
@@ -67,7 +72,7 @@ async function bootstrap() {
   expressApp.get('/', (_req: any, res: any) => {
     res.json({
       message: 'Welcome to the NestJS API Template!',
-      version: '1.0.0',
+      version,
       status: 'operational',
       environment: process.env.NODE_ENV || 'development',
       api_version: 'v1',
@@ -80,7 +85,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  console.log(`Application is running on: http://localhost:${port}`);
-  console.log(`Swagger docs: http://localhost:${port}/docs`);
+  logger.log(`Application is running on: http://localhost:${port}`);
+  logger.log(`Swagger docs: http://localhost:${port}/docs`);
 }
 bootstrap();

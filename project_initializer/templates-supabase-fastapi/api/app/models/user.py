@@ -16,6 +16,7 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import DateTime, Index, String, Text, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -60,10 +61,10 @@ class UserProfile(Base):
     )
 
     # Additional preferences
-    preferences: Mapped[Optional[str]] = mapped_column(
-        Text,
+    preferences: Mapped[Optional[dict]] = mapped_column(
+        JSONB,
         nullable=True,
-        comment="JSON string for additional user preferences/settings"
+        comment="User preferences/settings as JSON"
     )
 
     # Timestamps
@@ -84,7 +85,6 @@ class UserProfile(Base):
 
     # Table constraints and indexes
     __table_args__ = (
-        Index("idx_profiles_id", "id"),
         Index("idx_profiles_display_name", "display_name"),
         {
             "comment": "User profiles table - extends Supabase auth.users with additional profile data"

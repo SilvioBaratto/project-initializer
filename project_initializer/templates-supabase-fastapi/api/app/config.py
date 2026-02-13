@@ -1,8 +1,8 @@
 """Application configuration using Pydantic Settings v2"""
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
-from typing import List, Optional
+from pydantic import Field, SecretStr
+from typing import List
 
 
 class Settings(BaseSettings):
@@ -73,7 +73,6 @@ class Settings(BaseSettings):
     # Cache Configuration
     cache_ttl_default: int = Field(default=300)
     cache_ttl_users: int = Field(default=600)
-    cache_ttl_leagues: int = Field(default=1800)
 
     # CORS
     cors_origins: str = Field(
@@ -100,7 +99,7 @@ class Settings(BaseSettings):
         default="your-publishable-key",
         description="Supabase publishable (anon) key for client-side auth"
     )
-    supabase_service_role_key: str = Field(
+    supabase_service_role_key: SecretStr = Field(
         default="",
         description="Supabase service role key (server-side only, bypasses RLS)"
     )

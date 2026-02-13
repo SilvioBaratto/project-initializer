@@ -6,6 +6,7 @@ from fastapi import APIRouter, status
 from pydantic import BaseModel
 
 from app.config import settings
+from app.dependencies import CurrentUser
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -31,3 +32,13 @@ async def validate_token(request: AuthRequest):
         return AuthResponse(authenticated=True, message="Authentication successful")
 
     return AuthResponse(authenticated=False, message="Invalid token")
+
+
+@router.get("/me")
+async def get_me(current_user: CurrentUser):
+    """
+    Get the current authenticated user's information.
+
+    Requires a valid Bearer token in the Authorization header.
+    """
+    return current_user

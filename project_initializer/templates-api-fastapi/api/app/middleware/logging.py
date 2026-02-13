@@ -48,14 +48,15 @@ class LoggingMiddleware:
             }
         )
         
-        # Capture response data
+        # Capture response data (cap at 64KB to prevent OOM on large responses)
+        _MAX_LOG_BODY_SIZE = 64 * 1024
         response_body = b""
         response_status = 200
         response_headers = {}
-        
+
         async def send_wrapper(message: Message) -> None:
             nonlocal response_body, response_status, response_headers
-            
+
             if message["type"] == "http.response.start":
                 response_status = message["status"]
                 response_headers = dict(message.get("headers", []))
@@ -65,8 +66,9 @@ class LoggingMiddleware:
                 new_headers.append((b"x-process-time", f"{time.time() - start_time:.3f}s".encode()))
                 message["headers"] = new_headers
             elif message["type"] == "http.response.body":
-                response_body += message.get("body", b"")
-            
+                if len(response_body) < _MAX_LOG_BODY_SIZE:
+                    response_body += message.get("body", b"")
+
             await send(message)
         
         # Process request

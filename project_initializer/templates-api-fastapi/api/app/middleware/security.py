@@ -46,8 +46,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             ),
             
             # Custom security headers
-            "X-API-Version": "1.0.0",
-            "X-Powered-By": "FastAPI",
+            "X-API-Version": settings.version,
         }
         
         # Content Security Policy based on endpoint and environment

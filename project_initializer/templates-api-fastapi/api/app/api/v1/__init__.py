@@ -20,7 +20,7 @@ Each domain module should follow this pattern:
 \"\"\"User management endpoints\"\"\"
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.schemas.user import UserCreate, UserResponse, UserUpdate
@@ -31,10 +31,10 @@ router = APIRouter(prefix="/users", tags=["Users"])
 
 
 @router.get("/", response_model=list[UserResponse])
-async def list_users(
+def list_users(
     skip: int = 0,
     limit: int = 100,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     \"\"\"
     List all users with pagination.
@@ -43,27 +43,27 @@ async def list_users(
     - **limit**: Maximum number of records to return (default: 100)
     \"\"\"
     service = UserService(db)
-    return await service.get_multi(skip=skip, limit=limit)
+    return service.get_multi(skip=skip, limit=limit)
 
 
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def create_user(
+def create_user(
     user_in: UserCreate,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     \"\"\"Create a new user.\"\"\"
     service = UserService(db)
-    return await service.create(user_in)
+    return service.create(user_in)
 
 
 @router.get("/{user_id}", response_model=UserResponse)
-async def get_user(
+def get_user(
     user_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     \"\"\"Get a specific user by ID.\"\"\"
     service = UserService(db)
-    user = await service.get(user_id)
+    user = service.get(user_id)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -73,15 +73,15 @@ async def get_user(
 
 
 @router.put("/{user_id}", response_model=UserResponse)
-async def update_user(
+def update_user(
     user_id: str,
     user_in: UserUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
     \"\"\"Update an existing user.\"\"\"
     service = UserService(db)
-    user = await service.update(user_id, user_in)
+    user = service.update(user_id, user_in)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -91,14 +91,14 @@ async def update_user(
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(
+def delete_user(
     user_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
     \"\"\"Delete a user.\"\"\"
     service = UserService(db)
-    success = await service.delete(user_id)
+    success = service.delete(user_id)
     if not success:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -126,5 +126,5 @@ Best Practices
 4. **Documentation**: Write docstrings - they appear in OpenAPI/Swagger docs
 5. **Error Handling**: Raise HTTPException with meaningful error messages
 6. **Tags**: Use tags=["Resource"] for OpenAPI organization
-7. **Async**: Use async def for all endpoints when using async database
+7. **Synchronous**: Use def for endpoints with synchronous database access
 """

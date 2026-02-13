@@ -11,9 +11,9 @@ until nc -z ${DATABASE_HOST:-db} ${DATABASE_PORT:-5432}; do
 done
 echo "Database is ready!"
 
-# Run TypeORM migrations
+# Run Prisma migrations
 echo "Running database migrations..."
-npx typeorm migration:run -d dist/config/data-source.js
+npx prisma migrate deploy
 echo "Migrations completed!"
 
 echo "Setup complete! Starting application..."

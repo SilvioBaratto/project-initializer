@@ -23,7 +23,7 @@
     "postinstall": "npx prisma generate"
   },
   "dependencies": {
-    "@boundaryml/baml": "^0.218.0",
+    "@boundaryml/baml": "^0.219.0",
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^4.0.0",
     "@nestjs/core": "^11.0.0",

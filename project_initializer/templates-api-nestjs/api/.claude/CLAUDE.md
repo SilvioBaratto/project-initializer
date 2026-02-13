@@ -21,9 +21,12 @@ npm run build
 npm test
 
 # Database migrations
-npm run migration:run       # Apply migrations
-npm run migration:generate  # Create migration
-npm run migration:revert    # Rollback one migration
+npx prisma migrate dev        # Create and apply migration (dev)
+npx prisma migrate deploy     # Apply migrations (production)
+npx prisma generate           # Regenerate Prisma client
+
+# Prisma Studio (visual DB editor)
+npx prisma studio
 
 # Regenerate BAML client (after modifying .baml files)
 npx baml-cli generate
@@ -38,21 +41,24 @@ This is a NestJS application with BAML-powered AI chatbot functionality.
 ```
 src/
 ├── main.ts               # Bootstrap, Swagger, Helmet, CORS, ValidationPipe
-├── app.module.ts          # Root module (TypeORM, Config, Throttler)
-├── config/
-│   └── data-source.ts     # TypeORM CLI data source
-├── entities/              # TypeORM entities (base.entity.ts)
+├── app.module.ts          # Root module (Prisma, Config, Throttler)
+├── prisma/
+│   ├── prisma.module.ts   # @Global() PrismaModule
+│   └── prisma.service.ts  # PrismaService (extends PrismaClient)
 ├── common/
-│   ├── repositories/      # Generic CRUD base repository
+│   ├── decorators/        # Custom decorators (@CurrentUser, @Public)
 │   ├── middleware/         # Logging middleware
-│   ├── filters/           # Exception filters
+│   ├── filters/           # Exception filters (HTTP, Prisma)
 │   ├── exceptions/        # Custom API exceptions
-│   ├── decorators/        # Custom decorators (@CurrentUser)
 │   └── interceptors/      # Response transform interceptor
 └── modules/
     ├── health/            # Health check endpoint
+    ├── auth/              # Authentication (stub in base, replaced by overlays)
     ├── test/              # CRUD test endpoints
     └── chatbot/           # BAML-powered chatbot
+
+prisma/
+└── schema.prisma          # Database models
 
 baml_src/                  # BAML definitions for LLM functions
 baml_client/               # Auto-generated BAML TypeScript client (don't edit)
@@ -60,15 +66,15 @@ baml_client/               # Auto-generated BAML TypeScript client (don't edit)
 
 ### Key Patterns
 
-**Database Access**: TypeORM repositories injected via DI. Use BaseRepository for generic CRUD.
+**Database Access**: PrismaService injected via DI. PrismaModule is @Global.
+
+**Models**: Defined in `prisma/schema.prisma`. Regenerate client with `npx prisma generate`.
 
 **API Routes**: All v1 routes go through `/api/v1` prefix set in controllers.
 
 **BAML Integration**: Define LLM functions in `baml_src/*.baml`, regenerate client with `npx baml-cli generate`.
 
-**DTO Naming**: `Create<Entity>Dto`, `Update<Entity>Dto`, `<Entity>ResponseDto` pattern.
-
-**Entities**: Inherit from `BaseEntity` (includes UUID PK + timestamps).
+**DTO Naming**: `Create<Entity>Dto`, `Update<Entity>Dto`, `<Entity>ResponseDto` pattern (Zod-based via nestjs-zod).
 
 ### Middleware Stack
 
@@ -76,6 +82,6 @@ baml_client/               # Auto-generated BAML TypeScript client (don't edit)
 2. CORS
 3. Throttler (rate limiting)
 4. Logging middleware
-5. ValidationPipe (global)
-6. HttpExceptionFilter (global)
+5. ZodValidationPipe (global)
+6. HttpExceptionFilter + PrismaClientExceptionFilter (global)
 7. TransformInterceptor (global)
