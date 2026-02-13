@@ -45,14 +45,14 @@ RUN chown -R appuser:appgroup /app /entrypoint.sh
 USER appuser
 
 # Expose port
-EXPOSE 3000
+EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8000/health || exit 1
 
 # Use entrypoint script
 ENTRYPOINT ["/entrypoint.sh"]
 
 # Run the application
-CMD ["node", "dist/main"]
+CMD ["node", "dist/src/main"]

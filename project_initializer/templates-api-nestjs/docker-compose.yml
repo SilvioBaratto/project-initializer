@@ -35,10 +35,11 @@ services:
       DATABASE_USERNAME: postgres
       DATABASE_PASSWORD: postgres
       DATABASE_NAME: app_db
+      PORT: 8000
       CORS_ORIGINS: "http://localhost,http://localhost:4200,http://localhost:80"
       LOG_LEVEL: info
     ports:
-      - "3000:3000"
+      - "8000:8000"
     volumes:
       - ./api:/app
       - /app/node_modules

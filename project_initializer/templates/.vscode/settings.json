@@ -1,25 +1,11 @@
 {
   "cSpell.enabled": false,
-  "python.testing.pytestArgs": [
-    "tests",
-    "--no-cov",
-    "--tb=short"
-  ],
-  "python.testing.unittestEnabled": false,
-  "python.testing.pytestEnabled": true,
-  "python.testing.cwd": "${workspaceFolder}/api",
-  "python.defaultInterpreterPath": "/Users/silviobaratto/anaconda3/envs/app/bin/python",
-  "python.testing.autoTestDiscoverOnSaveEnabled": true,
-  "python.analysis.typeCheckingMode": "standard",
   "editor.formatOnSave": true,
   "[typescript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[html]": {
     "editor.defaultFormatter": "vscode.html-language-features"
-  },
-  "[python]": {
-    "editor.defaultFormatter": "ms-python.black-formatter"
   },
   "[json]": {
     "editor.defaultFormatter": "vscode.json-language-features"

@@ -45,7 +45,10 @@ include = ["project_initializer*"]
     "templates/**/*", "templates/**/.*",
     "templates-api-fastapi/**/*", "templates-api-fastapi/**/.*",
     "templates-api-nestjs/**/*", "templates-api-nestjs/**/.*",
-    "templates-auth-fastapi/**/*", "templates-auth-fastapi/**/.*",
-    "templates-auth-nestjs/**/*", "templates-auth-nestjs/**/.*",
-    "templates-auth-frontend/**/*", "templates-auth-frontend/**/.*",
+    "templates-token-fastapi/**/*", "templates-token-fastapi/**/.*",
+    "templates-token-nestjs/**/*", "templates-token-nestjs/**/.*",
+    "templates-token-frontend/**/*", "templates-token-frontend/**/.*",
+    "templates-supabase-fastapi/**/*", "templates-supabase-fastapi/**/.*",
+    "templates-supabase-nestjs/**/*", "templates-supabase-nestjs/**/.*",
+    "templates-supabase-frontend/**/*", "templates-supabase-frontend/**/.*",
 ]

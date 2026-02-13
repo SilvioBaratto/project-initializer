@@ -56,6 +56,6 @@ import { AuthGuard } from './modules/auth/auth.guard';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(LoggingMiddleware).forRoutes('*');
+    consumer.apply(LoggingMiddleware).forRoutes('*path');
   }
 }
