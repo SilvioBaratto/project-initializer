@@ -4,6 +4,7 @@ services:
     build:
       context: ./api
       dockerfile: Dockerfile
+      target: dev
     container_name: app_api
     env_file:
       - ./api/.env

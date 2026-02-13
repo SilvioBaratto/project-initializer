@@ -11,6 +11,10 @@ until nc -z ${DATABASE_HOST:-db} ${DATABASE_PORT:-5432}; do
 done
 echo "Database is ready!"
 
+# Generate Prisma client (needed when source is volume-mounted in dev)
+echo "Generating Prisma client..."
+npx prisma generate
+
 # Run Prisma migrations
 echo "Running database migrations..."
 npx prisma migrate deploy

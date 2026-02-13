@@ -24,17 +24,17 @@ services:
     build:
       context: ./api
       dockerfile: Dockerfile
+      target: dev
     container_name: app_api
     depends_on:
       db:
         condition: service_healthy
     environment:
       NODE_ENV: development
+      DATABASE_URL: "postgresql://postgres:postgres@db:5432/app_db?schema=public"
+      DIRECT_URL: "postgresql://postgres:postgres@db:5432/app_db?schema=public"
       DATABASE_HOST: db
       DATABASE_PORT: 5432
-      DATABASE_USERNAME: postgres
-      DATABASE_PASSWORD: postgres
-      DATABASE_NAME: app_db
       PORT: 8000
       CORS_ORIGINS: "http://localhost,http://localhost:4200,http://localhost:80"
       LOG_LEVEL: info
