@@ -126,4 +126,4 @@ export default class TypeBuilder {
     addBaml(baml: string): void {
         this.tb.addBaml(baml);
     }
-}
+}

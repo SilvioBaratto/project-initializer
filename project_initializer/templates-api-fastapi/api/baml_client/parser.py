@@ -13,7 +13,6 @@
 import typing
 import typing_extensions
 
-import baml_py
 
 from . import stream_types, types
 from .runtime import DoNotUseDirectlyCallManager, BamlCallOptions
@@ -56,4 +55,4 @@ class LlmStreamParser:
         __result__ = self.__options.merge_options(baml_options).parse_response(function_name="StreamChat", llm_response=llm_response, mode="stream")
         return typing.cast(stream_types.ChatResponse, __result__)
 
-    
+    

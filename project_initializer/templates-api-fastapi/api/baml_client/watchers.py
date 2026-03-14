@@ -12,7 +12,6 @@
 
 from typing import Callable, Any, Protocol, Generic, TypeVar, overload, Literal
 import threading
-import typing
 
 T = TypeVar("T")
 
@@ -43,4 +42,3 @@ class EventCollectorInternal(Protocol):
     def __handlers__(self) -> InternalEventBindings:
         ...
 
-
