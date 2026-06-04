@@ -3,10 +3,16 @@
 import argparse
 import shutil
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 from . import __version__
 from .env_generator import generate_env, parse_env
+from .file_transforms import (
+    filter_compose,
+    generate_frontend_compose,
+    strip_nginx_proxy_block,
+)
 
 FRAMEWORKS = ("fastapi", "nestjs")
 AUTH_MODES = ("token", "supabase")
@@ -31,11 +37,91 @@ def get_auth_frontend_overlay_dir(auth_mode: str) -> Path:
     return TEMPLATES_ROOT / f"templates-{auth_mode}-frontend"
 
 
+def _compose_transform(scope: str) -> Callable:
+    """Return a file_transform that filters docker-compose.yml for the given scope."""
+
+    def transform(path: Path) -> str | None:
+        if path.name == "docker-compose.yml":
+            return filter_compose(path.read_text(encoding="utf-8"), scope)
+        return None
+
+    return transform
+
+
+def _nginx_transform() -> Callable:
+    """Return a file_transform that strips the /api/ proxy from nginx.conf."""
+
+    def transform(path: Path) -> str | None:
+        if path.name == "nginx.conf":
+            return strip_nginx_proxy_block(path.read_text(encoding="utf-8"))
+        return None
+
+    return transform
+
+
+def select_layers(
+    scope: str,
+    framework: str,
+    auth: str | None,
+) -> list[tuple[Path, frozenset[str], Callable | None]]:
+    """Return the ordered merge layers for the requested scope.
+
+    Each tuple is (src_dir, skip_subdirs, file_transform).  For this cycle
+    all transforms are None (#6/#7 fill them later).  The frontend branch
+    MUST NOT consult ``framework`` — it is scope-only.
+
+    Declarative data construction — exempt from the <10-line rule.
+    """
+    base = get_templates_dir()
+    api = get_api_templates_dir(framework)
+
+    if scope == "fullstack":
+        layers: list[tuple[Path, frozenset[str], Callable | None]] = [
+            (base, frozenset(), None),
+            (api, frozenset(), None),
+        ]
+        if auth:
+            layers.append((get_auth_overlay_dir(auth, framework), frozenset(), None))
+            layers.append((get_auth_frontend_overlay_dir(auth), frozenset(), None))
+        return layers
+
+    if scope == "api":
+        compose = _compose_transform("api")
+        layers = [
+            (base, frozenset({"frontend"}), None),
+            (api, frozenset({"frontend"}), compose),
+        ]
+        if auth:
+            layers.append((get_auth_overlay_dir(auth, framework), frozenset(), compose))
+        return layers
+
+    # scope == "frontend"
+    layers = [(base, frozenset(), _nginx_transform())]
+    if auth:
+        layers.append((get_auth_frontend_overlay_dir(auth), frozenset(), None))
+    return layers
+
+
+def _copy_file(src: Path, dst: Path, file_transform: Callable | None) -> None:
+    """Copy src to dst, optionally transforming text content.
+
+    The transform receives the source Path and returns transformed text for
+    files it targets, or None to pass through to shutil.copy2 (binary-safe).
+    """
+    if file_transform is not None:
+        transformed = file_transform(src)
+        if transformed is not None:
+            dst.write_text(transformed, encoding="utf-8")
+            return
+    shutil.copy2(src, dst)
+
+
 def copy_template(
     dest_dir: Path,
     project_name: str | None = None,
     auth: str | None = None,
     framework: str = "fastapi",
+    scope: str = "fullstack",
 ) -> None:
     """Copy template files to destination directory."""
     skip_patterns = {
@@ -55,20 +141,27 @@ def copy_template(
             for pattern in skip_patterns
         )
 
-    def copy_tree(src: Path, dst: Path) -> None:
+    def copy_tree(
+        src: Path,
+        dst: Path,
+        skip_subdirs: frozenset[str] = frozenset(),
+        file_transform: Callable | None = None,
+    ) -> None:
         """Recursively copy directory tree, merging into existing dirs."""
         dst.mkdir(parents=True, exist_ok=True)
 
         for item in src.iterdir():
             if should_skip(item.name):
                 continue
+            if item.is_dir() and item.name in skip_subdirs:
+                continue
 
             dest_item = dst / item.name
 
             if item.is_dir():
-                copy_tree(item, dest_item)
+                copy_tree(item, dest_item, frozenset(), file_transform)
             else:
-                shutil.copy2(item, dest_item)
+                _copy_file(item, dest_item, file_transform)
                 print(f"  Created: {dest_item.relative_to(dest_dir)}")
 
     def require_dir(path: Path) -> None:
@@ -81,35 +174,23 @@ def copy_template(
     print(f"Framework: {framework}{auth_label}")
     print("-" * 40)
 
-    # Layer 1: Shared base (frontend, root configs)
-    templates_dir = get_templates_dir()
-    require_dir(templates_dir)
-    copy_tree(templates_dir, dest_dir)
+    for src, skip, transform in select_layers(scope, framework, auth):
+        require_dir(src)
+        copy_tree(src, dest_dir, skip, transform)
 
-    # Layer 2: Framework-specific API + docker-compose + nginx.conf
-    api_templates_dir = get_api_templates_dir(framework)
-    require_dir(api_templates_dir)
-    copy_tree(api_templates_dir, dest_dir)
+    # Generate .env for the API (only when the api layer is present)
+    if scope in ("fullstack", "api"):
+        env_example_path = TEMPLATES_ROOT / "env_defaults.env"
+        source = parse_env(env_example_path) if env_example_path.exists() else {}
+        env_content = generate_env(framework, auth, source, use_placeholders=True)
+        api_env_path = dest_dir / "api" / ".env"
+        api_env_path.write_text(env_content, encoding="utf-8")
+        print(f"  Created: {api_env_path.relative_to(dest_dir)}")
 
-    # Layer 3: Auth overlay (token or supabase)
-    if auth:
-        auth_api_dir = get_auth_overlay_dir(auth, framework)
-        require_dir(auth_api_dir)
-        print(f"  Applying {auth} auth API overlay...")
-        copy_tree(auth_api_dir, dest_dir)
-
-        auth_frontend_dir = get_auth_frontend_overlay_dir(auth)
-        require_dir(auth_frontend_dir)
-        print(f"  Applying {auth} auth frontend overlay...")
-        copy_tree(auth_frontend_dir, dest_dir)
-
-    # Generate .env for the API
-    env_example_path = TEMPLATES_ROOT / "env_defaults.env"
-    source = parse_env(env_example_path) if env_example_path.exists() else {}
-    env_content = generate_env(framework, auth, source, use_placeholders=True)
-    api_env_path = dest_dir / "api" / ".env"
-    api_env_path.write_text(env_content, encoding="utf-8")
-    print(f"  Created: {api_env_path.relative_to(dest_dir)}")
+    if scope == "frontend":
+        compose_path = dest_dir / "docker-compose.yml"
+        compose_path.write_text(generate_frontend_compose(), encoding="utf-8")
+        print(f"  Created: {compose_path.relative_to(dest_dir)}")
 
     print("-" * 40)
     print("Project created successfully!")
@@ -124,7 +205,9 @@ def copy_template(
         print("  cd api && npm install && npm run start:dev")
     else:
         print("\n  # FastAPI development:")
-        print("  cd api && pip install -r requirements.txt && uvicorn app.main:app --reload")
+        print(
+            "  cd api && pip install -r requirements.txt && uvicorn app.main:app --reload"
+        )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -147,12 +230,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Name of the project directory to create (default: current directory)",
     )
     parser.add_argument(
-        "-v", "--version",
+        "-v",
+        "--version",
         action="version",
         version=f"%(prog)s {__version__}",
     )
     parser.add_argument(
-        "-f", "--force",
+        "-f",
+        "--force",
         action="store_true",
         help="Overwrite existing files without prompting",
     )
@@ -227,7 +312,13 @@ def main() -> None:
             print("Aborted.")
             sys.exit(0)
 
-    copy_template(dest_dir, args.project_name, auth=args.auth, framework=framework)
+    copy_template(
+        dest_dir,
+        args.project_name,
+        auth=args.auth,
+        framework=framework,
+        scope=args.scope,
+    )
 
 
 if __name__ == "__main__":
