@@ -1,15 +1,15 @@
 """Global dependencies for the application"""
 
+import logging
 import time
-from typing import Optional, Annotated, Any
+from typing import Any, Annotated, Optional
+
 from fastapi import Depends, Header, Request
 from sqlalchemy.orm import Session
-import logging
+
+from app.database import get_db
 
 logger = logging.getLogger(__name__)
-
-# Database session dependencies - imported from database module
-from app.database import get_db
 
 
 # ===========================

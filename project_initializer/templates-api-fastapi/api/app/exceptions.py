@@ -231,7 +231,6 @@ class SuspiciousActivityError(SecurityViolationError):
     """Raised when suspicious activity is detected"""
 
     def __init__(self, activity_type: str, client_ip: Optional[str] = None):
-        message = f"Suspicious activity detected: {activity_type}"
         details = {}
         if client_ip:
             details["client_ip"] = client_ip

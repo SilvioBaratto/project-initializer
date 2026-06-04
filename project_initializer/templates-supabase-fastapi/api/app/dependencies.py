@@ -1,19 +1,18 @@
 """Global dependencies for the application"""
 
+import logging
 import time
-from typing import Optional, Annotated
-from fastapi import Depends, Request, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from typing import Annotated, Optional
+
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 from supabase import create_client
-import logging
 
 from app.config import settings
+from app.database import get_db
 
 logger = logging.getLogger(__name__)
-
-# Database session dependencies
-from app.database import get_db
 
 # Supabase client (server-side, for JWT verification)
 _supabase = create_client(settings.supabase_url, settings.supabase_publishable_key)

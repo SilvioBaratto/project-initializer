@@ -1,12 +1,14 @@
-from logging.config import fileConfig
-
-from dotenv import load_dotenv
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-
-from alembic import context
 import os
 import sys
+from logging.config import fileConfig
+
+from alembic import context
+from dotenv import load_dotenv
+from sqlalchemy import engine_from_config, pool
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from app.models import Base
 
 # Load .env file so users only need to configure .env for migrations
 load_dotenv()
@@ -30,9 +32,6 @@ else:
 # This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from app.models import Base
 
 target_metadata = Base.metadata
 

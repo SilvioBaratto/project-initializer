@@ -133,8 +133,16 @@ Best Practices
 """
 
 from datetime import datetime, timezone
-from typing import Optional, List, Any
+from typing import Any, List, Optional
+
 from pydantic import BaseModel, Field
+
+from app.schemas.chatbot import (
+    ChatRequest,
+    ChatResponse,
+    ConversationHistory,
+    StreamChunk,
+)
 
 
 def utc_now() -> datetime:
@@ -221,14 +229,6 @@ class SuccessResponse(BaseModel):
     message: Optional[str] = None
     data: Optional[Any] = None
 
-
-# Import chatbot schemas
-from app.schemas.chatbot import (
-    ConversationHistory,
-    ChatRequest,
-    ChatResponse,
-    StreamChunk,
-)
 
 # Export all schemas
 __all__ = [
