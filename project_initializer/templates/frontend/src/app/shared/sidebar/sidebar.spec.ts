@@ -1,19 +1,27 @@
-import { provideZonelessChangeDetection } from '@angular/core';
+import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { LucideIconConfig } from 'lucide-angular';
 
 import { ICON_PROVIDER } from './../../icons';
+import { ThemeService } from '../../services/theme.service';
 import { SidebarComponent } from './sidebar';
 
 describe('SidebarComponent', () => {
+  let themeSpy: jasmine.SpyObj<Pick<ThemeService, 'toggleTheme'>> & { theme: ReturnType<typeof signal> };
+
   beforeEach(async () => {
+    themeSpy = Object.assign(jasmine.createSpyObj('ThemeService', ['toggleTheme']), {
+      theme: signal('light'),
+    });
+
     await TestBed.configureTestingModule({
       imports: [SidebarComponent],
       providers: [
         provideZonelessChangeDetection(),
         provideRouter([]),
         ICON_PROVIDER,
+        { provide: ThemeService, useValue: themeSpy },
         {
           provide: LucideIconConfig,
           useFactory: () => {
@@ -27,31 +35,36 @@ describe('SidebarComponent', () => {
     }).compileComponents();
   });
 
+  async function render(): Promise<HTMLElement> {
+    const fixture = TestBed.createComponent(SidebarComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    return fixture.nativeElement;
+  }
+
   it('when the sidebar renders, a lucide-icon element is present', async () => {
-    const fixture = TestBed.createComponent(SidebarComponent);
-    fixture.detectChanges();
-    await fixture.whenStable();
-
-    const lucideIcon = fixture.nativeElement.querySelector('lucide-icon');
-    expect(lucideIcon).toBeTruthy();
+    const el = await render();
+    expect(el.querySelector('lucide-icon')).toBeTruthy();
   });
 
-  it('when the sidebar renders, the lucide-icon uses the seeded MessageSquare name', async () => {
-    const fixture = TestBed.createComponent(SidebarComponent);
-    fixture.detectChanges();
-    await fixture.whenStable();
-
-    const svg = fixture.nativeElement.querySelector('lucide-icon svg');
-    expect(svg).toBeTruthy();
+  it('when the nav renders, the Home, Dashboard and Settings labels are shown', async () => {
+    const el = await render();
+    const navText = el.querySelector('nav')!.textContent ?? '';
+    expect(navText).toContain('Home');
+    expect(navText).toContain('Dashboard');
+    expect(navText).toContain('Settings');
   });
 
-  it('when the nav item has an accessible label, the visible name text is rendered', async () => {
-    const fixture = TestBed.createComponent(SidebarComponent);
-    fixture.detectChanges();
-    await fixture.whenStable();
+  it('when the theme-toggle button is clicked, ThemeService.toggleTheme is called', async () => {
+    const el = await render();
+    const button = el.querySelector<HTMLButtonElement>('button[aria-label="Toggle theme"]');
+    expect(button).toBeTruthy();
+    button!.click();
+    expect(themeSpy.toggleTheme).toHaveBeenCalled();
+  });
 
-    const navLink = fixture.nativeElement.querySelector('nav a');
-    expect(navLink).toBeTruthy();
-    expect(navLink.textContent).toContain('Chatbot');
+  it('when the profile row renders, the placeholder name is shown', async () => {
+    const el = await render();
+    expect(el.querySelector('footer')?.textContent).toContain('User');
   });
 });

@@ -1,9 +1,12 @@
 @import 'tailwindcss';
 
 @theme {
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  /* Fonts */
+  --font-sans: 'Outfit', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Fira Code', ui-monospace, monospace;
 
-  /* Surface colors */
+  /* Surface */
   --color-surface: #fafafa;
   --color-surface-raised: #ffffff;
   --color-surface-inset: #f4f4f5;
@@ -14,12 +17,21 @@
 
   /* Text */
   --color-text: #18181b;
-  --color-text-secondary: #71717a;
-  --color-text-tertiary: #a1a1aa;
+  --color-text-secondary: #52525b;
+  --color-text-tertiary: #6b7280;
 
-  /* Accent (dark zinc) */
-  --color-accent: #27272a;
-  --color-accent-hover: #3f3f46;
+  /* Primary — violet */
+  --color-primary: #6d28d9;
+  --color-primary-hover: #5b21b6;
+  --color-primary-light: #f5f3ff;
+
+  /* Accent — indigo */
+  --color-accent: #4f46e5;
+  --color-accent-hover: #4338ca;
+  --color-accent-light: #eef2ff;
+
+  /* Signature pop — emerald */
+  --color-signature: #10b981;
 
   /* Semantic */
   --color-danger: #dc2626;
@@ -28,14 +40,162 @@
   --color-info: #2563eb;
 }
 
-/* Base styles */
-html {
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+.dark {
+  /* Surface */
+  --color-surface: #0a0a0b;
+  --color-surface-raised: #161618;
+  --color-surface-inset: #1f1f23;
+
+  /* Border */
+  --color-border: #2e2e33;
+  --color-border-muted: #1f1f23;
+
+  /* Text */
+  --color-text: #fafafa;
+  --color-text-secondary: #a1a1aa;
+  --color-text-tertiary: #71717a;
+
+  /* Primary — violet lifted for dark bg */
+  --color-primary: #8b5cf6;
+  --color-primary-hover: #7c3aed;
+  --color-primary-light: #1e1535;
+
+  /* Accent — indigo lifted */
+  --color-accent: #6366f1;
+  --color-accent-hover: #4f46e5;
+  --color-accent-light: #1e1b4b;
+
+  /* Signature pop — emerald (holds well on dark) */
+  --color-signature: #34d399;
+
+  /* Semantic */
+  --color-danger: #f87171;
+  --color-success: #4ade80;
+  --color-warning: #fbbf24;
+  --color-info: #60a5fa;
 }
 
-*:focus-visible {
-  outline: 2px solid #a1a1aa;
-  outline-offset: 2px;
-  border-radius: 4px;
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Prevent iOS auto-zoom on focused inputs */
+  @media (max-width: 767px) {
+    input,
+    textarea,
+    select {
+      font-size: 16px;
+    }
+  }
+
+  /* iOS safe-area bottom spacing utility */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  *:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Skip navigation link — visually hidden until focused */
+  .skip-link {
+    position: fixed;
+    top: -100%;
+    left: 1rem;
+    z-index: 50;
+    padding: 0.5rem 1rem;
+    background-color: var(--color-surface-raised);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    font-size: 0.875rem;
+    text-decoration: none;
+    transition: top 0.1s;
+  }
+
+  .skip-link:focus {
+    top: 1rem;
+  }
+
+  /* Respect reduced-motion preference */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Hide scrollbar while keeping scroll functionality */
+  .scrollbar-hidden {
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Suppress all transitions while theme is switching */
+  .theme-transitioning * {
+    transition: none !important;
+  }
+}
+
+@layer utilities {
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slide-in {
+    from {
+      opacity: 0;
+      transform: translateX(-12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      var(--color-surface-inset) 25%,
+      var(--color-surface-raised) 50%,
+      var(--color-surface-inset) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  .animate-fade-in-up {
+    animation: fade-in-up 0.3s ease-out both;
+  }
+
+  .animate-slide-in {
+    animation: slide-in 0.25s ease-out both;
+  }
 }

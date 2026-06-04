@@ -38,5 +38,33 @@ describe('ICON_PROVIDER', () => {
     it('returns icon data for MessageSquare', () => {
       expect(ICON_PROVIDER.useValue.getIcon('MessageSquare')).toBeTruthy();
     });
+
+    it('returns icon data for Home', () => {
+      expect(ICON_PROVIDER.useValue.getIcon('Home')).toBeTruthy();
+    });
+
+    it('returns icon data for LayoutDashboard', () => {
+      expect(ICON_PROVIDER.useValue.getIcon('LayoutDashboard')).toBeTruthy();
+    });
+
+    it('returns icon data for User', () => {
+      expect(ICON_PROVIDER.useValue.getIcon('User')).toBeTruthy();
+    });
+
+    it('returns icon data for LogOut', () => {
+      expect(ICON_PROVIDER.useValue.getIcon('LogOut')).toBeTruthy();
+    });
+
+    it('returns icon data for Sun', () => {
+      expect(ICON_PROVIDER.useValue.getIcon('Sun')).toBeTruthy();
+    });
+
+    it('returns icon data for Moon', () => {
+      expect(ICON_PROVIDER.useValue.getIcon('Moon')).toBeTruthy();
+    });
+
+    it('returns icon data for Monitor', () => {
+      expect(ICON_PROVIDER.useValue.getIcon('Monitor')).toBeTruthy();
+    });
   });
 });

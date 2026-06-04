@@ -15,7 +15,7 @@ import { ChatMessage } from '../../models/chat.model';
   selector: 'app-chatbot',
   templateUrl: './chatbot.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { style: 'flex:1; display:flex; flex-direction:column; min-height:0' },
+  host: { class: 'block h-full' },
 })
 export class ChatbotComponent {
   private readonly chatService = inject(ChatService);

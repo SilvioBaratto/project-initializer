@@ -1,14 +1,9 @@
-import { Component, computed, input, output, ChangeDetectionStrategy } from '@angular/core';
+import { Component, computed, inject, input, output, ChangeDetectionStrategy } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
-import { IconName } from '../../icons';
-
-interface NavItem {
-  name: string;
-  route: string;
-  icon: IconName;
-}
+import { NavItem, NAV_ITEMS } from '../nav-item.model';
+import { ThemeService } from '../../services/theme.service';
 
 @Component({
   selector: 'app-sidebar',
@@ -18,18 +13,24 @@ interface NavItem {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SidebarComponent {
+  private readonly themeService = inject(ThemeService);
+
   isOpen = input<boolean>(false);
   isMobile = input<boolean>(false);
 
   closeSidebar = output<void>();
 
-  navItems: NavItem[] = [
-    { name: 'Chatbot', route: '/', icon: 'MessageSquare' },
-  ];
+  readonly theme = this.themeService.theme;
+
+  navItems: NavItem[] = NAV_ITEMS;
 
   showSidebar = computed(() => !this.isMobile() || this.isOpen());
 
   onNavClick() {
     this.closeSidebar.emit();
+  }
+
+  toggleTheme() {
+    this.themeService.toggleTheme();
   }
 }
