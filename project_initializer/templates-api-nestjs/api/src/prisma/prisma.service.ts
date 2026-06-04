@@ -1,14 +1,20 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { PrismaClient } from '@generated/prisma';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { deriveSslOption } from './prisma-ssl.util';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
 
   constructor() {
-    const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
-    super({ adapter });
+    super({ adapter: PrismaService.buildAdapter() });
+  }
+
+  private static buildAdapter(): PrismaPg {
+    const connectionString = process.env.DATABASE_URL;
+    const ssl = deriveSslOption(connectionString);
+    return new PrismaPg({ connectionString, ssl });
   }
 
   async onModuleInit() {

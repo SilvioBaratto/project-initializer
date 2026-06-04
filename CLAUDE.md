@@ -9,12 +9,15 @@ This is a pip-installable CLI tool (`project-initializer`) that scaffolds full-s
 ## CLI Flags
 
 ```bash
-project-initializer <name> [--fastapi | --nestjs] [--auth token | --auth supabase] [--force]
+project-initializer <name> [--fastapi | --nestjs] [--auth token | --auth supabase] [--scope api | --scope frontend] [--force]
 ```
 
 - `--fastapi` (default) or `--nestjs` — backend framework
 - `--auth token` — bearer-token authentication
 - `--auth supabase` — Supabase JWT auth (replaces local DB with Supabase-hosted)
+- `--scope fullstack` (default) — scaffold both halves (`api/` + `frontend/`)
+- `--scope api` — backend only: skips the `frontend/` subtree and drops the `frontend` service from `docker-compose.yml`
+- `--scope frontend` — frontend only: base layer only, strips the `/api/` proxy block from `nginx.conf`; **cannot be combined with `--fastapi`/`--nestjs`/`--auth`** (those are api concerns)
 - `--force` — overwrite existing files without prompting
 
 ## Build & Run Commands
@@ -30,6 +33,10 @@ project-initializer test-fastapi-supabase --fastapi --auth supabase --force
 project-initializer test-nestjs --nestjs --force
 project-initializer test-nestjs-token --nestjs --auth token --force
 project-initializer test-nestjs-supabase --nestjs --auth supabase --force
+
+# Scaffold scope subsets (backend-only / frontend-only)
+project-initializer test-api --fastapi --scope api --force
+project-initializer test-frontend --scope frontend --force
 
 # Run full stack with Docker
 cd test-fastapi && docker-compose up -d
@@ -84,6 +91,15 @@ In `cli.py`, the `copy_tree(src, dst)` function recursively copies `src` into `d
 2. `copy_tree(templates-api-{framework}/, dest/)` — framework overlay
 3. If `--auth`: `copy_tree(templates-{auth}-{framework}/, dest/)` — auth API overlay
 4. If `--auth`: `copy_tree(templates-{auth}-frontend/, dest/)` — auth frontend overlay
+
+#### Scope-based layer selection
+
+`select_layers(scope, framework, auth)` (in `cli.py`) decides which layers above are merged, and `validate_scope()` rejects illegal combinations:
+
+- **`fullstack`** (default) — all layers above, as listed.
+- **`api`** — skips the `frontend/` subtree from every layer and applies a transform that drops the `frontend` service from `docker-compose.yml`. Generates `api/.env`.
+- **`frontend`** — copies the base layer only (no api framework/auth overlays) and strips the `/api/` proxy block from `nginx.conf`. No `api/.env`; emits a minimal frontend-only `docker-compose.yml`.
+- Root configs (`.env.example`, `CLAUDE.md`, `.gitignore`, `.vscode/`) are copied for **every** scope.
 
 ## `env_generator.py`
 

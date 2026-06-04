@@ -10,6 +10,7 @@
     "sourceMap": true,
     "outDir": "./dist",
     "baseUrl": "./",
+    "ignoreDeprecations": "6.0",
     "incremental": true,
     "skipLibCheck": true,
     "strictNullChecks": true,
@@ -23,7 +24,8 @@
       "@generated/zod": ["generated/zod/schemas/index"],
       "@generated/zod/*": ["generated/zod/schemas/*"]
     },
-    "typeRoots": ["./node_modules/@types"]
+    "typeRoots": ["./node_modules/@types"],
+    "types": ["node", "jest"]
   },
   "include": ["src/**/*", "generated/**/*"]
 }

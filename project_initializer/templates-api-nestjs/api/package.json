@@ -5,7 +5,7 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "build": "nest build",
+    "build": "nest build && tsc-alias -p tsconfig.json",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
@@ -20,7 +20,7 @@
     "prisma:migrate:deploy": "npx prisma migrate deploy",
     "prisma:migrate:reset": "npx prisma migrate reset",
     "prisma:studio": "npx prisma studio",
-    "postinstall": "npx prisma generate"
+    "postinstall": "npx prisma generate || true"
   },
   "dependencies": {
     "@boundaryml/baml": "0.222.0",
@@ -54,6 +54,7 @@
     "prisma-zod-generator": "2.1.4",
     "ts-jest": "29.4.11",
     "ts-node": "10.9.2",
+    "tsc-alias": "1.8.16",
     "tsconfig-paths": "4.2.0",
     "typescript": "6.0.3"
   },
