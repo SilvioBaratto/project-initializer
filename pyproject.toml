@@ -33,6 +33,9 @@ project-initializer = "project_initializer.cli:main"
 Homepage = "https://github.com/silviobaratto/project-initializer"
 Repository = "https://github.com/silviobaratto/project-initializer"
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.setuptools]
 include-package-data = true
 

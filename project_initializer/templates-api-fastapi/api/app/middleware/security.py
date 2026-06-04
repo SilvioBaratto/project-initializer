@@ -2,7 +2,7 @@
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-from typing import Dict, Any
+from typing import Dict
 from app.config import settings
 
 

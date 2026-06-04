@@ -4,7 +4,6 @@ import time
 import logging
 import uuid
 import json
-from typing import Any, Dict
 from starlette.types import ASGIApp, Scope, Receive, Send, Message
 
 logger = logging.getLogger(__name__)

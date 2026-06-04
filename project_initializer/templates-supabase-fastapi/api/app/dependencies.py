@@ -1,8 +1,8 @@
 """Global dependencies for the application"""
 
 import time
-from typing import Optional, Annotated, Any
-from fastapi import Depends, Header, Request, HTTPException, status
+from typing import Optional, Annotated
+from fastapi import Depends, Request, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from supabase import create_client

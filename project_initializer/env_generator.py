@@ -38,7 +38,6 @@ def generate_env(
     is_supabase = auth == "supabase"
     is_token = auth == "token"
     is_fastapi = framework == "fastapi"
-    is_nestjs = framework == "nestjs"
 
     def val(key: str, fallback: str = "") -> str:
         return source_env.get(key, fallback)

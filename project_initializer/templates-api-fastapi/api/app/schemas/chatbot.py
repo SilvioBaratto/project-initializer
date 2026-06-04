@@ -6,11 +6,9 @@ Schemas for chatbot request/response validation.
 Designed to match BAML function inputs/outputs.
 """
 
-from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field
 
-from app.schemas import utc_now
 
 
 # ===========================

@@ -5,7 +5,7 @@ import time
 import logging
 from typing import Optional, Annotated, Any
 
-from fastapi import Depends, Header, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 

@@ -6,7 +6,7 @@ This module provides shared fixtures for testing the FastAPI application.
 """
 
 import pytest
-from typing import AsyncGenerator, Generator
+from typing import Generator
 from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient

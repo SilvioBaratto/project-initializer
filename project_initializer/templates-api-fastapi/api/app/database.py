@@ -18,7 +18,7 @@ from typing import Optional, Generator, Dict, Any
 
 from sqlalchemy import create_engine, Engine, text
 from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.pool import QueuePool, NullPool
+from sqlalchemy.pool import QueuePool
 from sqlalchemy.exc import SQLAlchemyError, OperationalError, DisconnectionError
 
 from app.config import settings
@@ -95,8 +95,8 @@ class DatabaseManager:
 
         self._engine = create_engine(**engine_kwargs)
 
-        logger.info(f"Database engine created:")
-        logger.info(f"  - Pool class: QueuePool")
+        logger.info("Database engine created:")
+        logger.info("  - Pool class: QueuePool")
         logger.info(f"  - Pool size: {settings.database_pool_size}")
         logger.info(f"  - Max overflow: {settings.database_max_overflow}")
         logger.info(f"  - Pool recycle: {settings.database_pool_recycle}s")

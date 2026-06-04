@@ -100,13 +100,13 @@ class DatabaseManager:
         self._engine = create_engine(**engine_kwargs)
 
         logger.info("Supabase database engine created:")
-        logger.info(f"  - Pooler: Session Mode (port 5432)")
-        logger.info(f"  - Pool class: QueuePool (persistent connections)")
+        logger.info("  - Pooler: Session Mode (port 5432)")
+        logger.info("  - Pool class: QueuePool (persistent connections)")
         logger.info(f"  - Pool size: {settings.database_pool_size}")
         logger.info(f"  - Max overflow: {settings.database_max_overflow}")
         logger.info(f"  - Pool recycle: {settings.database_pool_recycle}s")
         logger.info(f"  - Pre-ping enabled: {settings.database_pool_pre_ping}")
-        logger.info(f"  - SSL: Required (Supabase enforced)")
+        logger.info("  - SSL: Required (Supabase enforced)")
 
     def _build_supabase_connect_args(self) -> Dict[str, Any]:
         """

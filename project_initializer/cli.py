@@ -10,6 +10,7 @@ from .env_generator import generate_env, parse_env
 
 FRAMEWORKS = ("fastapi", "nestjs")
 AUTH_MODES = ("token", "supabase")
+SCOPES = ("fullstack", "api", "frontend")
 
 TEMPLATES_ROOT = Path(__file__).parent
 
@@ -112,7 +113,7 @@ def copy_template(
 
     print("-" * 40)
     print("Project created successfully!")
-    print(f"\nNext steps:")
+    print("\nNext steps:")
     print(f"  cd {dest_dir.name}")
     print("  # Edit api/.env with your real keys")
     if auth == "supabase":
@@ -126,8 +127,15 @@ def copy_template(
         print("  cd api && pip install -r requirements.txt && uvicorn app.main:app --reload")
 
 
-def main() -> None:
-    """Main entry point for the CLI."""
+def build_parser() -> argparse.ArgumentParser:
+    """Construct the CLI argument parser.
+
+    Declarative builder: registers all flags in a flat sequence and is
+    therefore exempt from the per-method line limit. ``framework`` defaults
+    to ``None`` (no ``set_defaults``) so callers can distinguish an explicit
+    ``--fastapi``/``--nestjs`` from the absent case; the ``"fastapi"`` default
+    is resolved in ``main()`` after parsing.
+    """
     parser = argparse.ArgumentParser(
         prog="project-initializer",
         description="Initialize a new full-stack project with FastAPI or NestJS, Angular, and Docker",
@@ -156,6 +164,12 @@ def main() -> None:
         choices=AUTH_MODES,
         help="Auth mode: 'token' (simple token, default) or 'supabase'",
     )
+    parser.add_argument(
+        "--scope",
+        choices=SCOPES,
+        default="fullstack",
+        help="Layers to scaffold: 'fullstack' (default), 'api', or 'frontend'",
+    )
 
     framework_group = parser.add_mutually_exclusive_group()
     framework_group.add_argument(
@@ -172,9 +186,33 @@ def main() -> None:
         dest="framework",
         help="Use NestJS backend",
     )
-    parser.set_defaults(framework="fastapi")
 
+    return parser
+
+
+def validate_scope(scope: str, framework: str | None, auth: str | None) -> list[str]:
+    """Return error messages for invalid --scope / framework / auth combos.
+
+    Pure function (no I/O); empty list means valid. ``framework``/``auth`` are
+    ``None`` when their flags were omitted, so ``--scope frontend`` alone is
+    accepted. The ``api`` branch has no frontend-only flags to reject yet
+    (Cycle 2 may add them); ``api``/``fullstack`` accept all API options.
+    """
+    if scope == "frontend" and framework is not None:
+        return ["--scope frontend cannot be combined with --fastapi/--nestjs"]
+    if scope == "frontend" and auth is not None:
+        return ["--scope frontend cannot be combined with --auth"]
+    return []
+
+
+def main() -> None:
+    """Main entry point for the CLI."""
+    parser = build_parser()
     args = parser.parse_args()
+    errors = validate_scope(args.scope, args.framework, args.auth)
+    if errors:
+        parser.error(errors[0])
+    framework = args.framework if args.framework is not None else "fastapi"
 
     # Determine destination directory
     if args.project_name == ".":
@@ -189,7 +227,7 @@ def main() -> None:
             print("Aborted.")
             sys.exit(0)
 
-    copy_template(dest_dir, args.project_name, auth=args.auth, framework=args.framework)
+    copy_template(dest_dir, args.project_name, auth=args.auth, framework=framework)
 
 
 if __name__ == "__main__":

@@ -97,11 +97,11 @@ class Settings(BaseSettings):
     )
     supabase_publishable_key: str = Field(
         default="your-publishable-key",
-        description="Supabase publishable (anon) key for client-side auth"
+        description="Supabase publishable key (sb_publishable_...) for client-side auth"
     )
-    supabase_service_role_key: SecretStr = Field(
+    supabase_secret_key: SecretStr = Field(
         default="",
-        description="Supabase service role key (server-side only, bypasses RLS)"
+        description="Supabase secret key (sb_secret_..., server-side only, bypasses RLS)"
     )
 
     @property
