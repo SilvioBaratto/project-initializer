@@ -34,7 +34,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: /tmp/test-project/frontend
-        run: npm ci
+        run: npm install --legacy-peer-deps --no-audit --no-fund
 
       - name: Build Angular frontend
         working-directory: /tmp/test-project/frontend

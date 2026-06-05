@@ -4,7 +4,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![CI](https://github.com/silviobaratto/project-initializer/actions/workflows/test-package.yml/badge.svg)](https://github.com/silviobaratto/project-initializer/actions)
 
-CLI tool to scaffold full-stack projects with **FastAPI** or **NestJS**, **Angular**, and **Docker** — with optional authentication via token or Supabase.
+CLI tool to scaffold full-stack projects with **FastAPI** or **NestJS**, **Angular**, and **Docker** — with optional authentication via token or Supabase. Scaffold the full stack, or just the **backend** or **frontend** with `--scope`.
 
 ## Installation
 
@@ -59,6 +59,20 @@ project-initializer my-app --auth supabase    # Supabase JWT auth + RLS
 - **Token auth** (`--auth token`) — Bearer-token middleware on the API. Frontend gets a login guard and an HTTP interceptor that attaches the token.
 - **Supabase auth** (`--auth supabase`) — Supabase JWT validation on the API. Frontend integrates `@supabase/supabase-js` for login/signup. Docker Compose omits the local `db` service since Supabase hosts the database.
 
+## Project Scope (full-stack / backend-only / frontend-only)
+
+By default the CLI scaffolds both halves (`api/` + `frontend/`). Use `--scope` to generate only one:
+
+```bash
+project-initializer my-app                      # fullstack (default): api + frontend
+project-initializer my-app --scope api          # backend only — no frontend/, no frontend service
+project-initializer my-app --scope frontend     # frontend only — Angular app, no api/
+```
+
+- **`--scope api`** — emits `api/` + `docker-compose.yml` (without the `frontend` service) + `api/.env`. Combine with `--fastapi`/`--nestjs`/`--auth` as usual.
+- **`--scope frontend`** — emits just the Angular `frontend/` (nginx `/api/` proxy stripped). Cannot be combined with `--fastapi`/`--nestjs`/`--auth` (those are backend concerns).
+- **`--scope fullstack`** (default) — both halves, current behavior.
+
 ## All 6 Variants
 
 | Command | Backend | Auth |
@@ -73,9 +87,11 @@ project-initializer my-app --auth supabase    # Supabase JWT auth + RLS
 Additional flags:
 
 ```bash
-project-initializer my-project --force     # Overwrite existing files
-project-initializer .                      # Scaffold in current directory
-project-initializer --version              # Show version
+project-initializer my-project --scope api       # Backend only
+project-initializer my-project --scope frontend  # Frontend only
+project-initializer my-project --force           # Overwrite existing files
+project-initializer .                            # Scaffold in current directory
+project-initializer --version                    # Show version
 ```
 
 ## Generated Project Structure
@@ -111,7 +127,8 @@ The CLI auto-generates `api/.env` based on the chosen variant. A root `.env.exam
 For Supabase variants, configure these in `api/.env`:
 ```
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_PUBLISHABLE_KEY=your-anon-key
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_...   # client-side (replaces legacy anon key)
+SUPABASE_SECRET_KEY=sb_secret_...             # server-side, bypasses RLS (replaces service_role)
 ```
 
 ## Development
@@ -140,7 +157,7 @@ npm run test                           # Run tests
 
 ```bash
 cd frontend
-npm install
+npm install --legacy-peer-deps
 ng serve                               # Dev server on :4200
 ng build                               # Production build
 ng test                                # Unit tests
