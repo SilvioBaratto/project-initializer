@@ -73,6 +73,21 @@ project-initializer my-app --scope frontend     # frontend only — Angular app,
 - **`--scope frontend`** — emits just the Angular `frontend/` (nginx `/api/` proxy stripped). Cannot be combined with `--fastapi`/`--nestjs`/`--auth` (those are backend concerns).
 - **`--scope fullstack`** (default) — both halves, current behavior.
 
+## Async Database (opt-in)
+
+FastAPI backends scaffold the **sync** SQLAlchemy path by default — sync `def` path operations run in Starlette's threadpool, so a blocking `Session` never stalls the event loop. This is the recommended default per the FastAPI tutorial.
+
+Pass `--async-db` to additionally lay down the **async** SQLAlchemy overlay (async engine + `AsyncSession` + `get_async_db` dependency, asyncpg driver):
+
+```bash
+project-initializer my-app --async-db              # fullstack + async DB path
+project-initializer my-app --scope api --async-db  # backend only + async DB path
+```
+
+- FastAPI only — rejected with `--nestjs` and with `--scope frontend`.
+- Additive: the sync path stays the default; the async modules are an isolated overlay you wire in explicitly.
+- See the generated `api/.claude/CLAUDE.md` for the sync-vs-async convention (pick the keyword from the I/O, not by style).
+
 ## All 6 Variants
 
 | Command | Backend | Auth |
@@ -89,6 +104,7 @@ Additional flags:
 ```bash
 project-initializer my-project --scope api       # Backend only
 project-initializer my-project --scope frontend  # Frontend only
+project-initializer my-project --async-db        # FastAPI async SQLAlchemy path (opt-in)
 project-initializer my-project --force           # Overwrite existing files
 project-initializer .                            # Scaffold in current directory
 project-initializer --version                    # Show version
