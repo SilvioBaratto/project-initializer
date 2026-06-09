@@ -70,6 +70,9 @@ def generate_env(
         lines.append("")
         lines.append("# Authentication")
         lines.append(f"AUTH_TOKEN={val('AUTH_TOKEN')}")
+        lines.append(f"JWT_SECRET_KEY={val('JWT_SECRET_KEY', 'changeme')}")
+        lines.append("JWT_ALGORITHM=HS256")
+        lines.append("ACCESS_TOKEN_EXPIRE_MINUTES=30")
 
     # --- Server ---
     lines.append("")

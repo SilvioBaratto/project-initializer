@@ -56,6 +56,12 @@ baml_client/          # Auto-generated BAML Python client (don't edit)
 
 **Database Access**: Use `get_db` dependency or `database_manager.get_session()` context manager. Sessions use `autoflush=False` and `expire_on_commit=False`.
 
+**Sync vs async**: DB-backed endpoints are sync `def` handlers; BAML/LLM endpoints are `async def`. Pick the keyword from the I/O, not by convention.
+
+- Sync `def` path operations (and `def` dependencies) are offloaded to an `anyio` threadpool, so a blocking sync SQLAlchemy `Session` runs in a worker thread and never blocks the event loop. This is the **default and correct** path for DB routes — see `app/api/v1/items.py`.
+- `async def` runs directly on the event loop; a blocking call inside it stalls the whole loop. Reserve `async def` for real async I/O — specifically BAML/LLM `await` calls — see `app/services/chatbot_service.py`. Never add `async def` for stylistic consistency, and never mix a sync `Session` into an `async def` handler.
+- An opt-in async DB path (async engine + `AsyncSession`) exists and is gated behind a generator flag; the sync path above stays the default.
+
 **API Routes**: All v1 routes go through `/api/v1` prefix. Add new routers in `app/api/v1/router.py`.
 
 **BAML Integration**: Define LLM functions in `baml_src/*.baml`, regenerate client with `baml-cli generate`. Access via `from baml_client.async_client import b as baml_async_client`.

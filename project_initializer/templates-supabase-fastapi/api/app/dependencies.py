@@ -4,7 +4,7 @@ import logging
 import time
 from typing import Annotated, Optional
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Query, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 from supabase import create_client
@@ -152,13 +152,15 @@ def get_rate_limiter(requests: int = 100, window: int = 60) -> RateLimiter:
 class PaginationParams:
     def __init__(
         self,
-        skip: int = 0,
-        limit: int = 100,
+        skip: Annotated[int, Query(ge=0)] = 0,
+        limit: Annotated[int, Query(ge=1, le=100)] = 100,
         order_by: Optional[str] = None,
         order_desc: bool = False,
     ):
-        self.skip = max(0, skip)
-        self.limit = min(max(1, limit), 1000)
+        # Query(ge=0)/(ge=1, le=100) enforce bounds before __init__ runs and
+        # surface them in OpenAPI, so no in-body clamp is needed here.
+        self.skip = skip
+        self.limit = limit
         self.order_by = order_by
         self.order_desc = order_desc
 

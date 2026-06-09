@@ -5,6 +5,7 @@ from app.models.base import (
     TimestampMixin,
     UUIDPrimaryKeyMixin,
 )
+from app.models.item import Item
 from app.models.user import User, UserProfile
 
 __all__ = [
@@ -13,6 +14,7 @@ __all__ = [
     "StringUUIDPrimaryKeyMixin",
     "TimestampMixin",
     "UUIDPrimaryKeyMixin",
+    "Item",
     "User",
     "UserProfile",
 ]

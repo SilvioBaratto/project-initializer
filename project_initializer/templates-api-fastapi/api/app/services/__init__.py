@@ -199,12 +199,10 @@ Best Practices
 """
 
 # Import and export your services here:
-# from app.services.user_service import UserService
-# from app.services.auth_service import AuthService
 from app.services.chatbot_service import ChatbotService
+from app.services.item_service import ItemService
 
 __all__ = [
-    # "UserService",
-    # "AuthService",
     "ChatbotService",
+    "ItemService",
 ]

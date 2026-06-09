@@ -153,18 +153,8 @@ def time_ago(dt: datetime) -> str:
 """
 
 # Import and export your utilities here:
-# from app.utils.helpers import generate_uuid, slugify, truncate, safe_get
-# from app.utils.pagination import PaginationParams, PaginatedResponse
-# from app.utils.datetime_utils import utc_now, format_datetime, time_ago
+from app.utils.audit import write_audit_log
 
 __all__ = [
-    # "generate_uuid",
-    # "slugify",
-    # "truncate",
-    # "safe_get",
-    # "PaginationParams",
-    # "PaginatedResponse",
-    # "utc_now",
-    # "format_datetime",
-    # "time_ago",
+    "write_audit_log",
 ]

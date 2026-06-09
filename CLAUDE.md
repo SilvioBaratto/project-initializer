@@ -9,7 +9,7 @@ This is a pip-installable CLI tool (`project-initializer`) that scaffolds full-s
 ## CLI Flags
 
 ```bash
-project-initializer <name> [--fastapi | --nestjs] [--auth token | --auth supabase] [--scope api | --scope frontend] [--force]
+project-initializer <name> [--fastapi | --nestjs] [--auth token | --auth supabase] [--scope api | --scope frontend] [--async-db] [--force]
 ```
 
 - `--fastapi` (default) or `--nestjs` — backend framework
@@ -18,6 +18,7 @@ project-initializer <name> [--fastapi | --nestjs] [--auth token | --auth supabas
 - `--scope fullstack` (default) — scaffold both halves (`api/` + `frontend/`)
 - `--scope api` — backend only: skips the `frontend/` subtree and drops the `frontend` service from `docker-compose.yml`
 - `--scope frontend` — frontend only: base layer only, strips the `/api/` proxy block from `nginx.conf`; **cannot be combined with `--fastapi`/`--nestjs`/`--auth`** (those are api concerns)
+- `--async-db` — add the opt-in async SQLAlchemy path (FastAPI only): merges the `templates-asyncdb-fastapi` overlay and appends `asyncpg` + `sqlalchemy[asyncio]` to `api/requirements.txt`. The sync path stays the default. **Cannot be combined with `--nestjs` or `--scope frontend`** (it is an api concern).
 - `--force` — overwrite existing files without prompting
 
 ## Build & Run Commands

@@ -39,6 +39,18 @@ FastAPI application with layered architecture:
 | `app/middleware/` | Security, logging, rate limiting |
 | `baml_src/` | LLM function definitions (regenerate client with `baml-cli generate`) |
 
+**Sync vs async**: DB endpoints are sync `def` (offloaded to a threadpool with the sync `Session`); `async def` is reserved for BAML/LLM calls. See `api/.claude/CLAUDE.md` for the full rule.
+
+### Mapping from the FastAPI tutorial
+
+The official FastAPI "Bigger Applications" tutorial organizes path operations into a `routers/` package where each file creates an `APIRouter` and defines route functions — but those route functions also contain inline database queries, business logic, and raw return values. This scaffold maps the tutorial's `routers/` directly to `app/api/v1/`: each router file still owns an `APIRouter` and declares path operations (aggregated in `app/api/v1/router.py`, all under the `/api/v1` prefix), but nothing beyond that. What the tutorial keeps inline inside a route function is here split across four layers: router → `app/services/` (business logic) → `app/repositories/` (data access via the generic `BaseRepository`) → `app/models/` (SQLAlchemy) → `app/schemas/` (Pydantic `<Entity>Create`/`<Entity>Update`/`<Entity>Response`).
+
+This is a **conceptual documentation mapping only — no code is moved or restructured.** See `api/.claude/CLAUDE.md` for the deeper architecture doc.
+
+## Token auth (`--auth token`)
+
+When the `token` overlay is applied, `POST /auth/validate` is a validity **probe**: it returns **HTTP 200 with `authenticated=false`** for an invalid token, because both outcomes are successful *answers* to "is this token valid?". **401 is reserved for guarded endpoints that refuse access** (`/auth/me`, item writes), never for the probe. Consumers must inspect the `authenticated` body flag, not the status code alone — generic middleware that treats any 2xx as "pass" will not catch an invalid token. The supabase variant has **no** `/auth/validate` endpoint; token validity is resolved server-side via JWT / `supabase.auth.getUser()` instead.
+
 ## Docker Services
 
 | Service | Port | Description |

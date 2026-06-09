@@ -16,6 +16,8 @@ recursive-include project_initializer/templates-token-frontend *
 recursive-include project_initializer/templates-token-frontend .*
 recursive-include project_initializer/templates-supabase-frontend *
 recursive-include project_initializer/templates-supabase-frontend .*
+recursive-include project_initializer/templates-asyncdb-fastapi *
+recursive-include project_initializer/templates-asyncdb-fastapi .*
 include project_initializer/py.typed
 include project_initializer/templates/.gitignore
 include project_initializer/templates/.env.example

@@ -4,7 +4,7 @@ import logging
 import time
 from typing import Any, Annotated, Optional
 
-from fastapi import Depends, Header, Request
+from fastapi import Depends, Header, Query, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -49,8 +49,12 @@ def get_default_user_from_db(db: Session) -> dict:
         import uuid
         user_id = str(uuid.uuid4())
         default_user = User(
+            # Use an RFC 2606 reserved domain: routable-looking but guaranteed
+            # invalid, and a valid EmailStr (unlike ``.local``, which pydantic's
+            # EmailStr rejects as an RFC 6761 special-use TLD — that would 500
+            # the UserPublic response model on GET /users/me).
             id=user_id,
-            email="admin@app.local"
+            email="admin@example.com"
         )
         db.add(default_user)
         db.commit()
@@ -87,8 +91,10 @@ def get_current_user(
     if x_user_id:
         logger.debug(f"Using user ID from header: {x_user_id}")
         return {
+            # example.com (RFC 2606) keeps this a valid EmailStr so the
+            # UserPublic response model on GET /users/me serializes cleanly.
             "id": x_user_id,
-            "email": f"user_{x_user_id}@app.local",
+            "email": f"user_{x_user_id}@example.com",
             "username": f"user_{x_user_id}",
             "is_active": True
         }
@@ -243,20 +249,22 @@ class PaginationParams:
     
     def __init__(
         self,
-        skip: int = 0,
-        limit: int = 100,
+        skip: Annotated[int, Query(ge=0)] = 0,
+        limit: Annotated[int, Query(ge=1, le=100)] = 100,
         order_by: Optional[str] = None,
         order_desc: bool = False,
         cursor: Optional[str] = None,
         use_cursor: bool = False
     ):
-        self.skip = max(0, skip)
-        self.limit = min(max(1, limit), 1000)  # Max 1000 items for safety
+        # Query(ge=0)/(ge=1, le=100) enforce bounds before __init__ runs and
+        # surface them in OpenAPI, so no in-body clamp is needed here.
+        self.skip = skip
+        self.limit = limit
         self.order_by = order_by
         self.order_desc = order_desc
         self.cursor = cursor
         self.use_cursor = use_cursor or cursor is not None
-        
+
         # Performance warning for large offsets
         if self.skip > 10000 and not self.use_cursor:
             logger.warning(f"Large offset detected ({self.skip}). Consider using cursor-based pagination for better performance.")
@@ -285,22 +293,5 @@ class PaginationParams:
             return None, self.order_desc
 
 
-class FilterParams:
-    """Common filter parameters"""
-    
-    def __init__(
-        self,
-        search: Optional[str] = None,
-        is_active: Optional[bool] = None,
-        created_after: Optional[str] = None,
-        created_before: Optional[str] = None
-    ):
-        self.search = search
-        self.is_active = is_active
-        self.created_after = created_after
-        self.created_before = created_before
-
-
 # Dependency shortcuts
 Pagination = Annotated[PaginationParams, Depends()]
-Filters = Annotated[FilterParams, Depends()]

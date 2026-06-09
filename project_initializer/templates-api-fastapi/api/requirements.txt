@@ -11,6 +11,8 @@ alembic==1.18.4
 # Data Validation
 pydantic==2.13.4
 pydantic-settings==2.14.1
+# Required by pydantic EmailStr (UserBase.email); pydantic does not bundle it.
+email-validator==2.3.0
 
 # File Handling
 python-multipart==0.0.32
@@ -25,6 +27,9 @@ httpx==0.28.1
 # Authentication (optional - for future use if needed)
 python-jose[cryptography]==3.5.0
 passlib[bcrypt]==1.7.4
+# Pin bcrypt: passlib 1.7.4 reads bcrypt.__about__.__version__, removed in
+# bcrypt>=4.1, so an unpinned bcrypt (5.x) breaks CryptContext at hash time.
+bcrypt==4.0.1
 
 # Testing
 pytest==9.0.3

@@ -4,6 +4,8 @@ from fastapi import APIRouter
 
 from app.api.v1.test import router as test_router
 from app.api.v1.chatbot import router as chatbot_router
+from app.api.v1.items import router as items_router
+from app.api.v1.users import router as users_router
 
 # Create the main API router
 api_router = APIRouter()
@@ -11,3 +13,5 @@ api_router = APIRouter()
 # Include all route modules
 api_router.include_router(test_router)
 api_router.include_router(chatbot_router)
+api_router.include_router(items_router)
+api_router.include_router(users_router)

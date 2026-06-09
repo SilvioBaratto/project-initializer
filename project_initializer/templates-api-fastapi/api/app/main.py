@@ -8,7 +8,6 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
-from fastapi.openapi.utils import get_openapi
 
 from app.config import settings
 from app.database import database_manager, init_db, close_db
@@ -32,6 +31,23 @@ logging.basicConfig(
     ),
 )
 logger = logging.getLogger(__name__)
+
+
+# OpenAPI metadata — per-tag descriptions render as grouped sections in Swagger /
+# ReDoc. Order here is the order tags appear in the docs. Edit the descriptions
+# (and the contact / license below) to match your project before shipping.
+TAGS_METADATA = [
+    {"name": "Items", "description": "CRUD for the example **Item** resource — the reference DB-backed router."},
+    {"name": "Users", "description": "The authenticated user's own profile (`/users/me`)."},
+    {"name": "Auth", "description": "Authentication — token validation and (token variant) JWT register/login."},
+    {"name": "Chatbot", "description": "BAML-powered LLM chat: complete and streaming responses."},
+    {"name": "Test", "description": "Demo / health-style routes used to exercise the stack."},
+]
+
+# Project identity constants — set once at scaffold time, not per-deployment, so
+# they live here rather than in Settings (env vars). Replace with your own.
+CONTACT_INFO = {"name": "API Support", "email": "support@example.com"}
+LICENSE_INFO = {"name": "MIT", "identifier": "MIT"}
 
 
 @asynccontextmanager
@@ -87,7 +103,11 @@ def create_application() -> FastAPI:
     app = FastAPI(
         title=settings.project_name,
         version=settings.version,
+        summary="Modern API scaffold with layered architecture and BAML LLM integration.",
         description="Modern API",
+        openapi_tags=TAGS_METADATA,
+        contact=CONTACT_INFO,
+        license_info=LICENSE_INFO,
         docs_url=None,  # Disable default docs - we'll set up custom ones
         redoc_url=None,  # Disable default redoc - we'll set up custom ones
         openapi_url=(
@@ -197,8 +217,15 @@ def setup_documentation_endpoints(app: FastAPI) -> None:
 
     @app.get("/openapi.json", include_in_schema=False)
     def get_openapi_json():
-        """OpenAPI JSON schema"""
-        return get_openapi(title=app.title, version=app.version, routes=app.routes)
+        """OpenAPI JSON schema.
+
+        Delegate to ``app.openapi()`` so the served schema reflects ALL metadata
+        set on the app (summary/description/openapi_tags/contact/license_info).
+        The 3-arg ``get_openapi(title, version, routes)`` form silently dropped
+        them. This route is the sole responder only when ``openapi_url`` is None
+        (production); otherwise FastAPI's built-in route serves the same schema.
+        """
+        return app.openapi()
 
 
 # Create the application instance

@@ -11,6 +11,7 @@
 # baml-cli is available with the baml package.
 
 import typing
+import typing_extensions
 
 
 from . import stream_types, types
@@ -54,4 +55,4 @@ class LlmStreamParser:
         __result__ = self.__options.merge_options(baml_options).parse_response(function_name="StreamChat", llm_response=llm_response, mode="stream")
         return typing.cast(stream_types.ChatResponse, __result__)
 
-    
+    

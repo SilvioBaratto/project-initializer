@@ -106,3 +106,23 @@ def generate_frontend_compose() -> str:
         an ``app_network`` network definition; no ``depends_on``.
     """
     return _FRONTEND_COMPOSE
+
+
+# Pinned to match SQLAlchemy==2.0.50 already in the base requirements; the
+# extras form pulls greenlet for the async path. asyncpg is the async driver.
+_ASYNC_REQUIREMENTS = (
+    "\n# Async DB path (--async-db) — opt-in asyncpg driver + asyncio extras\n"
+    "asyncpg==0.31.0\n"
+    "sqlalchemy[asyncio]==2.0.50\n"
+)
+
+
+def append_async_requirements(text: str) -> str:
+    """Append the async DB deps to a requirements.txt body (pure, idempotent).
+
+    Returns ``text`` unchanged when ``asyncpg`` is already present so a re-run
+    over an already-async requirements file never double-appends.
+    """
+    if "asyncpg" in text:
+        return text
+    return text + _ASYNC_REQUIREMENTS

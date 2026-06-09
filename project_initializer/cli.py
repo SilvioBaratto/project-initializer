@@ -9,6 +9,7 @@ from pathlib import Path
 from . import __version__
 from .env_generator import generate_env, parse_env
 from .file_transforms import (
+    append_async_requirements,
     filter_compose,
     generate_frontend_compose,
     strip_nginx_proxy_block,
@@ -37,23 +38,60 @@ def get_auth_frontend_overlay_dir(auth_mode: str) -> Path:
     return TEMPLATES_ROOT / f"templates-{auth_mode}-frontend"
 
 
-def _compose_transform(scope: str) -> Callable:
-    """Return a file_transform that filters docker-compose.yml for the given scope."""
+def get_asyncdb_overlay_dir() -> Path:
+    """Opt-in async SQLAlchemy overlay (FastAPI only), merged by --async-db."""
+    return TEMPLATES_ROOT / "templates-asyncdb-fastapi"
 
-    def transform(path: Path) -> str | None:
+
+def _compose_handler(scope: str) -> Callable:
+    """File handler that filters docker-compose.yml for the given scope."""
+
+    def handle(path: Path) -> str | None:
         if path.name == "docker-compose.yml":
             return filter_compose(path.read_text(encoding="utf-8"), scope)
         return None
 
-    return transform
+    return handle
 
 
-def _nginx_transform() -> Callable:
-    """Return a file_transform that strips the /api/ proxy from nginx.conf."""
+def _nginx_handler() -> Callable:
+    """File handler that strips the /api/ proxy block from nginx.conf."""
 
-    def transform(path: Path) -> str | None:
+    def handle(path: Path) -> str | None:
         if path.name == "nginx.conf":
             return strip_nginx_proxy_block(path.read_text(encoding="utf-8"))
+        return None
+
+    return handle
+
+
+def _requirements_handler() -> Callable:
+    """File handler that appends the async DB deps to api/requirements.txt."""
+
+    def handle(path: Path) -> str | None:
+        if path.name == "requirements.txt":
+            return append_async_requirements(path.read_text(encoding="utf-8"))
+        return None
+
+    return handle
+
+
+def _combine(*handlers: Callable | None) -> Callable | None:
+    """Compose filename handlers into one transform; None if all are None.
+
+    Returning None when nothing applies preserves byte-identical pass-through
+    (the default scaffold). Handlers target disjoint filenames, so first
+    non-None wins is an unambiguous dispatch.
+    """
+    active = [handler for handler in handlers if handler is not None]
+    if not active:
+        return None
+
+    def transform(path: Path) -> str | None:
+        for handler in active:
+            result = handler(path)
+            if result is not None:
+                return result
         return None
 
     return transform
@@ -63,40 +101,51 @@ def select_layers(
     scope: str,
     framework: str,
     auth: str | None,
+    async_db: bool = False,
 ) -> list[tuple[Path, frozenset[str], Callable | None]]:
     """Return the ordered merge layers for the requested scope.
 
-    Each tuple is (src_dir, skip_subdirs, file_transform).  For this cycle
-    all transforms are None (#6/#7 fill them later).  The frontend branch
-    MUST NOT consult ``framework`` — it is scope-only.
+    Each tuple is (src_dir, skip_subdirs, file_transform). The frontend branch
+    MUST NOT consult ``framework`` — it is scope-only. When ``async_db`` is set
+    (FastAPI only), a requirements transform is composed onto the layers that
+    carry ``requirements.txt`` (the async overlay ships none), and the async
+    overlay is appended last.
 
     Declarative data construction — exempt from the <10-line rule.
     """
     base = get_templates_dir()
     api = get_api_templates_dir(framework)
+    want_async = async_db and framework == "fastapi"
+    reqs = _requirements_handler() if want_async else None
 
     if scope == "fullstack":
         layers: list[tuple[Path, frozenset[str], Callable | None]] = [
             (base, frozenset(), None),
-            (api, frozenset(), None),
+            (api, frozenset(), _combine(reqs)),
         ]
         if auth:
-            layers.append((get_auth_overlay_dir(auth, framework), frozenset(), None))
+            layers.append((get_auth_overlay_dir(auth, framework), frozenset(), _combine(reqs)))
             layers.append((get_auth_frontend_overlay_dir(auth), frozenset(), None))
+        if want_async:
+            layers.append((get_asyncdb_overlay_dir(), frozenset(), None))
         return layers
 
     if scope == "api":
-        compose = _compose_transform("api")
+        compose = _compose_handler("api")
         layers = [
             (base, frozenset({"frontend"}), None),
-            (api, frozenset({"frontend"}), compose),
+            (api, frozenset({"frontend"}), _combine(compose, reqs)),
         ]
         if auth:
-            layers.append((get_auth_overlay_dir(auth, framework), frozenset(), compose))
+            layers.append(
+                (get_auth_overlay_dir(auth, framework), frozenset(), _combine(compose, reqs))
+            )
+        if want_async:
+            layers.append((get_asyncdb_overlay_dir(), frozenset(), None))
         return layers
 
     # scope == "frontend"
-    layers = [(base, frozenset(), _nginx_transform())]
+    layers = [(base, frozenset(), _nginx_handler())]
     if auth:
         layers.append((get_auth_frontend_overlay_dir(auth), frozenset(), None))
     return layers
@@ -122,6 +171,7 @@ def copy_template(
     auth: str | None = None,
     framework: str = "fastapi",
     scope: str = "fullstack",
+    async_db: bool = False,
 ) -> None:
     """Copy template files to destination directory."""
     skip_patterns = {
@@ -174,7 +224,7 @@ def copy_template(
     print(f"Framework: {framework}{auth_label}")
     print("-" * 40)
 
-    for src, skip, transform in select_layers(scope, framework, auth):
+    for src, skip, transform in select_layers(scope, framework, auth, async_db):
         require_dir(src)
         copy_tree(src, dest_dir, skip, transform)
 
@@ -255,6 +305,12 @@ def build_parser() -> argparse.ArgumentParser:
         default="fullstack",
         help="Layers to scaffold: 'fullstack' (default), 'api', or 'frontend'",
     )
+    parser.add_argument(
+        "--async-db",
+        dest="async_db",
+        action="store_true",
+        help="Add the opt-in async SQLAlchemy path (FastAPI only)",
+    )
 
     framework_group = parser.add_mutually_exclusive_group()
     framework_group.add_argument(
@@ -275,18 +331,27 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def validate_scope(scope: str, framework: str | None, auth: str | None) -> list[str]:
+def validate_scope(
+    scope: str,
+    framework: str | None,
+    auth: str | None,
+    async_db: bool = False,
+) -> list[str]:
     """Return error messages for invalid --scope / framework / auth combos.
 
     Pure function (no I/O); empty list means valid. ``framework``/``auth`` are
     ``None`` when their flags were omitted, so ``--scope frontend`` alone is
-    accepted. The ``api`` branch has no frontend-only flags to reject yet
-    (Cycle 2 may add them); ``api``/``fullstack`` accept all API options.
+    accepted. ``--async-db`` is a FastAPI api concern: rejected for ``--nestjs``
+    and for ``--scope frontend``; ``api``/``fullstack`` accept all API options.
     """
     if scope == "frontend" and framework is not None:
         return ["--scope frontend cannot be combined with --fastapi/--nestjs"]
     if scope == "frontend" and auth is not None:
         return ["--scope frontend cannot be combined with --auth"]
+    if async_db and framework == "nestjs":
+        return ["--async-db is a FastAPI option and cannot be combined with --nestjs"]
+    if async_db and scope == "frontend":
+        return ["--async-db cannot be combined with --scope frontend"]
     return []
 
 
@@ -294,7 +359,7 @@ def main() -> None:
     """Main entry point for the CLI."""
     parser = build_parser()
     args = parser.parse_args()
-    errors = validate_scope(args.scope, args.framework, args.auth)
+    errors = validate_scope(args.scope, args.framework, args.auth, args.async_db)
     if errors:
         parser.error(errors[0])
     framework = args.framework if args.framework is not None else "fastapi"
@@ -318,6 +383,7 @@ def main() -> None:
         auth=args.auth,
         framework=framework,
         scope=args.scope,
+        async_db=args.async_db,
     )
 
 

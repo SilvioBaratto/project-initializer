@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=77.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,7 +7,8 @@ name = "project-initializer"
 version = "0.3.0"
 description = "CLI tool to scaffold full-stack projects with FastAPI or NestJS, Angular, and Docker"
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
 authors = [
     {name = "Silvio Baratto"}
@@ -17,7 +18,6 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -41,6 +41,11 @@ Repository = "https://github.com/silviobaratto/project-initializer"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "unit: unit test",
+    "integration: integration test",
+    "e2e: end-to-end test",
+]
 
 [tool.setuptools]
 include-package-data = true
@@ -60,4 +65,8 @@ include = ["project_initializer*"]
     "templates-supabase-fastapi/**/*", "templates-supabase-fastapi/**/.*",
     "templates-supabase-nestjs/**/*", "templates-supabase-nestjs/**/.*",
     "templates-supabase-frontend/**/*", "templates-supabase-frontend/**/.*",
+    "templates-asyncdb-fastapi/**/*", "templates-asyncdb-fastapi/**/.*",
 ]
+
+[tool.ruff]
+exclude = ["**/baml_client/**"]

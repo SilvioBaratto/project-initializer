@@ -58,6 +58,11 @@ class Settings(BaseSettings):
     # Authentication
     auth_token: str = Field(default="changeme")
 
+    # JWT (opt-in OAuth2-password flow — alternative to the static AUTH_TOKEN above)
+    jwt_secret_key: str = Field(default="changeme")
+    jwt_algorithm: str = Field(default="HS256")
+    access_token_expire_minutes: int = Field(default=30)
+
     # Security (optional for production)
     
     # Rate Limiting
