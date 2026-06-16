@@ -36,9 +36,10 @@ COPY . .
 ENV PYTHONPATH=/home/appuser/.local/lib/python3.12/site-packages
 RUN /home/appuser/.local/bin/baml-cli generate
 
-# Copy and make entrypoint script executable
+# Copy entrypoint script. Strip any CR (defends against a CRLF checkout on
+# Windows) and make it executable so the shebang resolves inside the container.
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 
 # Change ownership
 RUN chown -R appuser:appuser /app && \
