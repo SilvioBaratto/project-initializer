@@ -33,7 +33,11 @@ def test_when_new_user_registers_201_is_returned_with_user_public_body(client):
     but no password or password_hash."""
     resp = client.post(
         f"{API}/auth/register",
-        json={"email": "jwt-register@example.com", "password": "strongpassword", "username": "jwtregister"},
+        json={
+            "email": "jwt-register@example.com",
+            "password": "strongpassword",
+            "username": "jwtregister",
+        },
     )
 
     assert resp.status_code == 201
@@ -102,7 +106,9 @@ def test_when_token_receives_wrong_password_401_is_returned(client):
 
 
 @pytest.mark.integration
-def test_when_jwt_protected_route_called_with_valid_token_200_and_email_returned(client):
+def test_when_jwt_protected_route_called_with_valid_token_200_and_email_returned(
+    client,
+):
     """when the JWT-protected route is called with the minted bearer token,
     200 and the user email is returned."""
     client.post(
@@ -163,7 +169,9 @@ def test_when_openapi_fetched_then_jwt_routes_carry_explicit_summaries(client):
     paths = client.get("/openapi.json").json()["paths"]
 
     assert paths["/api/v1/auth/register"]["post"]["summary"] == "Register a new user"
-    assert paths["/api/v1/auth/token"]["post"]["summary"] == "Log in for an access token"
+    assert (
+        paths["/api/v1/auth/token"]["post"]["summary"] == "Log in for an access token"
+    )
     assert paths["/api/v1/auth/me/jwt"]["get"]["summary"] == "Get the current JWT user"
 
 

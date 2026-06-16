@@ -6,7 +6,11 @@ import logging
 from typing import Optional, Annotated, Any
 
 from fastapi import Depends, HTTPException, Query, Request, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, OAuth2PasswordBearer
+from fastapi.security import (
+    HTTPBearer,
+    HTTPAuthorizationCredentials,
+    OAuth2PasswordBearer,
+)
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -181,7 +185,9 @@ class RateLimiter:
         """Check rate limit for the request"""
         return self._check_memory_rate_limit(request, current_user)
 
-    def _check_memory_rate_limit(self, request: Request, current_user: Optional[dict] = None) -> bool:
+    def _check_memory_rate_limit(
+        self, request: Request, current_user: Optional[dict] = None
+    ) -> bool:
         if self.per_user and current_user:
             key = f"user:{current_user['id']}"
         else:
@@ -194,12 +200,14 @@ class RateLimiter:
             self._in_memory_cache[key] = []
 
         self._in_memory_cache[key] = [
-            timestamp for timestamp in self._in_memory_cache[key]
+            timestamp
+            for timestamp in self._in_memory_cache[key]
             if timestamp > window_start
         ]
 
         if len(self._in_memory_cache[key]) >= self.requests:
             from app.exceptions import RateLimitError
+
             raise RateLimitError(
                 message=f"Rate limit exceeded: {len(self._in_memory_cache[key])}/{self.requests} requests per {self.window}s"
             )
@@ -236,7 +244,7 @@ class PaginationParams:
         order_by: Optional[str] = None,
         order_desc: bool = False,
         cursor: Optional[str] = None,
-        use_cursor: bool = False
+        use_cursor: bool = False,
     ):
         # Query(ge=0)/(ge=1, le=100) enforce bounds before __init__ runs and
         # surface them in OpenAPI, so no in-body clamp is needed here.
@@ -248,11 +256,14 @@ class PaginationParams:
         self.use_cursor = use_cursor or cursor is not None
 
         if self.skip > 10000 and not self.use_cursor:
-            logger.warning(f"Large offset detected ({self.skip}). Consider using cursor-based pagination for better performance.")
+            logger.warning(
+                f"Large offset detected ({self.skip}). Consider using cursor-based pagination for better performance."
+            )
 
     def encode_cursor(self, value: Any) -> str:
         import base64
         import json
+
         cursor_data = {"value": str(value), "order_desc": self.order_desc}
         cursor_json = json.dumps(cursor_data)
         return base64.urlsafe_b64encode(cursor_json.encode()).decode()
@@ -264,6 +275,7 @@ class PaginationParams:
         try:
             import base64
             import json
+
             cursor_json = base64.urlsafe_b64decode(self.cursor.encode()).decode()
             cursor_data = json.loads(cursor_json)
             return cursor_data["value"], cursor_data["order_desc"]

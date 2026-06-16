@@ -25,6 +25,7 @@ router = APIRouter(prefix="/chat", tags=["Chatbot"])
 # Dependency Injection
 # ===========================
 
+
 def get_chatbot_service() -> ChatbotService:
     """
     Dependency that provides a ChatbotService instance.
@@ -43,10 +44,11 @@ def get_chatbot_service() -> ChatbotService:
 # Endpoints
 # ===========================
 
+
 @router.post("/", response_model=ChatResponse, status_code=status.HTTP_200_OK)
 async def chat(
     request: ChatRequest,
-    service: Annotated[ChatbotService, Depends(get_chatbot_service)]
+    service: Annotated[ChatbotService, Depends(get_chatbot_service)],
 ):
     """
     Send a chat message and receive a complete response.
@@ -89,14 +91,14 @@ async def chat(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to process chat request: {str(e)}"
+            detail=f"Failed to process chat request: {str(e)}",
         )
 
 
 @router.post("/stream", status_code=status.HTTP_200_OK)
 async def chat_stream(
     request: ChatRequest,
-    service: Annotated[ChatbotService, Depends(get_chatbot_service)]
+    service: Annotated[ChatbotService, Depends(get_chatbot_service)],
 ):
     """
     Send a chat message and receive a streaming response.
@@ -179,6 +181,7 @@ async def chat_stream(
                         print('Stream complete')
     ```
     """
+
     async def event_generator():
         """
         Generator that yields Server-Sent Events (SSE) formatted chunks.
@@ -198,10 +201,7 @@ async def chat_stream(
 
         except Exception as e:
             # Send error as SSE
-            error_chunk = StreamChunk(
-                content=f"Error: {str(e)}",
-                done=True
-            )
+            error_chunk = StreamChunk(content=f"Error: {str(e)}", done=True)
             yield f"data: {error_chunk.model_dump_json()}\n\n"
 
     return StreamingResponse(
@@ -211,7 +211,7 @@ async def chat_stream(
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",  # Disable buffering in nginx
-        }
+        },
     )
 
 
@@ -231,7 +231,4 @@ async def health_check():
     }
     ```
     """
-    return {
-        "status": "healthy",
-        "service": "chatbot"
-    }
+    return {"status": "healthy", "service": "chatbot"}

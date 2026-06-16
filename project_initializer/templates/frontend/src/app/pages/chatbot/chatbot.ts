@@ -8,8 +8,8 @@ import {
   ChangeDetectionStrategy,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ChatService } from '../../services/chat.service';
-import { ChatMessage } from '../../models/chat.model';
+import { ChatService } from '../../services/chat';
+import { ChatMessage } from '../../models/chat';
 
 @Component({
   selector: 'app-chatbot',

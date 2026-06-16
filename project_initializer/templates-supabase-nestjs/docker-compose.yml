@@ -1,4 +1,16 @@
 services:
+  # Redis (BullMQ queue backend)
+  redis:
+    image: redis:7-alpine
+    container_name: app_redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app_network
+
   # NestJS Backend (connects to hosted Supabase DB)
   api:
     build:
@@ -6,8 +18,14 @@ services:
       dockerfile: Dockerfile
       target: dev
     container_name: app_api
+    depends_on:
+      redis:
+        condition: service_healthy
     env_file:
       - ./api/.env
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     ports:
       - "8000:8000"
     volumes:
@@ -16,6 +34,12 @@ services:
     networks:
       - app_network
     command: npm run start:dev
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8000/api/v1/health/liveness || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
 
   # Angular Frontend with nginx and API proxy
   frontend:
@@ -24,7 +48,8 @@ services:
       dockerfile: Dockerfile
     container_name: app_frontend
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     ports:
       - "4200:80"
     networks:

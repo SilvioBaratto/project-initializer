@@ -1,6 +1,6 @@
 import { Component, computed, input, output, inject, ChangeDetectionStrategy } from '@angular/core';
 import { RouterLink, RouterLinkActive, Router } from '@angular/router';
-import { AuthService } from '../../services/auth.service';
+import { AuthService } from '../../services/auth';
 
 interface NavItem {
   name: string;

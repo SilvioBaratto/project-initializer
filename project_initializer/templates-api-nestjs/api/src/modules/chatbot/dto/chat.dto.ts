@@ -15,6 +15,20 @@ export const StreamChunkSchema = z.object({
   done: z.boolean(),
 });
 
+export const ChatJobAcceptedSchema = z.object({
+  jobId: z.string(),
+});
+
+export const ChatJobStatusSchema = z.object({
+  jobId: z.string(),
+  state: z.string(),
+  // nullish() accepts the response object, null (non-completed/failed jobs), or undefined.
+  // .optional() alone rejects null, causing a ZodError → HTTP 500 for any state except completed.
+  result: ChatResponseSchema.nullish(),
+});
+
 export class ChatRequestDto extends createZodDto(ChatRequestSchema) {}
 export class ChatResponseDto extends createZodDto(ChatResponseSchema) {}
 export class StreamChunkDto extends createZodDto(StreamChunkSchema) {}
+export class ChatJobAcceptedDto extends createZodDto(ChatJobAcceptedSchema) {}
+export class ChatJobStatusDto extends createZodDto(ChatJobStatusSchema) {}

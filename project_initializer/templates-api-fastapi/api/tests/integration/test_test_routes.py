@@ -47,7 +47,8 @@ def test_when_item_crud_round_trips_then_it_persists_and_deletes(client):
     """when an item is created, it round-trips through the DB and a delete removes it."""
     # CREATE (201)
     created = client.post(
-        f"{API}/items", json={"name": "Widget", "description": "A widget", "price": 9.99}
+        f"{API}/items",
+        json={"name": "Widget", "description": "A widget", "price": 9.99},
     )
     assert created.status_code == 201
     item_id = created.json()["id"]
@@ -66,7 +67,9 @@ def test_when_item_crud_round_trips_then_it_persists_and_deletes(client):
     assert any(it["id"] == item_id for it in body["items"])
 
     # UPDATE — fields change
-    updated = client.put(f"{API}/items/{item_id}", json={"name": "Renamed", "price": 1.0})
+    updated = client.put(
+        f"{API}/items/{item_id}", json={"name": "Renamed", "price": 1.0}
+    )
     assert updated.status_code == 200
     assert updated.json()["name"] == "Renamed"
     assert updated.json()["price"] == 1.0

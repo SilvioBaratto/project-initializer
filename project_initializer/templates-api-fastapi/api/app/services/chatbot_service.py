@@ -44,8 +44,7 @@ class ChatbotService:
         return ChatResponse(answer=result.answer)
 
     async def stream_chat(
-        self,
-        request: ChatRequest
+        self, request: ChatRequest
     ) -> AsyncGenerator[StreamChunk, None]:
         """
         Process a chat request with streaming response.
@@ -69,13 +68,7 @@ class ChatbotService:
 
         async for partial in stream:
             if partial and partial.answer:
-                yield StreamChunk(
-                    content=partial.answer,
-                    done=False
-                )
+                yield StreamChunk(content=partial.answer, done=False)
 
         final = await stream.get_final_response()
-        yield StreamChunk(
-            content=final.answer,
-            done=True
-        )
+        yield StreamChunk(content=final.answer, done=True)

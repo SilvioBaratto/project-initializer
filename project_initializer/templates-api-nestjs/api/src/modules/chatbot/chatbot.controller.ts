@@ -1,15 +1,26 @@
-import { Controller, Post, Get, Body, Res } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, Res } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Response } from 'express';
+import { ZodSerializerDto } from 'nestjs-zod';
 import { ChatbotService } from './chatbot.service';
-import { ChatRequestDto, ChatResponseDto } from './dto/chat.dto';
+import { ChatJobService } from './chat-job.service';
+import {
+  ChatRequestDto,
+  ChatResponseDto,
+  ChatJobAcceptedDto,
+  ChatJobStatusDto,
+} from './dto/chat.dto';
 
 @ApiTags('Chatbot')
 @Controller('chat')
 export class ChatbotController {
-  constructor(private readonly chatbotService: ChatbotService) {}
+  constructor(
+    private readonly chatbotService: ChatbotService,
+    private readonly chatJobService: ChatJobService,
+  ) {}
 
   @Post()
+  @ZodSerializerDto(ChatResponseDto)
   @ApiOperation({ summary: 'Send a chat message' })
   async chat(@Body() chatRequest: ChatRequestDto): Promise<ChatResponseDto> {
     return this.chatbotService.chat(chatRequest);
@@ -37,6 +48,22 @@ export class ChatbotController {
       );
       res.end();
     }
+  }
+
+  @Post('jobs')
+  @ZodSerializerDto(ChatJobAcceptedDto)
+  @ApiOperation({ summary: 'Enqueue a chat job (async)' })
+  async enqueueChat(@Body() chatRequest: ChatRequestDto): Promise<ChatJobAcceptedDto> {
+    const jobId = await this.chatJobService.enqueueChat(chatRequest);
+    return { jobId };
+  }
+
+  @Get('jobs/:id')
+  @ZodSerializerDto(ChatJobStatusDto)
+  @ApiOperation({ summary: 'Poll chat job status' })
+  async getJobStatus(@Param('id') id: string): Promise<ChatJobStatusDto> {
+    const { state, result } = await this.chatJobService.getJobStatus(id);
+    return { jobId: id, state, result: result as ChatJobStatusDto['result'] };
   }
 
   @Get('health')

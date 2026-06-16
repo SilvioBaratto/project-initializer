@@ -34,7 +34,9 @@ def test_when_validate_gets_wrong_token_then_authenticated_false(client):
 
 
 @pytest.mark.integration
-def test_when_validate_gets_invalid_token_then_200_not_401_is_the_locked_contract(client):
+def test_when_validate_gets_invalid_token_then_200_not_401_is_the_locked_contract(
+    client,
+):
     """LOCKED CONTRACT: /auth/validate is a validity probe, not a guard.
 
     An invalid token is a successful *answer* to "is this token valid?", so the
@@ -42,7 +44,9 @@ def test_when_validate_gets_invalid_token_then_200_not_401_is_the_locked_contrac
     reserved for guarded endpoints that refuse access (``/auth/me``, item
     writes). Do not flip this to 401 without changing this contract on purpose.
     """
-    resp = client.post(f"{API}/auth/validate", json={"token": "definitely-not-the-token"})
+    resp = client.post(
+        f"{API}/auth/validate", json={"token": "definitely-not-the-token"}
+    )
 
     assert resp.status_code == 200
     assert resp.status_code != 401

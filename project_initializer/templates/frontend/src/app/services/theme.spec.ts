@@ -1,28 +1,28 @@
-import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { vi } from 'vitest';
 
-import { ThemeService } from './theme.service';
+import { ThemeService } from './theme';
 
 const STORAGE_KEY = 'app-theme';
 
 describe('ThemeService', () => {
   let matchMediaMock: {
     matches: boolean;
-    addEventListener: jasmine.Spy;
-    removeEventListener: jasmine.Spy;
+    addEventListener: ReturnType<typeof vi.fn>;
+    removeEventListener: ReturnType<typeof vi.fn>;
   };
 
   function setupMatchMedia(prefersDark: boolean): void {
     matchMediaMock = {
       matches: prefersDark,
-      addEventListener: jasmine.createSpy('addEventListener'),
-      removeEventListener: jasmine.createSpy('removeEventListener'),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
     };
-    spyOn(window, 'matchMedia').and.returnValue(matchMediaMock as unknown as MediaQueryList);
+    vi.spyOn(window, 'matchMedia').mockReturnValue(matchMediaMock as unknown as MediaQueryList);
   }
 
   function createService(): ThemeService {
-    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection()] });
+    TestBed.configureTestingModule({});
     return TestBed.inject(ThemeService);
   }
 
@@ -94,7 +94,7 @@ describe('ThemeService', () => {
     it('when setTheme is called, the choice is written to localStorage', () => {
       setupMatchMedia(false);
       const service = createService();
-      const setItem = spyOn(localStorage, 'setItem');
+      const setItem = vi.spyOn(localStorage, 'setItem');
       service.setTheme('dark');
       expect(setItem).toHaveBeenCalledWith(STORAGE_KEY, 'dark');
     });
@@ -122,7 +122,7 @@ describe('ThemeService', () => {
     it('when the service initializes, a matchMedia change listener is registered', () => {
       setupMatchMedia(false);
       createService();
-      expect(matchMediaMock.addEventListener).toHaveBeenCalledWith('change', jasmine.any(Function));
+      expect(matchMediaMock.addEventListener).toHaveBeenCalledWith('change', expect.any(Function));
     });
   });
 

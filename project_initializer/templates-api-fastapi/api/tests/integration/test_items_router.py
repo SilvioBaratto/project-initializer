@@ -151,9 +151,9 @@ def test_when_openapi_fetched_then_limit_advertises_min_1_max_100(client):
 @pytest.mark.integration
 def test_when_openapi_fetched_then_item_id_path_advertises_min_length(client):
     """when the OpenAPI schema is read, the item_id path param advertises minLength 1."""
-    params = client.get("/openapi.json").json()["paths"][
-        "/api/v1/items/{item_id}"
-    ]["get"]["parameters"]
+    params = client.get("/openapi.json").json()["paths"]["/api/v1/items/{item_id}"][
+        "get"
+    ]["parameters"]
     item_id = next(p for p in params if p["name"] == "item_id")
     assert item_id["schema"].get("minLength") == 1
 

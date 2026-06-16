@@ -25,8 +25,11 @@ _bearer_scheme = HTTPBearer(auto_error=False)
 # Supabase JWT Authentication
 # ===========================
 
+
 async def get_current_user(
-    credentials: Annotated[Optional[HTTPAuthorizationCredentials], Depends(_bearer_scheme)],
+    credentials: Annotated[
+        Optional[HTTPAuthorizationCredentials], Depends(_bearer_scheme)
+    ],
 ) -> dict:
     """
     Verify the Supabase JWT and return the authenticated user.
@@ -68,7 +71,9 @@ async def get_current_user(
 
 
 async def get_optional_user(
-    credentials: Annotated[Optional[HTTPAuthorizationCredentials], Depends(_bearer_scheme)],
+    credentials: Annotated[
+        Optional[HTTPAuthorizationCredentials], Depends(_bearer_scheme)
+    ],
 ) -> Optional[dict]:
     """Return authenticated user if token is present, None otherwise."""
     if not credentials:
@@ -97,6 +102,7 @@ DBSession = Annotated[Session, Depends(get_db)]
 # Rate Limiting
 # ===========================
 
+
 class RateLimiter:
     """In-memory rate limiting dependency"""
 
@@ -124,6 +130,7 @@ class RateLimiter:
 
         if len(self._in_memory_cache[key]) >= self.requests:
             from app.exceptions import RateLimitError
+
             raise RateLimitError(
                 message=f"Rate limit exceeded: {len(self._in_memory_cache[key])}/{self.requests} requests per {self.window}s"
             )
@@ -148,6 +155,7 @@ def get_rate_limiter(requests: int = 100, window: int = 60) -> RateLimiter:
 # ===========================
 # Pagination
 # ===========================
+
 
 class PaginationParams:
     def __init__(

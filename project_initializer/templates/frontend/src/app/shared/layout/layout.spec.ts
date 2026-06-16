@@ -1,6 +1,5 @@
-import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { LucideIconConfig } from 'lucide-angular';
 
 import { ICON_PROVIDER } from '../../icons';
@@ -11,7 +10,6 @@ describe('LayoutComponent', () => {
     await TestBed.configureTestingModule({
       imports: [LayoutComponent],
       providers: [
-        provideZonelessChangeDetection(),
         provideRouter([]),
         ICON_PROVIDER,
         {
@@ -73,5 +71,45 @@ describe('LayoutComponent', () => {
     expect(component.isSidebarOpen()).toBe(false);
     component.toggleSidebar();
     expect(component.isSidebarOpen()).toBe(true);
+  });
+
+  it('when navigation ends, focus moves to main-content', async () => {
+    const routes = [{ path: 'home', component: LayoutComponent }];
+    await TestBed.configureTestingModule({
+      imports: [LayoutComponent],
+      providers: [
+        provideRouter(routes),
+        ICON_PROVIDER,
+        {
+          provide: LucideIconConfig,
+          useFactory: () => {
+            const cfg = new LucideIconConfig();
+            cfg.size = 16;
+            cfg.strokeWidth = 1.5;
+            return cfg;
+          },
+        },
+      ],
+    }).compileComponents();
+
+    const router = TestBed.inject(Router);
+    const fixture = TestBed.createComponent(LayoutComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const main = fixture.nativeElement.querySelector('#main-content') as HTMLElement;
+    expect(main).toBeTruthy();
+
+    await router.navigate(['/home']);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(document.activeElement).toBe(main);
+  });
+
+  it('when the shell renders, a skip link pointing to main-content is present', async () => {
+    const el = await render();
+    const skipLink = el.querySelector('a.skip-link[href="#main-content"]');
+    expect(skipLink).toBeTruthy();
   });
 });

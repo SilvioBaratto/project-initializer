@@ -1,10 +1,10 @@
-import { provideZonelessChangeDetection } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { vi } from 'vitest';
 import { LucideIconConfig } from 'lucide-angular';
 
 import { ICON_PROVIDER } from '../../icons';
-import { ThemeService } from '../../services/theme.service';
+import { ThemeService } from '../../services/theme';
 import { SidebarComponent } from './sidebar';
 
 /**
@@ -25,7 +25,7 @@ describe('Theme toggle (integration)', () => {
   beforeEach(async () => {
     localStorage.clear();
     document.documentElement.classList.remove('dark', 'theme-transitioning');
-    spyOn(window, 'matchMedia').and.returnValue({
+    vi.spyOn(window, 'matchMedia').mockReturnValue({
       matches: false,
       addEventListener: () => {},
       removeEventListener: () => {},
@@ -34,7 +34,6 @@ describe('Theme toggle (integration)', () => {
     await TestBed.configureTestingModule({
       imports: [SidebarComponent],
       providers: [
-        provideZonelessChangeDetection(),
         provideRouter([]),
         ICON_PROVIDER,
         {

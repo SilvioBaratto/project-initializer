@@ -21,6 +21,7 @@ router = APIRouter(prefix="/test", tags=["Test"])
 # Health/Echo Endpoints
 # ===========================
 
+
 @router.get("/ping", response_model=MessageResponse)
 async def ping():
     """
@@ -43,11 +44,7 @@ async def echo_get(message: str):
     Returns:
         Echo response with the message and timestamp
     """
-    return EchoResponse(
-        echo=message,
-        received_at=utc_now(),
-        metadata=None
-    )
+    return EchoResponse(echo=message, received_at=utc_now(), metadata=None)
 
 
 @router.post("/echo", response_model=EchoResponse)
@@ -62,7 +59,5 @@ async def echo_post(request: EchoRequest):
         Echo response with the message and timestamp
     """
     return EchoResponse(
-        echo=request.message,
-        received_at=utc_now(),
-        metadata=request.metadata
+        echo=request.message, received_at=utc_now(), metadata=request.metadata
     )

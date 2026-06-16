@@ -1,23 +1,24 @@
-import { provideZonelessChangeDetection, signal } from '@angular/core';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { vi } from 'vitest';
 import { LucideIconConfig } from 'lucide-angular';
 
 import { ICON_PROVIDER } from '../../icons';
-import { ThemeService } from '../../services/theme.service';
+import { ThemeService } from '../../services/theme';
 import { SettingsComponent } from './settings';
 
 describe('SettingsComponent', () => {
-  let themeSpy: jasmine.SpyObj<Pick<ThemeService, 'setTheme'>> & { theme: ReturnType<typeof signal> };
+  let themeSpy: { setTheme: ReturnType<typeof vi.fn>; theme: ReturnType<typeof signal> };
 
   beforeEach(async () => {
-    themeSpy = Object.assign(jasmine.createSpyObj('ThemeService', ['setTheme']), {
+    themeSpy = {
+      setTheme: vi.fn(),
       theme: signal('system'),
-    });
+    };
 
     await TestBed.configureTestingModule({
       imports: [SettingsComponent],
       providers: [
-        provideZonelessChangeDetection(),
         ICON_PROVIDER,
         { provide: ThemeService, useValue: themeSpy },
         {

@@ -38,33 +38,27 @@ class UserProfile(Base):
         String(36),
         primary_key=True,
         nullable=False,
-        comment="Supabase auth.users UUID (as string)"
+        comment="Supabase auth.users UUID (as string)",
     )
 
     # Profile fields
     display_name: Mapped[Optional[str]] = mapped_column(
-        String(100),
-        nullable=True,
-        comment="User's display name (public)"
+        String(100), nullable=True, comment="User's display name (public)"
     )
 
     avatar_url: Mapped[Optional[str]] = mapped_column(
         String(500),
         nullable=True,
-        comment="URL to user's avatar image (typically Supabase Storage)"
+        comment="URL to user's avatar image (typically Supabase Storage)",
     )
 
     bio: Mapped[Optional[str]] = mapped_column(
-        Text,
-        nullable=True,
-        comment="User's bio/description"
+        Text, nullable=True, comment="User's bio/description"
     )
 
     # Additional preferences
     preferences: Mapped[Optional[dict]] = mapped_column(
-        JSONB,
-        nullable=True,
-        comment="User preferences/settings as JSON"
+        JSONB, nullable=True, comment="User preferences/settings as JSON"
     )
 
     # Timestamps
@@ -72,7 +66,7 @@ class UserProfile(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
-        comment="Profile creation timestamp"
+        comment="Profile creation timestamp",
     )
 
     updated_at: Mapped[datetime] = mapped_column(
@@ -80,7 +74,7 @@ class UserProfile(Base):
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
-        comment="Profile last update timestamp"
+        comment="Profile last update timestamp",
     )
 
     # Table constraints and indexes

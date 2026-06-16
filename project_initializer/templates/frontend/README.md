@@ -54,6 +54,48 @@ ng e2e
 
 Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
 
+## Router features
+
+The scaffold enables two `provideRouter` features in `app.config.ts`:
+
+| Feature | What it does |
+|---|---|
+| **`withComponentInputBinding()`** | Binds route parameters, query params, and data directly to signal `input()` properties on routed components — no `ActivatedRoute` injection needed. |
+| **`withViewTransitions()`** | Wraps route navigations in the [View Transitions API](https://developer.mozilla.org/en-US/docs/Web/API/View_Transitions_API), producing smooth cross-page animations in supporting browsers (gracefully no-ops in others). |
+
+### Using `withComponentInputBinding`
+
+```typescript
+// In a routed component — no ActivatedRoute needed
+export class ItemDetailComponent {
+  readonly id = input<string>();   // bound from :id route param automatically
+}
+```
+
+### Using `withViewTransitions`
+
+Navigations automatically use the browser's default cross-fade. To customise the transition, add CSS `view-transition-name` rules and a `@keyframes` block for `::view-transition-*` pseudo-elements.
+
+## Production security hardening — CSP nonces
+
+The scaffold ships a `Content-Security-Policy: default-src 'self'` baseline from nginx. For production, tighten the policy with per-request nonces so inline scripts injected by third-party libraries are blocked unless they carry the server-issued nonce.
+
+### Options
+
+| Approach | Where to configure |
+|---|---|
+| **`autoCsp: true`** in `angular.json` build options | Instructs the Angular build to inject `ngCspNonce` meta tags automatically during SSR/server rendering. |
+| **`ngCspNonce` attribute** on the `<app-root>` element | Pass a unique, unpredictable nonce per request from your server template into the bootstrap token `CSP_NONCE`. Angular reads this token and stamps it on all inline styles/scripts it generates. |
+| **`CSP_NONCE` injection token** | Provide the token in `app.config.ts`: `{ provide: CSP_NONCE, useValue: getRequestNonce() }`. Angular uses it for runtime-generated inline elements. |
+
+### Rules
+
+- Nonces **must be unique and unpredictable per HTTP response** — a static nonce is equivalent to no nonce.
+- Generate nonces server-side (e.g. `secrets.token_hex(16)`) and pass them in both the `Content-Security-Policy` header and the HTML template.
+- Update the nginx `add_header Content-Security-Policy` line to include `'nonce-<VALUE>'` in `script-src` and `style-src`.
+
+Reference: [angular.dev/best-practices/security](https://angular.dev/best-practices/security)
+
 ## Additional Resources
 
 For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.

@@ -9,10 +9,7 @@ class Settings(BaseSettings):
     """Application settings with environment variable support"""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-        extra="ignore"
+        env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="ignore"
     )
 
     # Project Information
@@ -27,7 +24,7 @@ class Settings(BaseSettings):
     # Format: postgresql://postgres.[PROJECT_REF]:[PASSWORD]@[POOLER_HOST]:5432/postgres?sslmode=require
     database_url: str = Field(
         alias="DATABASE_URL",
-        description="Supabase Session Mode Pooler connection string (port 5432) with SSL"
+        description="Supabase Session Mode Pooler connection string (port 5432) with SSL",
     )
 
     # Direct Connection URL - for Alembic migrations only
@@ -35,39 +32,34 @@ class Settings(BaseSettings):
     direct_database_url: str = Field(
         default="",
         alias="DIRECT_DATABASE_URL",
-        description="Direct connection for Alembic migrations (bypass pooler)"
+        description="Direct connection for Alembic migrations (bypass pooler)",
     )
 
     # Pool Configuration - Optimized for Supabase Session Mode Pooler
     # Session Pooler: persistent connections held open by backend pool
     # For 1000+ users: backend pool (20-30) << Supabase pool size (80-120)
     database_pool_size: int = Field(
-        default=20,
-        description="SQLAlchemy pool size (persistent connections)"
+        default=20, description="SQLAlchemy pool size (persistent connections)"
     )
     database_max_overflow: int = Field(
-        default=10,
-        description="Max overflow connections under burst load"
+        default=10, description="Max overflow connections under burst load"
     )
     database_pool_timeout: int = Field(
-        default=30,
-        description="Timeout waiting for connection from pool"
+        default=30, description="Timeout waiting for connection from pool"
     )
     database_pool_recycle: int = Field(
         default=300,
-        description="Recycle connections every 5 minutes (prevent stale connections)"
+        description="Recycle connections every 5 minutes (prevent stale connections)",
     )
     database_pool_pre_ping: bool = Field(
-        default=True,
-        description="Verify connections are alive before use"
+        default=True, description="Verify connections are alive before use"
     )
     database_echo: bool = Field(
-        default=False,
-        description="Log all SQL queries (debug only)"
+        default=False, description="Log all SQL queries (debug only)"
     )
     database_pool_reset_on_return: str = Field(
         default="rollback",
-        description="Reset strategy when connection returned to pool"
+        description="Reset strategy when connection returned to pool",
     )
 
     # Cache Configuration
@@ -75,9 +67,7 @@ class Settings(BaseSettings):
     cache_ttl_users: int = Field(default=600)
 
     # CORS
-    cors_origins: str = Field(
-        default="http://localhost:4200,http://localhost:4300"
-    )
+    cors_origins: str = Field(default="http://localhost:4200,http://localhost:4300")
 
     @property
     def cors_origins_list(self) -> List[str]:
@@ -86,22 +76,23 @@ class Settings(BaseSettings):
             return [
                 "http://localhost:4200",
                 "http://localhost:4300",
-                "http://127.0.0.1:4200"
+                "http://127.0.0.1:4200",
             ]
-        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        return [
+            origin.strip() for origin in self.cors_origins.split(",") if origin.strip()
+        ]
 
     # Supabase Configuration
     supabase_url: str = Field(
-        default="https://your-project.supabase.co",
-        description="Supabase project URL"
+        default="https://your-project.supabase.co", description="Supabase project URL"
     )
     supabase_publishable_key: str = Field(
         default="your-publishable-key",
-        description="Supabase publishable key (sb_publishable_...) for client-side auth"
+        description="Supabase publishable key (sb_publishable_...) for client-side auth",
     )
     supabase_secret_key: SecretStr = Field(
         default="",
-        description="Supabase secret key (sb_secret_..., server-side only, bypasses RLS)"
+        description="Supabase secret key (sb_secret_..., server-side only, bypasses RLS)",
     )
 
     @property

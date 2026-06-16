@@ -1,5 +1,5 @@
 import { NestFactory, HttpAdapterHost } from '@nestjs/core';
-import { Logger } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { cleanupOpenApiDoc } from 'nestjs-zod';
 import helmet from 'helmet';
@@ -13,8 +13,8 @@ import { join } from 'path';
 const { version } = require(join(process.cwd(), 'package.json'));
 
 async function bootstrap() {
-  const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  app.useLogger(app.get(Logger));
 
   // Enable graceful shutdown hooks (for Prisma disconnect)
   app.enableShutdownHooks();
@@ -41,7 +41,7 @@ async function bootstrap() {
       'X-Client-Info',
       'X-Dev-User',
     ],
-    exposedHeaders: ['X-Total-Count', 'X-Rate-Limit-Remaining'],
+    exposedHeaders: ['X-Total-Count', 'X-Rate-Limit-Remaining', 'X-Request-Id'],
     maxAge: 3600,
   });
 
@@ -68,7 +68,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, cleanupOpenApiDoc(document));
 
-  // Health endpoint at root (outside /api/v1 prefix)
+  // Welcome endpoint at root (outside /api/v1 prefix)
   const expressApp = app.getHttpAdapter().getInstance();
   expressApp.get('/', (_req: any, res: any) => {
     res.json({
@@ -80,13 +80,8 @@ async function bootstrap() {
       docs_url: '/docs',
     });
   });
-  expressApp.get('/health', (_req: any, res: any) => {
-    res.json({ status: 'ok' });
-  });
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  logger.log(`Application is running on: http://localhost:${port}`);
-  logger.log(`Swagger docs: http://localhost:${port}/docs`);
 }
 bootstrap();

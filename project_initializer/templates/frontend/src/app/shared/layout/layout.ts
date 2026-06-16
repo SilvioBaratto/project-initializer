@@ -6,8 +6,9 @@ import {
   OnInit,
   OnDestroy,
   ChangeDetectionStrategy,
+  DestroyRef,
 } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { Title } from '@angular/platform-browser';
 import { LucideAngularModule } from 'lucide-angular';
@@ -26,6 +27,7 @@ import { BottomTabBarComponent } from '../bottom-tab-bar/bottom-tab-bar';
 export class LayoutComponent implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly title = inject(Title);
+  private readonly destroyRef = inject(DestroyRef);
 
   isSidebarOpen = signal(false);
   isMobile = signal(false);
@@ -45,6 +47,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.checkScreenSize();
     this.initializeResizeObserver();
+    this.initializeFocusManagement();
   }
 
   ngOnDestroy() {
@@ -57,6 +60,15 @@ export class LayoutComponent implements OnInit, OnDestroy {
 
   closeSidebar() {
     this.isSidebarOpen.set(false);
+  }
+
+  private initializeFocusManagement() {
+    this.router.events.pipe(
+      filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe(() => {
+      document.getElementById('main-content')?.focus({ preventScroll: true });
+    });
   }
 
   private checkScreenSize() {

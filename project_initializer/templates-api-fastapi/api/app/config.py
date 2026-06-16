@@ -9,10 +9,7 @@ class Settings(BaseSettings):
     """Application settings with environment variable support"""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-        extra="ignore"
+        env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="ignore"
     )
 
     # Project Information
@@ -25,7 +22,7 @@ class Settings(BaseSettings):
     # Database Configuration - Local PostgreSQL
     database_url: str = Field(
         default="postgresql://postgres:postgres@localhost:5433/app_db",
-        alias="DATABASE_URL"
+        alias="DATABASE_URL",
     )
 
     # Pool Configuration - Standard settings for local PostgreSQL
@@ -40,9 +37,7 @@ class Settings(BaseSettings):
     cache_ttl_users: int = Field(default=600)
 
     # CORS
-    cors_origins: str = Field(
-        default="http://localhost:4200,http://localhost:4300"
-    )
+    cors_origins: str = Field(default="http://localhost:4200,http://localhost:4300")
 
     @property
     def cors_origins_list(self) -> List[str]:
@@ -51,9 +46,11 @@ class Settings(BaseSettings):
             return [
                 "http://localhost:4200",
                 "http://localhost:4300",
-                "http://127.0.0.1:4200"
+                "http://127.0.0.1:4200",
             ]
-        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        return [
+            origin.strip() for origin in self.cors_origins.split(",") if origin.strip()
+        ]
 
     # Security (optional for production)
 

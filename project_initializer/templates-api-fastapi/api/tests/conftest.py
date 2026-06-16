@@ -46,9 +46,7 @@ def db_session(test_engine) -> Generator[Session, None, None]:
     Rolls back after each test for isolation.
     """
     TestingSessionLocal = sessionmaker(
-        autocommit=False,
-        autoflush=False,
-        bind=test_engine
+        autocommit=False, autoflush=False, bind=test_engine
     )
     session = TestingSessionLocal()
     try:
@@ -63,6 +61,7 @@ def client(db_session: Session) -> Generator[TestClient, None, None]:
     """
     Create a test client with overridden database dependency.
     """
+
     def override_get_db():
         try:
             yield db_session

@@ -33,3 +33,6 @@ coverage/
 # Logs
 *.log
 npm-debug.log*
+
+# Scaffolded output — created when `project-initializer` is run inside this dir
+project_initializer/

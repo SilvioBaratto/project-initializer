@@ -20,7 +20,9 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     """Schema for creating a user — includes plain-text password."""
 
-    password: str = Field(..., min_length=8, description="Plain-text password (min 8 chars)")
+    password: str = Field(
+        ..., min_length=8, description="Plain-text password (min 8 chars)"
+    )
 
 
 class UserPublic(UserBase):

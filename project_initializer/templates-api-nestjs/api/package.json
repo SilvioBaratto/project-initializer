@@ -14,6 +14,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
+    "test:e2e": "jest --config ./test/jest-e2e.json",
     "prisma:generate": "npx prisma generate",
     "prisma:migrate:dev": "npx prisma migrate dev",
     "prisma:migrate:create": "npx prisma migrate dev --create-only",
@@ -24,17 +25,27 @@
   },
   "dependencies": {
     "@boundaryml/baml": "0.222.0",
+    "@bull-board/api": "8.0.0",
+    "@bull-board/express": "8.0.0",
+    "@bull-board/nestjs": "8.0.0",
+    "express-basic-auth": "1.2.1",
+    "@nestjs/bullmq": "11.0.4",
     "@nestjs/common": "11.1.24",
     "@nestjs/config": "4.0.4",
     "@nestjs/core": "11.1.24",
     "@nestjs/platform-express": "11.1.24",
     "@nestjs/swagger": "11.4.4",
+    "@nestjs/terminus": "11.1.1",
     "@nestjs/throttler": "6.5.0",
     "@prisma/adapter-pg": "7.8.0",
     "@prisma/client": "7.8.0",
+    "bullmq": "5.78.0",
     "helmet": "8.2.0",
+    "nestjs-pino": "4.6.1",
     "nestjs-zod": "5.4.0",
     "pg": "8.21.0",
+    "pino": "9.14.0",
+    "pino-http": "10.5.0",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
     "uuid": "14.0.0",
@@ -42,6 +53,7 @@
   },
   "devDependencies": {
     "@nestjs/cli": "11.0.21",
+    "pino-pretty": "13.1.3",
     "@nestjs/schematics": "11.1.0",
     "@nestjs/testing": "11.1.24",
     "@types/express": "5.0.6",
@@ -53,6 +65,8 @@
     "prisma": "7.8.0",
     "prisma-zod-generator": "2.1.4",
     "ts-jest": "29.4.11",
+    "@types/supertest": "6.0.2",
+    "supertest": "7.1.0",
     "ts-node": "10.9.2",
     "tsc-alias": "1.8.16",
     "tsconfig-paths": "4.2.0",
@@ -69,6 +83,15 @@
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
+    "moduleNameMapper": {
+      "^@generated/prisma$": "<rootDir>/../generated/prisma/client",
+      "^@generated/zod$": "<rootDir>/../generated/zod/schemas/index",
+      "^@generated/zod/(.*)$": "<rootDir>/../generated/zod/schemas/$1",
+      "^@/(.*)$": "<rootDir>/$1"
+    },
+    "transformIgnorePatterns": [
+      "node_modules/(?!(uuid)/)"
+    ],
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],

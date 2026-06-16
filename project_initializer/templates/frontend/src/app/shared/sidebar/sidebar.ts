@@ -2,8 +2,8 @@ import { Component, computed, inject, input, output, ChangeDetectionStrategy } f
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
-import { NavItem, NAV_ITEMS } from '../nav-item.model';
-import { ThemeService } from '../../services/theme.service';
+import { NavItem, NAV_ITEMS } from '../nav-item';
+import { ThemeService } from '../../services/theme';
 
 @Component({
   selector: 'app-sidebar',

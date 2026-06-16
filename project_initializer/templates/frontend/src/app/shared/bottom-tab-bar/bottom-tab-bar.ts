@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
-import { NavItem, NAV_ITEMS } from '../nav-item.model';
+import { NavItem, NAV_ITEMS } from '../nav-item';
 
 @Component({
   selector: 'app-bottom-tab-bar',

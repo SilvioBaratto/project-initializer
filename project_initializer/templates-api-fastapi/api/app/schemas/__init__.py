@@ -167,19 +167,23 @@ def utc_now() -> datetime:
 # Message/Echo Schemas
 # ===========================
 
+
 class MessageResponse(BaseModel):
     """Simple message response"""
+
     message: str
 
 
 class EchoRequest(BaseModel):
     """Echo request body"""
+
     message: str = Field(..., description="Message to echo back")
     metadata: Optional[dict] = Field(default=None, description="Optional metadata")
 
 
 class EchoResponse(BaseModel):
     """Echo response"""
+
     echo: str
     received_at: datetime = Field(default_factory=utc_now)
     metadata: Optional[dict] = None
@@ -196,8 +200,10 @@ class EchoResponse(BaseModel):
 # Generic API Schemas
 # ===========================
 
+
 class ErrorResponse(BaseModel):
     """Standard error response"""
+
     error: str
     detail: Optional[str] = None
     code: Optional[str] = None
@@ -205,6 +211,7 @@ class ErrorResponse(BaseModel):
 
 class SuccessResponse(BaseModel):
     """Standard success response"""
+
     success: bool = True
     message: Optional[str] = None
     data: Optional[Any] = None

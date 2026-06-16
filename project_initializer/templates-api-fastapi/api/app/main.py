@@ -37,11 +37,26 @@ logger = logging.getLogger(__name__)
 # ReDoc. Order here is the order tags appear in the docs. Edit the descriptions
 # (and the contact / license below) to match your project before shipping.
 TAGS_METADATA = [
-    {"name": "Items", "description": "CRUD for the example **Item** resource — the reference DB-backed router."},
-    {"name": "Users", "description": "The authenticated user's own profile (`/users/me`)."},
-    {"name": "Auth", "description": "Authentication — token validation and (token variant) JWT register/login."},
-    {"name": "Chatbot", "description": "BAML-powered LLM chat: complete and streaming responses."},
-    {"name": "Test", "description": "Demo / health-style routes used to exercise the stack."},
+    {
+        "name": "Items",
+        "description": "CRUD for the example **Item** resource — the reference DB-backed router.",
+    },
+    {
+        "name": "Users",
+        "description": "The authenticated user's own profile (`/users/me`).",
+    },
+    {
+        "name": "Auth",
+        "description": "Authentication — token validation and (token variant) JWT register/login.",
+    },
+    {
+        "name": "Chatbot",
+        "description": "BAML-powered LLM chat: complete and streaming responses.",
+    },
+    {
+        "name": "Test",
+        "description": "Demo / health-style routes used to exercise the stack.",
+    },
 ]
 
 # Project identity constants — set once at scaffold time, not per-deployment, so

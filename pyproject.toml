@@ -68,5 +68,13 @@ include = ["project_initializer*"]
     "templates-asyncdb-fastapi/**/*", "templates-asyncdb-fastapi/**/.*",
 ]
 
+[tool.setuptools.exclude-package-data]
+"project_initializer" = [
+    "*/node_modules/*",
+    "*/node_modules/**/*",
+    "**/node_modules/*",
+    "**/node_modules/**/*",
+]
+
 [tool.ruff]
 exclude = ["**/baml_client/**"]

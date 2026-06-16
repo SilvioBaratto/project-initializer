@@ -8,6 +8,7 @@ Hand-written (scaffold ships without a live DB connection). Additive: creates
 the ``users`` table only — never touches existing data. Chained after the items
 migration; Alembic's alembic_version table guarantees it runs at most once.
 """
+
 from typing import Sequence, Union
 
 import sqlalchemy as sa
@@ -29,10 +30,24 @@ def upgrade() -> None:
         sa.Column("first_name", sa.String(length=100), nullable=True),
         sa.Column("last_name", sa.String(length=100), nullable=True),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
-        sa.Column("is_verified", sa.Boolean(), nullable=False, server_default=sa.false()),
-        sa.Column("is_superuser", sa.Boolean(), nullable=False, server_default=sa.false()),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "is_verified", sa.Boolean(), nullable=False, server_default=sa.false()
+        ),
+        sa.Column(
+            "is_superuser", sa.Boolean(), nullable=False, server_default=sa.false()
+        ),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.Column("last_login", sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("email"),

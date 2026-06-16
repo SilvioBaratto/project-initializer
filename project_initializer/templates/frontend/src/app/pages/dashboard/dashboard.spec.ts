@@ -1,4 +1,3 @@
-import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { LucideIconConfig } from 'lucide-angular';
 
@@ -10,7 +9,6 @@ describe('DashboardComponent', () => {
     await TestBed.configureTestingModule({
       imports: [DashboardComponent],
       providers: [
-        provideZonelessChangeDetection(),
         ICON_PROVIDER,
         {
           provide: LucideIconConfig,

@@ -110,10 +110,12 @@ def generate_frontend_compose() -> str:
 
 # Pinned to match SQLAlchemy==2.0.50 already in the base requirements; the
 # extras form pulls greenlet for the async path. asyncpg is the async driver.
+# aiosqlite is used for unit testing with in-memory SQLite.
 _ASYNC_REQUIREMENTS = (
     "\n# Async DB path (--async-db) — opt-in asyncpg driver + asyncio extras\n"
     "asyncpg==0.31.0\n"
     "sqlalchemy[asyncio]==2.0.50\n"
+    "aiosqlite==0.20.0\n"
 )
 
 

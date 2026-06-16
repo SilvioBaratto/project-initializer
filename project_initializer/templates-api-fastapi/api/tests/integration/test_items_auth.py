@@ -30,7 +30,10 @@ def test_when_base_variant_writes_without_credentials_then_they_succeed(client):
     assert created.status_code == 201
 
     item_id = created.json()["id"]
-    assert client.put(f"{API}/items/{item_id}", json={"name": "Renamed"}).status_code == 200
+    assert (
+        client.put(f"{API}/items/{item_id}", json={"name": "Renamed"}).status_code
+        == 200
+    )
     assert client.delete(f"{API}/items/{item_id}").status_code == 204
 
 
@@ -39,7 +42,10 @@ def test_when_guarded_writes_have_no_credentials_then_401(client):
     """when get_current_user 401s, the write ops (POST/PUT/DELETE) return 401."""
     app.dependency_overrides[get_current_user] = _raise_401
     try:
-        assert client.post(f"{API}/items", json={"name": "X", "price": 1.0}).status_code == 401
+        assert (
+            client.post(f"{API}/items", json={"name": "X", "price": 1.0}).status_code
+            == 401
+        )
         assert client.put(f"{API}/items/some-id", json={"name": "X"}).status_code == 401
         assert client.delete(f"{API}/items/some-id").status_code == 401
     finally:

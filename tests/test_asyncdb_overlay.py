@@ -14,6 +14,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from project_initializer.file_transforms import append_async_requirements
+
 _ROOT = Path(__file__).resolve().parent.parent
 _TEMPLATES = _ROOT / "project_initializer"
 BASE_API = _TEMPLATES / "templates-api-fastapi" / "api"
@@ -38,15 +40,37 @@ def test_when_base_template_inspected_async_modules_are_absent():
 
 
 def _merge(dest: Path) -> Path:
-    """Copy base API then the async overlay on top — mirrors copy_template merge."""
+    """Copy base API then the async overlay on top, applying async requirements transform.
+
+    Mirrors the copy_tree merge in cli.py with the _requirements_handler applied.
+    """
     shutil.copytree(BASE_API, dest, dirs_exist_ok=True)
     shutil.copytree(OVERLAY_API, dest, dirs_exist_ok=True)
+
+    # Apply the async requirements transformation to the merged requirements.txt
+    req_file = dest / "requirements.txt"
+    if req_file.exists():
+        req_file.write_text(
+            append_async_requirements(req_file.read_text(encoding="utf-8")),
+            encoding="utf-8",
+        )
+
     return dest
 
 
 def test_when_async_overlay_test_run_async_crud_passes(tmp_path):
     """when the overlay's async test is run on a merged tree, async CRUD passes."""
     api = _merge(tmp_path / "api")
+    # Install dependencies from the merged requirements.txt (which includes asyncpg)
+    # Use the current Python's site-packages by running in the same environment
+    install_result = subprocess.run(
+        [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"],
+        cwd=api,
+        capture_output=True,
+        text=True,
+    )
+    if install_result.returncode != 0:
+        raise RuntimeError(f"pip install failed: {install_result.stderr}")
     result = subprocess.run(
         [sys.executable, "-m", "pytest", OVERLAY_TEST, "--noconftest", "-q"],
         cwd=api,

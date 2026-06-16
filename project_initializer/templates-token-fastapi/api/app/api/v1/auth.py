@@ -120,7 +120,9 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)) -> User:
     """Create a new user account and return the public user representation."""
     repo = BaseRepository(User, db)
     if repo.get_by_field("email", user_in.email):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail="Email already registered"
+        )
     data = user_in.model_dump(exclude={"password"})
     data["password_hash"] = hash_password(user_in.password)
     user = repo.create_from_dict(data)
@@ -135,7 +137,9 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)) -> User:
     response_description="A signed JWT access token and its bearer type.",
     responses={**BAD_CREDENTIALS_RESPONSE},
 )
-def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)) -> TokenResponse:
+def login(
+    form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
+) -> TokenResponse:
     """Mint a signed JWT for a registered user (OAuth2 password flow)."""
     user = BaseRepository(User, db).get_by_field("email", form.username)
     if user is None or not verify_password(form.password, user.password_hash or ""):
@@ -145,7 +149,10 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
             headers={"WWW-Authenticate": "Bearer"},
         )
     token = create_access_token(
-        user.id, settings.jwt_secret_key, settings.jwt_algorithm, settings.access_token_expire_minutes
+        user.id,
+        settings.jwt_secret_key,
+        settings.jwt_algorithm,
+        settings.access_token_expire_minutes,
     )
     return TokenResponse(access_token=token)
 

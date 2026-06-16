@@ -44,12 +44,24 @@ def test_when_package_read_tsc_alias_is_pinned_exactly(path):
 
 def test_when_both_packages_compared_only_supabase_js_differs():
     base, supa = _load_json(BASE_PKG), _load_json(SUPABASE_PKG)
-    extra = set(supa["dependencies"]) - set(base["dependencies"])
-    assert extra == {"@supabase/supabase-js"}
-    # Everything outside the dependencies block must be identical.
+    base_deps, supa_deps = set(base["dependencies"]), set(supa["dependencies"])
+    # Symmetric check: supabase adds only @supabase/supabase-js, and drops nothing
+    # the base carries (guards against an overlay omitting a base dependency such
+    # as @nestjs/bullmq, which the shared chatbot module imports).
+    assert supa_deps - base_deps == {"@supabase/supabase-js"}
+    assert base_deps - supa_deps == set()
+    # Everything outside the dependencies block must be identical, except the jest
+    # moduleNameMapper: the supabase overlay legitimately adds extra stubs so its
+    # app.module.spec.ts can run in isolation without the full base-template src tree.
     base.pop("dependencies")
     supa.pop("dependencies")
-    assert base == supa
+    base_mapper = base.get("jest", {}).pop("moduleNameMapper", {})
+    supa_mapper = supa.get("jest", {}).pop("moduleNameMapper", {})
+    assert base == supa, "packages diverged beyond allowed differences"
+    # Base keys must all appear in supabase (supabase may add overlay-specific stubs).
+    assert base_mapper.items() <= supa_mapper.items(), (
+        "supabase moduleNameMapper dropped a base entry"
+    )
 
 
 def test_when_tsconfig_read_baseurl_deprecation_is_silenced():

@@ -30,7 +30,9 @@ async def session():
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    factory = async_sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
+    factory = async_sessionmaker(
+        bind=engine, expire_on_commit=False, class_=AsyncSession
+    )
     async with factory() as db:
         yield db
     await engine.dispose()
@@ -38,9 +40,7 @@ async def session():
 
 def test_when_url_has_sslmode_then_asyncpg_url_strips_it_and_sets_ssl():
     """when the URL carries sslmode=require, the asyncpg URL drops it and ssl is set."""
-    url, connect_args = to_asyncpg_url(
-        "postgresql://u:p@host:5432/db?sslmode=require"
-    )
+    url, connect_args = to_asyncpg_url("postgresql://u:p@host:5432/db?sslmode=require")
     assert url == "postgresql+asyncpg://u:p@host:5432/db"
     assert "sslmode" not in url
     assert "ssl" in connect_args

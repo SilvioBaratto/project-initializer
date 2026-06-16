@@ -1,7 +1,7 @@
 import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { AuthService } from '../services/auth.service';
+import { AuthService } from '../services/auth';
 import { from, switchMap, catchError, throwError } from 'rxjs';
 
 let refreshPromise: Promise<boolean> | null = null;

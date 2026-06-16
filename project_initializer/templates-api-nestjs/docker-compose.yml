@@ -19,6 +19,18 @@ services:
     networks:
       - app_network
 
+  # Redis (BullMQ queue backend)
+  redis:
+    image: redis:7-alpine
+    container_name: app_redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app_network
+
   # NestJS Backend with hot reload
   api:
     build:
@@ -29,12 +41,16 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       NODE_ENV: development
       DATABASE_URL: "postgresql://postgres:postgres@db:5432/app_db?schema=public"
       DIRECT_URL: "postgresql://postgres:postgres@db:5432/app_db?schema=public"
       DATABASE_HOST: db
       DATABASE_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       PORT: 8000
       CORS_ORIGINS: "http://localhost,http://localhost:4200,http://localhost:80"
       LOG_LEVEL: info
@@ -46,6 +62,12 @@ services:
     networks:
       - app_network
     command: npm run start:dev
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8000/api/v1/health/liveness || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
 
   # Angular Frontend with nginx and API proxy
   frontend:
@@ -54,7 +76,8 @@ services:
       dockerfile: Dockerfile
     container_name: app_frontend
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     ports:
       - "4200:80"
     networks:

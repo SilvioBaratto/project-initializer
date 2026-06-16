@@ -1,6 +1,5 @@
-import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { LucideIconConfig } from 'lucide-angular';
 
 import { ICON_PROVIDER } from './../../icons';
@@ -11,7 +10,6 @@ describe('BottomTabBarComponent', () => {
     await TestBed.configureTestingModule({
       imports: [BottomTabBarComponent],
       providers: [
-        provideZonelessChangeDetection(),
         provideRouter([]),
         ICON_PROVIDER,
         {
@@ -55,5 +53,35 @@ describe('BottomTabBarComponent', () => {
     expect(text).toContain('Home');
     expect(text).toContain('Dashboard');
     expect(text).toContain('Settings');
+  });
+
+  it('when a tab is active, aria-current page is exposed on the anchor', async () => {
+    // Use a real /home route so RouterLinkActive activates and sets aria-current.
+    const { RouterTestingModule } = await import('@angular/router/testing');
+    await TestBed.configureTestingModule({
+      imports: [BottomTabBarComponent],
+      providers: [
+        provideRouter([{ path: 'home', component: BottomTabBarComponent }]),
+        ICON_PROVIDER,
+        {
+          provide: LucideIconConfig,
+          useFactory: () => {
+            const cfg = new LucideIconConfig();
+            cfg.size = 16;
+            cfg.strokeWidth = 1.5;
+            return cfg;
+          },
+        },
+      ],
+    }).compileComponents();
+
+    const router = TestBed.inject(Router);
+    await router.navigate(['/home']);
+    const fixture = TestBed.createComponent(BottomTabBarComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const activeAnchor = fixture.nativeElement.querySelector('nav a[aria-current="page"]');
+    expect(activeAnchor).toBeTruthy();
   });
 });

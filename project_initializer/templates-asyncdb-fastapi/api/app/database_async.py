@@ -36,7 +36,14 @@ def to_asyncpg_url(url: str) -> tuple[str, dict]:
     sslmode = params.pop("sslmode", [None])[0]
     query = urlencode({key: value[0] for key, value in params.items()})
     asyncpg_url = urlunparse(
-        ("postgresql+asyncpg", parsed.netloc, parsed.path, parsed.params, query, parsed.fragment)
+        (
+            "postgresql+asyncpg",
+            parsed.netloc,
+            parsed.path,
+            parsed.params,
+            query,
+            parsed.fragment,
+        )
     )
     connect_args: dict = {}
     if sslmode and sslmode != "disable":

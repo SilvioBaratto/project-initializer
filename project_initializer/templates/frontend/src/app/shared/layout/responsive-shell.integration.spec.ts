@@ -1,6 +1,6 @@
-import { provideZonelessChangeDetection } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { vi } from 'vitest';
 import { LucideIconConfig } from 'lucide-angular';
 
 import { ICON_PROVIDER } from '../../icons';
@@ -28,8 +28,8 @@ describe('Responsive shell (integration)', () => {
       unobserve(): void {}
       disconnect(): void {}
     } as unknown as typeof ResizeObserver;
-    spyOnProperty(window, 'innerWidth', 'get').and.returnValue(1024);
-    spyOn(window, 'matchMedia').and.returnValue({
+    vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(1024);
+    vi.spyOn(window, 'matchMedia').mockReturnValue({
       matches: false,
       addEventListener: () => {},
       removeEventListener: () => {},
@@ -38,7 +38,6 @@ describe('Responsive shell (integration)', () => {
     await TestBed.configureTestingModule({
       imports: [LayoutComponent],
       providers: [
-        provideZonelessChangeDetection(),
         provideRouter(routes),
         ICON_PROVIDER,
         {

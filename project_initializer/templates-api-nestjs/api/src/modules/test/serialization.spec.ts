@@ -1,0 +1,43 @@
+import 'reflect-metadata';
+import { ItemResponseSchema } from './dto/item.dto';
+import { TestController } from './test.controller';
+
+const ZOD_SERIALIZER_DTO_OPTIONS = 'ZOD_SERIALIZER_DTO_OPTIONS';
+
+const validItem = {
+  id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+  name: 'test item',
+  description: 'desc',
+  created_at: '2024-01-01T00:00:00.000Z',
+  updated_at: '2024-01-01T00:00:00.000Z',
+};
+
+describe('Response serialization', () => {
+  it('when ItemResponseSchema parses an object with an extra secret field, the secret field is stripped', () => {
+    const result = ItemResponseSchema.parse({ ...validItem, password: 'leak' });
+
+    expect(result).not.toHaveProperty('password');
+    expect(result).toMatchObject({ id: validItem.id, name: validItem.name });
+  });
+
+  it('when findOne handler is inspected, ZodSerializerDto metadata is present', () => {
+    const metadata = Reflect.getMetadata(
+      ZOD_SERIALIZER_DTO_OPTIONS,
+      TestController.prototype.findOne,
+    );
+
+    expect(metadata).toBeDefined();
+  });
+
+  it('when streamChat handler is inspected, ZodSerializerDto metadata is absent', () => {
+    // SSE handler bypasses the interceptor and must not carry the decorator
+    const ChatbotControllerModule = require('../chatbot/chatbot.controller');
+    const { ChatbotController } = ChatbotControllerModule;
+    const metadata = Reflect.getMetadata(
+      ZOD_SERIALIZER_DTO_OPTIONS,
+      ChatbotController.prototype.streamChat,
+    );
+
+    expect(metadata).toBeUndefined();
+  });
+});

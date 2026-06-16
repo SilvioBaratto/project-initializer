@@ -58,7 +58,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         skip: int = 0,
         limit: int = 100,
         order_by: Optional[str] = None,
-        desc: bool = True
+        desc: bool = True,
     ) -> Sequence[ModelType]:
         """Get multiple records with pagination."""
         stmt = select(self.model)

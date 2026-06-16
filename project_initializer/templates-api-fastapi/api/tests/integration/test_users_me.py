@@ -62,7 +62,9 @@ def test_when_user_id_header_given_then_response_is_200_with_email(client):
 
 
 @pytest.mark.integration
-def test_when_openapi_fetched_then_users_me_has_summary_and_response_description(client):
+def test_when_openapi_fetched_then_users_me_has_summary_and_response_description(
+    client,
+):
     """when the OpenAPI schema is read, GET /users/me carries a summary and a
     documented success response description (#24)."""
     op = client.get("/openapi.json").json()["paths"]["/api/v1/users/me"]["get"]

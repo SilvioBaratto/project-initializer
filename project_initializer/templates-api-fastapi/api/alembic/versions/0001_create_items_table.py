@@ -11,6 +11,7 @@ most once per database, so no extra IF NOT EXISTS guard is required. The
 upgrade is purely additive (creates a new table) and never touches existing
 data.
 """
+
 from typing import Sequence, Union
 
 import sqlalchemy as sa

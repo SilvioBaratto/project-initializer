@@ -1,38 +1,53 @@
-import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { Module } from '@nestjs/common';
+import { BullModule } from '@nestjs/bullmq';
+import { BullBoardModule } from '@bull-board/nestjs';
+import { ExpressAdapter } from '@bull-board/express';
 import { ConfigModule } from '@nestjs/config';
+import { validate } from './config/env.validation';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD, APP_PIPE, APP_INTERCEPTOR } from '@nestjs/core';
 import { ZodValidationPipe, ZodSerializerInterceptor } from 'nestjs-zod';
+import { LoggerModule } from 'nestjs-pino';
 import { PrismaModule } from './prisma/prisma.module';
-import { LoggingMiddleware } from './common/middleware/logging.middleware';
 import { HealthModule } from './modules/health/health.module';
 import { TestModule } from './modules/test/test.module';
 import { ChatbotModule } from './modules/chatbot/chatbot.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { MonitoringModule } from './modules/monitoring/monitoring.module';
+import { loggerConfig } from './config/logger.config';
 
+// Base template (no auth): dashboard is open to local operators.
+// Protect with a reverse-proxy allowlist in production.
+// Dashboard path: /api/v1/admin/queues (global prefix prepended by BullBoardModule).
 @Module({
   imports: [
-    // Configuration
     ConfigModule.forRoot({
       isGlobal: true,
+      validate: validate,
     }),
-
-    // Database
+    BullModule.forRoot({
+      connection: {
+        host: process.env.REDIS_HOST ?? 'localhost',
+        port: Number(process.env.REDIS_PORT ?? 6379),
+      },
+    }),
+    BullBoardModule.forRoot({
+      route: '/admin/queues',
+      adapter: ExpressAdapter,
+    }),
+    LoggerModule.forRoot(loggerConfig),
     PrismaModule,
-
-    // Rate limiting
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
         limit: 100,
       },
     ]),
-
-    // Feature modules
     HealthModule,
     TestModule,
     ChatbotModule,
     AuthModule,
+    MonitoringModule,
   ],
   providers: [
     {
@@ -49,8 +64,4 @@ import { AuthModule } from './modules/auth/auth.module';
     },
   ],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer) {
-    consumer.apply(LoggingMiddleware).forRoutes('*path');
-  }
-}
+export class AppModule {}

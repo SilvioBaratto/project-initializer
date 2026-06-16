@@ -84,8 +84,15 @@ def generate_env(
     else:
         lines.append("NODE_ENV=development")
         lines.append("PORT=8000")
-    lines.append(f"LOG_LEVEL={val('LOG_LEVEL', 'INFO')}")
+    lines.append(f"LOG_LEVEL={val('LOG_LEVEL', 'info').lower()}")
     lines.append(f"CORS_ORIGINS={val('CORS_ORIGINS', 'http://localhost:4200')}")
+
+    # --- Redis (NestJS BullMQ queue backend) ---
+    if not is_fastapi:
+        lines.append("")
+        lines.append("# Redis")
+        lines.append(f"REDIS_HOST={val('REDIS_HOST', 'localhost')}")
+        lines.append(f"REDIS_PORT={val('REDIS_PORT', '6379')}")
 
     # --- Azure OpenAI ---
     lines.append("")
@@ -100,7 +107,9 @@ def generate_env(
     lines.append(f"ANTHROPIC_API_KEY={val('ANTHROPIC_API_KEY')}")
     lines.append(f"OPENAI_API_KEY={val('OPENAI_API_KEY')}")
     lines.append(f"GOOGLE_API_KEY={val('GOOGLE_API_KEY')}")
-    lines.append(f"OLLAMA_BASE_URL={val('OLLAMA_BASE_URL', 'http://localhost:11434/v1')}")
+    lines.append(
+        f"OLLAMA_BASE_URL={val('OLLAMA_BASE_URL', 'http://localhost:11434/v1')}"
+    )
 
     lines.append("")
     return "\n".join(lines)

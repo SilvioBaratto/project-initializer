@@ -24,7 +24,10 @@ class TimestampMixin:
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
     )
 
 
@@ -40,7 +43,9 @@ class StringUUIDPrimaryKeyMixin:
     """Mixin to add string-based UUID primary key for compatibility"""
 
     id: Mapped[str] = mapped_column(
-        String(36), primary_key=True, nullable=False  # UUID string length
+        String(36),
+        primary_key=True,
+        nullable=False,  # UUID string length
     )
 
 

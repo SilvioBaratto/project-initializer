@@ -47,6 +47,7 @@ def get_default_user_from_db(db: Session) -> dict:
         # If no users exist, create a default one
         logger.warning("No users found in database, creating default user")
         import uuid
+
         user_id = str(uuid.uuid4())
         default_user = User(
             # Use an RFC 2606 reserved domain: routable-looking but guaranteed
@@ -54,7 +55,7 @@ def get_default_user_from_db(db: Session) -> dict:
             # EmailStr rejects as an RFC 6761 special-use TLD — that would 500
             # the UserPublic response model on GET /users/me).
             id=user_id,
-            email="admin@example.com"
+            email="admin@example.com",
         )
         db.add(default_user)
         db.commit()
@@ -66,7 +67,7 @@ def get_default_user_from_db(db: Session) -> dict:
         "id": user.id,
         "email": user.email,
         "username": user.email.split("@")[0],
-        "is_active": True
+        "is_active": True,
     }
 
     logger.debug(f"Using default user from database: {user.email} ({user.id})")
@@ -74,8 +75,7 @@ def get_default_user_from_db(db: Session) -> dict:
 
 
 def get_current_user(
-    x_user_id: Annotated[Optional[str], Header()] = None,
-    db: Session = Depends(get_db)
+    x_user_id: Annotated[Optional[str], Header()] = None, db: Session = Depends(get_db)
 ) -> dict:
     """
     Get current user - simplified for local development.
@@ -96,7 +96,7 @@ def get_current_user(
             "id": x_user_id,
             "email": f"user_{x_user_id}@example.com",
             "username": f"user_{x_user_id}",
-            "is_active": True
+            "is_active": True,
         }
 
     # Otherwise get default user from database
@@ -104,8 +104,7 @@ def get_current_user(
 
 
 def get_optional_user(
-    x_user_id: Annotated[Optional[str], Header()] = None,
-    db: Session = Depends(get_db)
+    x_user_id: Annotated[Optional[str], Header()] = None, db: Session = Depends(get_db)
 ) -> Optional[dict]:
     """
     Get optional user (returns None if no user context).
@@ -122,9 +121,7 @@ def get_optional_user(
     return None
 
 
-def require_user(
-    current_user: dict = Depends(get_current_user)
-) -> dict:
+def require_user(current_user: dict = Depends(get_current_user)) -> dict:
     """
     Require authenticated user (alias for get_current_user).
 
@@ -137,9 +134,7 @@ def require_user(
     return current_user
 
 
-def get_user_id(
-    current_user: dict = Depends(get_current_user)
-) -> str:
+def get_user_id(current_user: dict = Depends(get_current_user)) -> str:
     """
     Get current user's ID.
 
@@ -157,7 +152,9 @@ CurrentUser = Annotated[dict, Depends(get_current_user)]
 OptionalUser = Annotated[Optional[dict], Depends(get_optional_user)]
 RequireAuth = Depends(require_user)
 UserId = Annotated[str, Depends(get_user_id)]
-AdminUser = Annotated[dict, Depends(get_current_user)]  # No admin distinction in simple mode
+AdminUser = Annotated[
+    dict, Depends(get_current_user)
+]  # No admin distinction in simple mode
 
 
 class RateLimiter:
@@ -180,7 +177,9 @@ class RateLimiter:
         """Check rate limit for the request"""
         return self._check_memory_rate_limit(request, current_user)
 
-    def _check_memory_rate_limit(self, request: Request, current_user: Optional[dict] = None) -> bool:
+    def _check_memory_rate_limit(
+        self, request: Request, current_user: Optional[dict] = None
+    ) -> bool:
         """In-memory rate limiting"""
         # Determine rate limit key
         if self.per_user and current_user:
@@ -197,13 +196,15 @@ class RateLimiter:
 
         # Remove old entries
         self._in_memory_cache[key] = [
-            timestamp for timestamp in self._in_memory_cache[key]
+            timestamp
+            for timestamp in self._in_memory_cache[key]
             if timestamp > window_start
         ]
 
         # Check rate limit
         if len(self._in_memory_cache[key]) >= self.requests:
             from app.exceptions import RateLimitError
+
             raise RateLimitError(
                 message=f"Rate limit exceeded: {len(self._in_memory_cache[key])}/{self.requests} requests per {self.window}s"
             )
@@ -240,13 +241,13 @@ DBSession = Annotated[Session, Depends(get_db)]
 class PaginationParams:
     """
     Advanced pagination parameters with cursor support for better performance
-    
+
     Features:
     - Traditional offset/limit pagination
     - Cursor-based pagination for large datasets (17x faster performance)
     - Configurable limits with safety bounds
     """
-    
+
     def __init__(
         self,
         skip: Annotated[int, Query(ge=0)] = 0,
@@ -254,7 +255,7 @@ class PaginationParams:
         order_by: Optional[str] = None,
         order_desc: bool = False,
         cursor: Optional[str] = None,
-        use_cursor: bool = False
+        use_cursor: bool = False,
     ):
         # Query(ge=0)/(ge=1, le=100) enforce bounds before __init__ runs and
         # surface them in OpenAPI, so no in-body clamp is needed here.
@@ -267,24 +268,28 @@ class PaginationParams:
 
         # Performance warning for large offsets
         if self.skip > 10000 and not self.use_cursor:
-            logger.warning(f"Large offset detected ({self.skip}). Consider using cursor-based pagination for better performance.")
-    
+            logger.warning(
+                f"Large offset detected ({self.skip}). Consider using cursor-based pagination for better performance."
+            )
+
     def encode_cursor(self, value: Any) -> str:
         """Encode cursor value for pagination"""
         import base64
         import json
+
         cursor_data = {"value": str(value), "order_desc": self.order_desc}
         cursor_json = json.dumps(cursor_data)
         return base64.urlsafe_b64encode(cursor_json.encode()).decode()
-    
+
     def decode_cursor(self) -> tuple[Any, bool]:
         """Decode cursor value from pagination"""
         if not self.cursor:
             return None, self.order_desc
-        
+
         try:
             import base64
             import json
+
             cursor_json = base64.urlsafe_b64decode(self.cursor.encode()).decode()
             cursor_data = json.loads(cursor_json)
             return cursor_data["value"], cursor_data["order_desc"]

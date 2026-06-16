@@ -124,7 +124,9 @@ def select_layers(
             (api, frozenset(), _combine(reqs)),
         ]
         if auth:
-            layers.append((get_auth_overlay_dir(auth, framework), frozenset(), _combine(reqs)))
+            layers.append(
+                (get_auth_overlay_dir(auth, framework), frozenset(), _combine(reqs))
+            )
             layers.append((get_auth_frontend_overlay_dir(auth), frozenset(), None))
         if want_async:
             layers.append((get_asyncdb_overlay_dir(), frozenset(), None))
@@ -138,7 +140,11 @@ def select_layers(
         ]
         if auth:
             layers.append(
-                (get_auth_overlay_dir(auth, framework), frozenset(), _combine(compose, reqs))
+                (
+                    get_auth_overlay_dir(auth, framework),
+                    frozenset(),
+                    _combine(compose, reqs),
+                )
             )
         if want_async:
             layers.append((get_asyncdb_overlay_dir(), frozenset(), None))
@@ -183,6 +189,7 @@ def copy_template(
         "*.egg-info",
         "dist",
         "build",
+        "test-stubs",
     }
 
     def should_skip(name: str) -> bool:

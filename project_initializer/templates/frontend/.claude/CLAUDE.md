@@ -33,6 +33,8 @@ You are an expert in TypeScript, Angular, and scalable web application developme
 - Use `computed()` for derived state
 - Keep state transformations pure and predictable
 - Do NOT use `mutate` on signals, use `update` or `set` instead
+- Capture signal values into locals BEFORE `await`; reads after an async boundary are not tracked (reactive context is synchronous only)
+- `effect()` is for side effects only (logging, third-party sync via `afterNextRender`); never copy signal→signal in an effect — use `computed()` or `linkedSignal()`
 
 ## Templates
 
@@ -45,3 +47,7 @@ You are an expert in TypeScript, Angular, and scalable web application developme
 - Design services around a single responsibility
 - Use the `providedIn: 'root'` option for singleton services
 - Use the `inject()` function instead of constructor injection
+
+## Security
+
+- Never use `bypassSecurityTrust*` APIs or bind untrusted data to `[innerHTML]`; Angular's built-in sanitization is the only safe path

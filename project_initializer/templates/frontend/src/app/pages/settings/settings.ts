@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { IconName } from '../../icons';
-import { ThemeMode, ThemeService } from '../../services/theme.service';
+import { ThemeMode, ThemeService } from '../../services/theme';
 
 interface ThemeOption {
   mode: ThemeMode;

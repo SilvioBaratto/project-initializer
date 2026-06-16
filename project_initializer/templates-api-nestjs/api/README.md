@@ -27,12 +27,12 @@ src/
 ├── prisma/                # Global PrismaModule + PrismaService
 ├── common/
 │   ├── decorators/        # @CurrentUser, @Public
-│   ├── middleware/         # Logging middleware
 │   ├── filters/           # Exception filters
 │   ├── exceptions/        # Custom API exceptions
 │   └── interceptors/      # Response transform
+├── config/                # env validation (zod) + pino logger config
 └── modules/
-    ├── health/            # Health check endpoint
+    ├── health/            # Terminus liveness/readiness probes
     ├── auth/              # Authentication
     ├── test/              # CRUD test endpoints
     └── chatbot/           # BAML-powered chatbot

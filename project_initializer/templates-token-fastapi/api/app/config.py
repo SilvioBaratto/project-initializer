@@ -7,27 +7,24 @@ from typing import List
 
 class Settings(BaseSettings):
     """Application settings with environment variable support"""
-    
+
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-        extra="ignore"
+        env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="ignore"
     )
-    
+
     # Project Information
     project_name: str = "FastAPI Template"
     version: str = "1.0.0"
-    
+
     # API Configuration
     api_v1_str: str = "/api/v1"
-    
+
     # Database Configuration - Local PostgreSQL
     database_url: str = Field(
         default="postgresql://postgres:postgres@localhost:5433/app_db",
-        alias="DATABASE_URL"
+        alias="DATABASE_URL",
     )
-    
+
     # Pool Configuration - Standard settings for local PostgreSQL
     database_pool_size: int = Field(default=5)
     database_max_overflow: int = Field(default=10)
@@ -40,10 +37,8 @@ class Settings(BaseSettings):
     cache_ttl_users: int = Field(default=600)
 
     # CORS
-    cors_origins: str = Field(
-        default="http://localhost:4200,http://localhost:4300"
-    )
-    
+    cors_origins: str = Field(default="http://localhost:4200,http://localhost:4300")
+
     @property
     def cors_origins_list(self) -> List[str]:
         """Get CORS origins as a list"""
@@ -51,10 +46,12 @@ class Settings(BaseSettings):
             return [
                 "http://localhost:4200",
                 "http://localhost:4300",
-                "http://127.0.0.1:4200"
+                "http://127.0.0.1:4200",
             ]
-        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
-    
+        return [
+            origin.strip() for origin in self.cors_origins.split(",") if origin.strip()
+        ]
+
     # Authentication
     auth_token: str = Field(default="changeme")
 
@@ -64,23 +61,23 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = Field(default=30)
 
     # Security (optional for production)
-    
+
     # Rate Limiting
     rate_limit_requests: int = Field(default=100)
     rate_limit_window: int = Field(default=60)
-    
+
     # Logging
     log_level: str = Field(default="INFO")
     log_format: str = Field(default="json")
-    
+
     # Monitoring
     enable_metrics: bool = Field(default=True)
     metrics_path: str = Field(default="/metrics")
-    
+
     # Performance
     connection_timeout: int = Field(default=10)
     read_timeout: int = Field(default=30)
-    
+
     # Environment detection helpers
     debug: bool = Field(default=True)
     environment: str = Field(default="development")

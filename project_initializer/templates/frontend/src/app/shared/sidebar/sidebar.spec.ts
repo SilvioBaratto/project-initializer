@@ -1,24 +1,25 @@
-import { provideZonelessChangeDetection, signal } from '@angular/core';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { vi } from 'vitest';
 import { LucideIconConfig } from 'lucide-angular';
 
 import { ICON_PROVIDER } from './../../icons';
-import { ThemeService } from '../../services/theme.service';
+import { ThemeService } from '../../services/theme';
 import { SidebarComponent } from './sidebar';
 
 describe('SidebarComponent', () => {
-  let themeSpy: jasmine.SpyObj<Pick<ThemeService, 'toggleTheme'>> & { theme: ReturnType<typeof signal> };
+  let themeSpy: { toggleTheme: ReturnType<typeof vi.fn>; theme: ReturnType<typeof signal> };
 
   beforeEach(async () => {
-    themeSpy = Object.assign(jasmine.createSpyObj('ThemeService', ['toggleTheme']), {
+    themeSpy = {
+      toggleTheme: vi.fn(),
       theme: signal('light'),
-    });
+    };
 
     await TestBed.configureTestingModule({
       imports: [SidebarComponent],
       providers: [
-        provideZonelessChangeDetection(),
         provideRouter([]),
         ICON_PROVIDER,
         { provide: ThemeService, useValue: themeSpy },
