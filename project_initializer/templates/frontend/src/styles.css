@@ -1,9 +1,9 @@
 @import 'tailwindcss';
+@custom-variant dark (&:where(.dark, .dark *):not(:where(.light, .light *)));
 /* `dark:` applies inside a `.dark` subtree, EXCEPT where a nested `.light`
    re-asserts the light theme (used by the component catalog to show a true
    light preview even when the global theme is dark). The inner `:where()`
    keeps the `:not()` at zero specificity so utility ordering is unaffected. */
-@custom-variant dark (&:where(.dark, .dark *):not(:where(.light, .light *)));
 
 @theme {
   /* Fonts */
