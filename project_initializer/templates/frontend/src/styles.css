@@ -1,5 +1,9 @@
 @import 'tailwindcss';
-@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant dark (&:where(.dark, .dark *):not(:where(.light, .light *)));
+/* `dark:` applies inside a `.dark` subtree, EXCEPT where a nested `.light`
+   re-asserts the light theme (used by the component catalog to show a true
+   light preview even when the global theme is dark). The inner `:where()`
+   keeps the `:not()` at zero specificity so utility ordering is unaffected. */
 
 @theme {
   /* Fonts */
@@ -74,6 +78,44 @@
   --color-success: #4ade80;
   --color-warning: #fbbf24;
   --color-info: #60a5fa;
+}
+
+/* Re-assert the light theme inside a `.dark` ancestor. Mirrors the @theme
+   light values so a `.light`-scoped region renders light regardless of the
+   global theme — the symmetric counterpart to `.dark`. */
+.light {
+  /* Surface */
+  --color-surface: #fafafa;
+  --color-surface-raised: #ffffff;
+  --color-surface-inset: #f4f4f5;
+
+  /* Border */
+  --color-border: #e4e4e7;
+  --color-border-muted: #f4f4f5;
+
+  /* Text */
+  --color-text: #18181b;
+  --color-text-secondary: #52525b;
+  --color-text-tertiary: #6b7280;
+
+  /* Primary — violet */
+  --color-primary: #6d28d9;
+  --color-primary-hover: #5b21b6;
+  --color-primary-light: #f5f3ff;
+
+  /* Accent — indigo */
+  --color-accent: #4f46e5;
+  --color-accent-hover: #4338ca;
+  --color-accent-light: #eef2ff;
+
+  /* Signature pop — emerald */
+  --color-signature: #10b981;
+
+  /* Semantic */
+  --color-danger: #dc2626;
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-info: #2563eb;
 }
 
 @layer base {

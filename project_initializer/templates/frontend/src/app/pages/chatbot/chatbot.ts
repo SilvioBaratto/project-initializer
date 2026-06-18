@@ -8,6 +8,7 @@ import {
   ChangeDetectionStrategy,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { LucideAngularModule } from 'lucide-angular';
 import { ChatService } from '../../services/chat';
 import { ChatMessage } from '../../models/chat';
 
@@ -15,6 +16,7 @@ import { ChatMessage } from '../../models/chat';
   selector: 'app-chatbot',
   templateUrl: './chatbot.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [LucideAngularModule],
   host: { class: 'block h-full' },
 })
 export class ChatbotComponent {
@@ -32,7 +34,7 @@ export class ChatbotComponent {
     this.userInput.set(textarea.value);
 
     textarea.style.height = 'auto';
-    textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+    textarea.style.height = Math.min(textarea.scrollHeight, 168) + 'px';
   }
 
   onKeydown(event: Event) {

@@ -24,6 +24,7 @@ import { ThemePreviewComponent } from '../theme-preview';
   ],
   template: `
     <app-theme-preview label="Navbar / Hamburger">
+      <ng-template>
       <app-stack [gap]="3">
         <app-navbar>
           <span navbarBrand class="font-semibold text-text text-sm">My App</span>
@@ -31,9 +32,11 @@ import { ThemePreviewComponent } from '../theme-preview';
         </app-navbar>
         <app-hamburger [open]="true" />
       </app-stack>
+      </ng-template>
     </app-theme-preview>
 
     <app-theme-preview label="Tabs">
+      <ng-template>
       <ui-tabs>
         <ui-tab [tabIndex]="0">Overview</ui-tab>
         <ui-tab [tabIndex]="1">Details</ui-tab>
@@ -42,10 +45,13 @@ import { ThemePreviewComponent } from '../theme-preview';
         <ui-tab-panel [panelIndex]="1">Details content</ui-tab-panel>
         <ui-tab-panel [panelIndex]="2">History content</ui-tab-panel>
       </ui-tabs>
+      </ng-template>
     </app-theme-preview>
 
     <app-theme-preview label="Breadcrumbs">
+      <ng-template>
       <ui-breadcrumbs [items]="breadcrumbs" />
+      </ng-template>
     </app-theme-preview>
   `,
 })

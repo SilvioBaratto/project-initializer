@@ -59,12 +59,19 @@
     }
   </div>
 
-  <!-- Input bar -->
-  <div class="border-t border-border bg-surface-raised px-4 py-3 md:px-8">
-    <form (ngSubmit)="onSend()" class="max-w-3xl mx-auto flex items-end gap-2">
+  <!-- Input bar — Gemini-style pill, identical on mobile and desktop.
+       The textarea and send button sit inline (items-end), so the send stays
+       pinned bottom-right as the text grows. The textarea auto-grows up to a
+       ~168px cap (matching Gemini's 7-line max), then scrolls internally. -->
+  <div class="px-4 py-3 md:px-8 md:py-4">
+    <form
+      (ngSubmit)="onSend()"
+      class="max-w-3xl mx-auto flex items-end gap-2 rounded-[26px] border border-border bg-surface-inset px-2 py-1.5 shadow-sm transition-colors focus-within:border-accent/40 focus-within:shadow">
       <textarea
         aria-label="Chat message"
-        class="flex-1 resize-none rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-1 focus:ring-accent/50 focus:border-accent/50 transition-colors"
+        class="flex-1 resize-none border-0 bg-transparent px-3 py-1.5 text-[15px]/6 text-text placeholder:text-text-secondary/60
+               [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
+               focus:outline-none focus:ring-0"
         rows="1"
         placeholder="Type a message..."
         [value]="userInput()"
@@ -76,10 +83,8 @@
         type="submit"
         aria-label="Send message"
         [disabled]="isLoading() || !userInput().trim()"
-        class="flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl bg-accent hover:bg-accent/90 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
-        </svg>
+        class="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-full bg-accent hover:bg-accent/90 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors">
+        <lucide-icon name="arrow-up" class="w-5 h-5" aria-hidden="true" />
       </button>
     </form>
   </div>

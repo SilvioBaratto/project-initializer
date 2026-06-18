@@ -35,7 +35,13 @@ FRONTEND = (
 
 STYLES_CSS = FRONTEND / "src" / "styles.css"
 
-_CUSTOM_VARIANT_DECL = "@custom-variant dark (&:where(.dark, .dark *));"
+# The selector also excludes `.light` subtrees so a nested `.light` scope (used by
+# the component catalog) can re-assert the light theme under a global `.dark`. The
+# inner `:where()` keeps the `:not()` at zero specificity, preserving issue #2's
+# behaviour: `dark:` still fires on `.dark` and its descendants.
+_CUSTOM_VARIANT_DECL = (
+    "@custom-variant dark (&:where(.dark, .dark *):not(:where(.light, .light *)));"
+)
 
 # @import may use single or double quotes — accept both.
 _IMPORT_PATTERN = re.compile(r"""@import\s+['"]tailwindcss['"];""")
