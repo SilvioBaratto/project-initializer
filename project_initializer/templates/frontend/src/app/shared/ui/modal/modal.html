@@ -1,0 +1,30 @@
+@if (open()) {
+  <!-- Backdrop -->
+  <div
+    class="fixed inset-0 z-50 bg-black/40 dark:bg-black/60 flex items-center justify-center p-4"
+    data-testid="modal-backdrop"
+    (click)="handleClose()"
+    aria-hidden="true"
+  ></div>
+
+  <!-- Dialog panel -->
+  <div
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="label()"
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+    appFocusTrap
+    [active]="open()"
+    (close)="handleClose()"
+  >
+    <div
+      class="pointer-events-auto w-full max-w-lg rounded-xl shadow-xl
+             bg-surface-raised dark:bg-surface-raised
+             border border-border dark:border-border
+             animate-fade-in-up"
+      (click)="$event.stopPropagation()"
+    >
+      <ng-content />
+    </div>
+  </div>
+}

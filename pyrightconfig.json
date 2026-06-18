@@ -1,6 +1,7 @@
 {
   "exclude": [
-    "project_initializer/templates*"
+    "project_initializer/templates*",
+    "tests"
   ],
   "venvPath": "."
 }

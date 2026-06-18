@@ -1,0 +1,53 @@
+<!-- Horizontal-scroll wrapper: overscroll-contain keeps scroll chains contained on mobile -->
+<div
+  class="w-full overflow-x-auto overscroll-contain rounded-lg border border-border"
+  tabindex="0"
+  role="region"
+  aria-label="Data table"
+>
+  <!-- Semantic table: visible at ≥md, hidden below -->
+  <table class="hidden md:table w-full border-collapse text-sm text-text">
+    <thead class="bg-surface-inset text-text-secondary dark:bg-surface-inset dark:text-text-secondary">
+      <tr>
+        @for (col of columns(); track col.key) {
+          <th
+            scope="col"
+            class="px-4 py-3 text-left font-medium"
+          >
+            {{ col.header }}
+          </th>
+        }
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-border dark:divide-border">
+      @for (row of rows(); track $index) {
+        <tr class="bg-surface-raised hover:bg-surface-inset transition-colors dark:bg-surface-raised dark:hover:bg-surface-inset">
+          @for (col of columns(); track col.key) {
+            <td class="px-4 py-3">
+              {{ row[col.key] }}
+              <ng-content [select]="'[slot-cell-' + col.key + ']'" />
+            </td>
+          }
+        </tr>
+      }
+    </tbody>
+  </table>
+
+  <!-- Card/stacked layout: visible below md, hidden at ≥md -->
+  <ul class="md:hidden divide-y divide-border dark:divide-border">
+    @for (row of rows(); track $index) {
+      <li class="px-4 py-3 bg-surface-raised dark:bg-surface-raised space-y-1">
+        @for (col of columns(); track col.key) {
+          <div class="flex items-start gap-2 text-sm">
+            <span class="font-medium text-text-secondary dark:text-text-secondary w-28 shrink-0">
+              {{ col.header }}
+            </span>
+            <span class="text-text dark:text-text">
+              {{ row[col.key] }}
+            </span>
+          </div>
+        }
+      </li>
+    }
+  </ul>
+</div>

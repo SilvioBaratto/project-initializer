@@ -1,7 +1,6 @@
 import {
   Component,
   signal,
-  computed,
   inject,
   OnInit,
   OnDestroy,
@@ -16,10 +15,13 @@ import { filter, map } from 'rxjs/operators';
 
 import { SidebarComponent } from '../sidebar/sidebar';
 import { BottomTabBarComponent } from '../bottom-tab-bar/bottom-tab-bar';
+import { ToastComponent } from '../ui/toast/toast';
+import { NavbarComponent } from '../ui/navbar/navbar';
+import { HamburgerComponent } from '../ui/hamburger/hamburger';
 
 @Component({
   selector: 'app-layout',
-  imports: [RouterOutlet, SidebarComponent, BottomTabBarComponent, LucideAngularModule],
+  imports: [RouterOutlet, SidebarComponent, BottomTabBarComponent, LucideAngularModule, ToastComponent, NavbarComponent, HamburgerComponent],
   templateUrl: './layout.html',
   styleUrl: './layout.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -31,8 +33,6 @@ export class LayoutComponent implements OnInit, OnDestroy {
 
   isSidebarOpen = signal(false);
   isMobile = signal(false);
-
-  showOverlay = computed(() => this.isSidebarOpen() && this.isMobile());
 
   readonly announced = toSignal(
     this.router.events.pipe(

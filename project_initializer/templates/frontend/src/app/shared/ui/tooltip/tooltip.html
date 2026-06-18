@@ -1,0 +1,13 @@
+<span aria-describedby="{{ tooltipId }}" class="contents">
+  <ng-content />
+</span>
+@if (visible()) {
+  <span
+    id="{{ tooltipId }}"
+    role="tooltip"
+    class="pointer-events-none absolute z-50 rounded px-2 py-1 text-xs
+           bg-text text-surface dark:bg-text dark:text-surface
+           shadow-md whitespace-nowrap animate-fade-in-up
+           bottom-full mb-1 left-1/2 -translate-x-1/2"
+  >{{ text() }}</span>
+}

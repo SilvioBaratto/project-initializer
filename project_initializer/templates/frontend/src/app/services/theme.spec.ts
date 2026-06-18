@@ -94,9 +94,9 @@ describe('ThemeService', () => {
     it('when setTheme is called, the choice is written to localStorage', () => {
       setupMatchMedia(false);
       const service = createService();
-      const setItem = vi.spyOn(localStorage, 'setItem');
       service.setTheme('dark');
-      expect(setItem).toHaveBeenCalledWith(STORAGE_KEY, 'dark');
+      // Verify via read-back — avoids jsdom localStorage spy quirks
+      expect(localStorage.getItem(STORAGE_KEY)).toBe('dark');
     });
   });
 

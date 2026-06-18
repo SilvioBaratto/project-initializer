@@ -78,16 +78,6 @@
             "providersFile": "src/test-providers.ts",
             "include": [
               "src/**/*.spec.ts"
-            ],
-            "assets": [
-              {
-                "glob": "**/*",
-                "input": "src/assets",
-                "output": "/assets/"
-              }
-            ],
-            "styles": [
-              "src/styles.css"
             ]
           }
         }

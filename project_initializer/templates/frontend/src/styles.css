@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   /* Fonts */
@@ -90,9 +91,26 @@
     }
   }
 
-  /* iOS safe-area bottom spacing utility */
+  /* iOS safe-area inset utilities — require viewport-fit=cover in <meta viewport> */
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .pl-safe {
+    padding-left: env(safe-area-inset-left);
+  }
+
+  .pr-safe {
+    padding-right: env(safe-area-inset-right);
+  }
+
+  .px-safe {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 
   *:focus-visible {
@@ -146,6 +164,32 @@
   .theme-transitioning * {
     transition: none !important;
   }
+
+  /* Set touch-action manipulation on tappable elements: removes the ~300ms double-tap-zoom
+     delay and double-tap zoom while keeping pinch-to-zoom and pan gestures intact.
+     Scoped to explicit tap targets only; native form controls manage their own touch events.
+     NEVER set user-scalable=no / maximum-scale=1 — pinch zoom must stay enabled (WCAG 1.4.4). */
+  a,
+  button,
+  [role="button"],
+  label {
+    touch-action: manipulation;
+  }
+
+  /* h-dvh / h-svh / h-lvh trade-offs — layout.html uses h-dvh on the shell root and
+     md:h-dvh on the main scroll container (overflow-y-auto):
+       dvh — dynamic: shrinks/grows as the mobile browser toolbar shows/hides. Best for
+             full-screen shells that must exactly track the visible viewport live.
+       svh — small: height with toolbar fully visible (conservative floor). Use when you
+             want a guaranteed minimum without content jumping.
+       lvh — large: height with toolbar fully hidden (expanded ceiling). Avoid for
+             interactive shells; content may be clipped behind the toolbar on iOS.
+     Known fragile: sticky footers + env(safe-area-inset-bottom) when the toolbar hides
+     on iOS Safari — always verify on a real device. Refs: research §1.7, §4. */
+
+  /* scroll-snap utilities (scroll-snap-type / scroll-snap-align / snap-*) are provided
+     by Tailwind v4 core at zero config cost. Apply snap-x snap-mandatory + snap-start
+     to carousel containers when a carousel component is built (YAGNI — none exists yet). */
 }
 
 @layer utilities {

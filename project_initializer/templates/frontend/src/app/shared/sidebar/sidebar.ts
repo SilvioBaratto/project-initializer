@@ -4,10 +4,11 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { NavItem, NAV_ITEMS } from '../nav-item';
 import { ThemeService } from '../../services/theme';
+import { DrawerComponent } from '../ui/drawer/drawer';
 
 @Component({
   selector: 'app-sidebar',
-  imports: [RouterLink, RouterLinkActive, LucideAngularModule],
+  imports: [RouterLink, RouterLinkActive, LucideAngularModule, DrawerComponent],
   templateUrl: './sidebar.html',
   styleUrl: './sidebar.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -24,7 +25,8 @@ export class SidebarComponent {
 
   navItems: NavItem[] = NAV_ITEMS;
 
-  showSidebar = computed(() => !this.isMobile() || this.isOpen());
+  /** Desktop always shows; mobile shows only when open. Mirrors original showSidebar logic. */
+  readonly showSidebar = computed(() => !this.isMobile() || this.isOpen());
 
   onNavClick() {
     this.closeSidebar.emit();

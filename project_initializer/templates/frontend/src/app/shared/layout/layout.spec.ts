@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
+import { vi } from 'vitest';
 import { LucideIconConfig } from 'lucide-angular';
 
 import { ICON_PROVIDER } from '../../icons';
@@ -7,6 +8,12 @@ import { LayoutComponent } from './layout';
 
 describe('LayoutComponent', () => {
   beforeEach(async () => {
+    vi.spyOn(window, 'matchMedia').mockReturnValue({
+      matches: false,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    } as unknown as MediaQueryList);
+
     await TestBed.configureTestingModule({
       imports: [LayoutComponent],
       providers: [
@@ -23,6 +30,11 @@ describe('LayoutComponent', () => {
         },
       ],
     }).compileComponents();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    document.documentElement.classList.remove('dark', 'theme-transitioning');
   });
 
   async function render(): Promise<HTMLElement> {
@@ -75,6 +87,11 @@ describe('LayoutComponent', () => {
 
   it('when navigation ends, focus moves to main-content', async () => {
     const routes = [{ path: 'home', component: LayoutComponent }];
+    vi.spyOn(window, 'matchMedia').mockReturnValue({
+      matches: false,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    } as unknown as MediaQueryList);
     await TestBed.configureTestingModule({
       imports: [LayoutComponent],
       providers: [

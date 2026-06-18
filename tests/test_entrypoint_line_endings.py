@@ -26,9 +26,7 @@ TEMPLATES = REPO_ROOT / "project_initializer"
 GITATTRIBUTES = TEMPLATES / "templates" / ".gitattributes"
 
 ENTRYPOINTS = sorted(
-    p
-    for p in TEMPLATES.rglob("entrypoint.sh")
-    if "node_modules" not in p.parts
+    p for p in TEMPLATES.rglob("entrypoint.sh") if "node_modules" not in p.parts
 )
 
 DOCKERFILES_WITH_ENTRYPOINT = sorted(
