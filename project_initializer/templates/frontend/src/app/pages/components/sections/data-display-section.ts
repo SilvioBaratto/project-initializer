@@ -28,10 +28,13 @@ import { ThemePreviewComponent } from '../theme-preview';
   ],
   template: `
     <app-theme-preview label="Table">
+      <ng-template>
       <ui-table [columns]="tableColumns" [rows]="tableRows" />
+      </ng-template>
     </app-theme-preview>
 
     <app-theme-preview label="List / Avatar">
+      <ng-template>
       <app-stack direction="row" [gap]="4" align="start">
         <ui-list variant="divided">
           <li class="px-4 py-2 text-sm text-text">Item one</li>
@@ -44,21 +47,27 @@ import { ThemePreviewComponent } from '../theme-preview';
           <app-avatar alt="Carol White" size="lg" />
         </app-stack>
       </app-stack>
+      </ng-template>
     </app-theme-preview>
 
     <app-theme-preview label="Stat Cards">
+      <ng-template>
       <app-grid [gap]="3">
         <app-stat-card metric="1,284" label="Active users" delta="+12%" deltaDirection="up" />
         <app-stat-card metric="8,932" label="Sessions" delta="-3%" deltaDirection="down" />
         <app-stat-card metric="342" label="Conversations" />
       </app-grid>
+      </ng-template>
     </app-theme-preview>
 
     <app-theme-preview label="Pagination">
+      <ng-template>
       <ui-pagination [page]="2" [total]="5" />
+      </ng-template>
     </app-theme-preview>
 
     <app-theme-preview label="Accordion">
+      <ng-template>
       <ui-accordion>
         <ui-accordion-item [index]="0">
           <span slot="header">What is Angular?</span>
@@ -69,6 +78,7 @@ import { ThemePreviewComponent } from '../theme-preview';
           A utility-first CSS framework.
         </ui-accordion-item>
       </ui-accordion>
+      </ng-template>
     </app-theme-preview>
   `,
 })

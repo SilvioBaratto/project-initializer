@@ -27,6 +27,7 @@ import { ThemePreviewComponent } from '../theme-preview';
   ],
   template: `
     <app-theme-preview label="Container / Stack / Grid / Card">
+      <ng-template>
       <app-container size="sm">
         <app-stack [gap]="3">
           <app-card>
@@ -41,9 +42,11 @@ import { ThemePreviewComponent } from '../theme-preview';
           </app-grid>
         </app-stack>
       </app-container>
+      </ng-template>
     </app-theme-preview>
 
     <app-theme-preview label="Spinner / Skeleton">
+      <ng-template>
       <app-stack direction="row" [gap]="6" align="center">
         <app-spinner />
         <app-stack [gap]="2">
@@ -52,9 +55,11 @@ import { ThemePreviewComponent } from '../theme-preview';
           <app-skeleton shape="avatar" width="w-8" height="h-8" />
         </app-stack>
       </app-stack>
+      </ng-template>
     </app-theme-preview>
 
     <app-theme-preview label="Alert / Badge">
+      <ng-template>
       <app-stack [gap]="3">
         <app-alert variant="info">Info alert message</app-alert>
         <app-alert variant="success">Success alert message</app-alert>
@@ -68,6 +73,7 @@ import { ThemePreviewComponent } from '../theme-preview';
           <app-badge variant="danger">Danger</app-badge>
         </app-stack>
       </app-stack>
+      </ng-template>
     </app-theme-preview>
   `,
 })

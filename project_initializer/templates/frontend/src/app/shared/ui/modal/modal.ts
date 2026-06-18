@@ -7,6 +7,7 @@ import {
   input,
   output,
 } from '@angular/core';
+import { LucideAngularModule } from 'lucide-angular';
 import { FocusTrapDirective } from '../focus-trap/focus-trap.directive';
 
 /** Inerts all body-level siblings of `host`'s top-level ancestor. */
@@ -26,7 +27,7 @@ function setBodySiblingsInert(host: HTMLElement, inert: boolean): void {
   selector: 'app-modal',
   templateUrl: './modal.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FocusTrapDirective],
+  imports: [FocusTrapDirective, LucideAngularModule],
   host: { '(document:keydown)': 'onDocumentKeydown($event)' },
 })
 export class ModalComponent {

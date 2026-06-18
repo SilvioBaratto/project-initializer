@@ -27,7 +27,8 @@ import { ThemePreviewComponent } from '../theme-preview';
   ],
   template: `
     <app-theme-preview label="Button variants">
-      <app-stack direction="row" [gap]="2" align="center">
+      <ng-template>
+      <app-stack direction="row" [gap]="2" align="center" [wrap]="true">
         <app-button variant="primary">Primary</app-button>
         <app-button variant="secondary">Secondary</app-button>
         <app-button variant="ghost">Ghost</app-button>
@@ -35,9 +36,11 @@ import { ThemePreviewComponent } from '../theme-preview';
         <app-button [loading]="true">Loading</app-button>
         <app-button [disabled]="true">Disabled</app-button>
       </app-stack>
+      </ng-template>
     </app-theme-preview>
 
     <app-theme-preview label="Input / Select / Form field">
+      <ng-template>
       <app-stack [gap]="3">
         <app-form-field label="Name" helpText="Enter your full name">
           <app-input />
@@ -49,15 +52,18 @@ import { ThemePreviewComponent } from '../theme-preview';
           <app-select [options]="countryOptions" />
         </app-form-field>
       </app-stack>
+      </ng-template>
     </app-theme-preview>
 
     <app-theme-preview label="Checkbox / Radio">
+      <ng-template>
       <app-stack [gap]="2">
         <app-checkbox label="Accept terms" />
         <app-checkbox label="Subscribe to newsletter" [checked]="true" />
         <app-radio name="size-demo" value="sm" label="Small" />
         <app-radio name="size-demo" value="lg" label="Large" [checked]="true" />
       </app-stack>
+      </ng-template>
     </app-theme-preview>
   `,
 })

@@ -6,6 +6,11 @@ import { NavigationSectionComponent } from './sections/navigation-section';
 import { OverlaysSectionComponent } from './sections/overlays-section';
 import { DataDisplaySectionComponent } from './sections/data-display-section';
 
+import { ModalComponent } from '../../shared/ui/modal/modal';
+import { SlideOverComponent } from '../../shared/ui/slide-over/slide-over';
+import { DrawerComponent } from '../../shared/ui/drawer/drawer';
+import { ButtonComponent } from '../../shared/ui/button/button';
+
 @Component({
   selector: 'app-components',
   templateUrl: './components.html',
@@ -16,6 +21,10 @@ import { DataDisplaySectionComponent } from './sections/data-display-section';
     NavigationSectionComponent,
     OverlaysSectionComponent,
     DataDisplaySectionComponent,
+    ModalComponent,
+    SlideOverComponent,
+    DrawerComponent,
+    ButtonComponent,
   ],
   host: { class: 'block p-6 md:p-8' },
 })

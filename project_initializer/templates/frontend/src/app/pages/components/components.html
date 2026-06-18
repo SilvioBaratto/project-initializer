@@ -33,21 +33,13 @@
     </p>
     <!-- Dual-region trigger row: light (left) and dark-scoped (right) -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-      <div class="rounded-lg border border-border bg-surface p-4">
+      <div class="light rounded-lg border border-border bg-surface p-4">
         <p class="mb-2 text-xs text-text-tertiary">Light — Overlay Triggers</p>
-        <app-overlays-section
-          [activeOverlay]="activeOverlay()"
-          (opened)="openOverlay($event)"
-          (closed)="closeOverlay()"
-        />
+        <app-overlays-section (opened)="openOverlay($event)" />
       </div>
       <div class="dark rounded-lg border border-border bg-surface p-4">
         <p class="mb-2 text-xs text-text-tertiary">Dark — Overlay Triggers</p>
-        <app-overlays-section
-          [activeOverlay]="activeOverlay()"
-          (opened)="openOverlay($event)"
-          (closed)="closeOverlay()"
-        />
+        <app-overlays-section (opened)="openOverlay($event)" />
       </div>
     </div>
   </section>
@@ -57,4 +49,32 @@
     <h2 class="mb-6 text-lg font-semibold text-text border-b border-border pb-2">Data Display</h2>
     <app-data-display-section />
   </section>
+
+  <!-- Overlays rendered once at page root — outside any .dark container so they
+       follow the global theme (CSS variables inherit through the DOM tree, not
+       the visual box). At most one open at a time. -->
+  @if (activeOverlay() === 'modal') {
+    <app-modal [open]="true" label="Demo Modal" (closed)="closeOverlay()">
+      <p class="text-sm text-text">This is a demo modal dialog.</p>
+      <div class="mt-4">
+        <app-button variant="secondary" (clicked)="closeOverlay()">Close</app-button>
+      </div>
+    </app-modal>
+  }
+  @if (activeOverlay() === 'slide-over') {
+    <app-slide-over [open]="true" label="Demo Slide-over" (closed)="closeOverlay()">
+      <p class="p-4 text-sm text-text">Demo slide-over panel content.</p>
+      <div class="p-4">
+        <app-button variant="secondary" (clicked)="closeOverlay()">Close</app-button>
+      </div>
+    </app-slide-over>
+  }
+  @if (activeOverlay() === 'drawer') {
+    <app-drawer [open]="true" side="right" (close)="closeOverlay()">
+      <p class="p-4 text-sm text-text">Demo drawer panel content.</p>
+      <div class="p-4">
+        <app-button variant="secondary" (clicked)="closeOverlay()">Close</app-button>
+      </div>
+    </app-drawer>
+  }
 </div>

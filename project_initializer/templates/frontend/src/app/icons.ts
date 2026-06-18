@@ -1,5 +1,6 @@
 import { LUCIDE_ICONS, LucideIconProvider } from 'lucide-angular';
 import {
+  ArrowUp,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -30,6 +31,7 @@ import {
 // names (CheckCircle, Sliders, FunctionSquare, Home) to their canonical
 // (non-deprecated) counterparts in lucide-angular ≥ 0.477.
 const icons = {
+  ArrowUp,
   CheckCircle: CircleCheckBig,
   ChevronDown,
   ChevronLeft,
