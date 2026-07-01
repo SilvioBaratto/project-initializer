@@ -6,12 +6,12 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as jwt from 'jsonwebtoken';
-import * as jwksRsa from 'jwks-rsa';
+import { JwksClient } from 'jwks-rsa';
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
-  private readonly jwksClient: jwksRsa.JwksClient;
+  private readonly jwksClient: JwksClient;
   private readonly tenantId: string;
   private readonly audience: string[];
   private readonly requiredScope: string;
@@ -24,7 +24,7 @@ export class AuthService {
     this.audience = [clientId, audienceEnv].filter((v, i, a) => a.indexOf(v) === i);
     this.requiredScope = this.configService.getOrThrow<string>('ENTRA_API_SCOPE');
 
-    this.jwksClient = jwksRsa({
+    this.jwksClient = new JwksClient({
       jwksUri: `https://login.microsoftonline.com/${this.tenantId}/discovery/v2.0/keys`,
       cache: true,
       rateLimit: true,
