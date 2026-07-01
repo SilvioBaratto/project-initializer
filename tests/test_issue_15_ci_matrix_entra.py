@@ -51,7 +51,7 @@ def _entry_for(variant: str) -> dict | None:
 # ---------------------------------------------------------------------------
 # fastapi-entra row (criterion: matrix includes a fastapi-entra row with
 # flags "--fastapi --auth entra", scope "fullstack",
-# install_cmd "pip install baml-py", baml_cmd "baml-cli generate")
+# install_cmd "pip install baml-py==0.223.0", baml_cmd "baml-cli generate")
 # ---------------------------------------------------------------------------
 
 
@@ -75,7 +75,7 @@ def test_when_fastapi_entra_row_scope_is_fullstack():
 def test_when_fastapi_entra_row_install_cmd_is_pip_install_baml_py():
     entry = _entry_for("fastapi-entra")
     assert entry is not None, "fastapi-entra row missing"
-    assert entry["install_cmd"] == "pip install baml-py"
+    assert entry["install_cmd"] == "pip install baml-py==0.223.0"
 
 
 def test_when_fastapi_entra_row_baml_cmd_is_baml_cli_generate():
