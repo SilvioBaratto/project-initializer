@@ -13,11 +13,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # NOTE: the baml-py pin in install_cmd must match the `version` in the
+        # templates' baml_src/generators.baml — BAML enforces a major/minor match.
         include:
           - variant: "fastapi"
             flags: "--fastapi"
             scope: "fullstack"
-            install_cmd: "pip install baml-py"
+            install_cmd: "pip install baml-py==0.223.0"
             baml_cmd: "baml-cli generate"
           - variant: "nestjs"
             flags: "--nestjs"
@@ -27,7 +29,7 @@ jobs:
           - variant: "fastapi-entra"
             flags: "--fastapi --auth entra"
             scope: "fullstack"
-            install_cmd: "pip install baml-py"
+            install_cmd: "pip install baml-py==0.223.0"
             baml_cmd: "baml-cli generate"
           - variant: "nestjs-entra"
             flags: "--nestjs --auth entra"
@@ -37,7 +39,7 @@ jobs:
           - variant: "fastapi-api"
             flags: "--fastapi --scope api"
             scope: "api"
-            install_cmd: "pip install baml-py"
+            install_cmd: "pip install baml-py==0.223.0"
             baml_cmd: "baml-cli generate"
           - variant: "nestjs-api"
             flags: "--nestjs --scope api"
