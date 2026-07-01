@@ -4,7 +4,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![CI](https://github.com/silviobaratto/project-initializer/actions/workflows/test-package.yml/badge.svg)](https://github.com/silviobaratto/project-initializer/actions)
 
-CLI tool to scaffold full-stack projects with **FastAPI** or **NestJS**, **Angular**, and **Docker** — with optional authentication via token or Supabase. Scaffold the full stack, or just the **backend** or **frontend** with `--scope`.
+CLI tool to scaffold full-stack projects with **FastAPI** or **NestJS**, **Angular**, and **Docker** — with optional authentication via token, Supabase, or Microsoft Entra ID. Scaffold the full stack, or just the **backend** or **frontend** with `--scope`.
 
 ## Installation
 
@@ -48,16 +48,18 @@ project-initializer my-app --nestjs     # NestJS backend
 
 ## Authentication Modes
 
-Add authentication with `--auth token` or `--auth supabase`:
+Add authentication with `--auth token`, `--auth supabase`, or `--auth entra`:
 
 ```bash
 project-initializer my-app --auth token      # Simple bearer-token auth
 project-initializer my-app --auth supabase    # Supabase JWT auth + RLS
+project-initializer my-app --auth entra       # Microsoft Entra ID (Azure AD) OIDC
 ```
 
 - **No auth** (default) — No authentication middleware. Good for prototyping.
 - **Token auth** (`--auth token`) — Bearer-token middleware on the API. Frontend gets a login guard and an HTTP interceptor that attaches the token.
 - **Supabase auth** (`--auth supabase`) — Supabase JWT validation on the API. Frontend integrates `@supabase/supabase-js` for login/signup. Docker Compose omits the local `db` service since Supabase hosts the database.
+- **Entra auth** (`--auth entra`) — Microsoft Entra ID (formerly Azure AD) OIDC. Both backends validate Entra v2 JWT bearer tokens in-process via RS256 + JWKS. The Angular frontend uses MSAL for login. Requires two Entra app registrations (API + SPA).
 
 ## Project Scope (full-stack / backend-only / frontend-only)
 
@@ -88,16 +90,18 @@ project-initializer my-app --scope api --async-db  # backend only + async DB pat
 - Additive: the sync path stays the default; the async modules are an isolated overlay you wire in explicitly.
 - See the generated `api/.claude/CLAUDE.md` for the sync-vs-async convention (pick the keyword from the I/O, not by style).
 
-## All 6 Variants
+## All 8 Variants
 
 | Command | Backend | Auth |
 |---------|---------|------|
 | `project-initializer app` | FastAPI | None |
 | `project-initializer app --auth token` | FastAPI | Token |
 | `project-initializer app --auth supabase` | FastAPI | Supabase |
+| `project-initializer app --auth entra` | FastAPI | Entra ID |
 | `project-initializer app --nestjs` | NestJS | None |
 | `project-initializer app --nestjs --auth token` | NestJS | Token |
 | `project-initializer app --nestjs --auth supabase` | NestJS | Supabase |
+| `project-initializer app --nestjs --auth entra` | NestJS | Entra ID |
 
 Additional flags:
 

@@ -16,7 +16,7 @@ from .file_transforms import (
 )
 
 FRAMEWORKS = ("fastapi", "nestjs")
-AUTH_MODES = ("token", "supabase")
+AUTH_MODES = ("token", "supabase", "entra")
 SCOPES = ("fullstack", "api", "frontend")
 
 TEMPLATES_ROOT = Path(__file__).parent
@@ -171,6 +171,33 @@ def _copy_file(src: Path, dst: Path, file_transform: Callable | None) -> None:
     shutil.copy2(src, dst)
 
 
+def _next_steps_lines(auth: str | None, framework: str) -> list[str]:
+    """Return the 'Next steps' guidance lines for the given auth/framework combo.
+
+    Declarative data construction — exempt from the <10-line rule.
+    """
+    lines = ["  # Edit api/.env with your real keys"]
+    if auth == "supabase":
+        lines.append(
+            "  # Configure SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in api/.env"
+        )
+    elif auth == "entra":
+        lines.append(
+            "  # Configure ENTRA_TENANT_ID, ENTRA_API_CLIENT_ID and ENTRA_SPA_CLIENT_ID in api/.env"
+        )
+        lines.append("  # Register a SPA app + an API app in Entra ID (see README)")
+    lines.append("  docker-compose up -d")
+    if framework == "nestjs":
+        lines.append("\n  # NestJS API development:")
+        lines.append("  cd api && npm install && npm run start:dev")
+    else:
+        lines.append("\n  # FastAPI development:")
+        lines.append(
+            "  cd api && pip install -r requirements.txt && uvicorn app.main:app --reload"
+        )
+    return lines
+
+
 def copy_template(
     dest_dir: Path,
     project_name: str | None = None,
@@ -253,18 +280,8 @@ def copy_template(
     print("Project created successfully!")
     print("\nNext steps:")
     print(f"  cd {dest_dir.name}")
-    print("  # Edit api/.env with your real keys")
-    if auth == "supabase":
-        print("  # Configure SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in api/.env")
-    print("  docker-compose up -d")
-    if framework == "nestjs":
-        print("\n  # NestJS API development:")
-        print("  cd api && npm install && npm run start:dev")
-    else:
-        print("\n  # FastAPI development:")
-        print(
-            "  cd api && pip install -r requirements.txt && uvicorn app.main:app --reload"
-        )
+    for line in _next_steps_lines(auth, framework):
+        print(line)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -304,7 +321,7 @@ def build_parser() -> argparse.ArgumentParser:
         const="token",
         default=None,
         choices=AUTH_MODES,
-        help="Auth mode: 'token' (simple token, default) or 'supabase'",
+        help="Auth mode: 'token' (simple token, default), 'supabase', or 'entra' (Microsoft Entra ID)",
     )
     parser.add_argument(
         "--scope",

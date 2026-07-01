@@ -1,0 +1,39 @@
+<div class="min-h-screen bg-surface flex items-center justify-center px-4">
+  <div class="w-full max-w-sm">
+    <!-- Header -->
+    <div class="mb-8">
+      <h1 class="text-xl font-semibold tracking-tight text-text">Sign in</h1>
+      <p class="mt-1 text-sm text-text-secondary">Use your Microsoft account to continue.</p>
+    </div>
+
+    <!-- Card -->
+    <div class="border border-border rounded-lg p-6 bg-surface-raised">
+      @if (errorMessage()) {
+        <p class="mb-4 text-sm text-danger" aria-live="polite">{{ errorMessage() }}</p>
+      }
+
+      <button
+        type="button"
+        (click)="onMicrosoftLogin()"
+        [disabled]="isLoading()"
+        aria-label="Sign in with Microsoft"
+        class="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium border border-border rounded-md bg-surface-raised text-text hover:bg-surface disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+        <!-- Microsoft logo -->
+        <svg class="w-4 h-4" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+          <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+          <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+          <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+        </svg>
+        @if (isLoading()) {
+          <span class="flex items-center gap-2">
+            <span class="inline-block w-3.5 h-3.5 border-2 border-text/30 border-t-text rounded-full animate-spin"></span>
+            Signing in...
+          </span>
+        } @else {
+          Sign in with Microsoft
+        }
+      </button>
+    </div>
+  </div>
+</div>

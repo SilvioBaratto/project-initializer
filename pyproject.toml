@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "project-initializer"
-version = "0.3.4"
+version = "0.3.5"
 description = "CLI tool to scaffold full-stack projects with FastAPI or NestJS, Angular, and Docker"
 readme = "README.md"
 license = "MIT"
@@ -68,6 +68,9 @@ include = ["project_initializer*"]
     "templates-supabase-nestjs/**/*", "templates-supabase-nestjs/**/.*",
     "templates-supabase-frontend/**/*", "templates-supabase-frontend/**/.*",
     "templates-asyncdb-fastapi/**/*", "templates-asyncdb-fastapi/**/.*",
+    "templates-entra-fastapi/**/*", "templates-entra-fastapi/**/.*",
+    "templates-entra-nestjs/**/*", "templates-entra-nestjs/**/.*",
+    "templates-entra-frontend/**/*", "templates-entra-frontend/**/.*",
 ]
 
 [tool.setuptools.exclude-package-data]

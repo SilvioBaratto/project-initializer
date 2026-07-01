@@ -4,17 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a pip-installable CLI tool (`project-initializer`) that scaffolds full-stack projects in **6 variants**: 2 frameworks (FastAPI, NestJS) x 3 auth modes (none, token, supabase). The repository contains the CLI package and all template files it copies.
+This is a pip-installable CLI tool (`project-initializer`) that scaffolds full-stack projects in **8 variants**: 2 frameworks (FastAPI, NestJS) x 4 auth modes (none, token, supabase, entra). The repository contains the CLI package and all template files it copies.
 
 ## CLI Flags
 
 ```bash
-project-initializer <name> [--fastapi | --nestjs] [--auth token | --auth supabase] [--scope api | --scope frontend] [--async-db] [--force]
+project-initializer <name> [--fastapi | --nestjs] [--auth token | --auth supabase | --auth entra] [--scope api | --scope frontend] [--async-db] [--force]
 ```
 
 - `--fastapi` (default) or `--nestjs` — backend framework
 - `--auth token` — bearer-token authentication
 - `--auth supabase` — Supabase JWT auth (replaces local DB with Supabase-hosted)
+- `--auth entra` — Microsoft Entra ID (formerly Azure AD) OIDC; in-process RS256 JWT validation on both backends, MSAL login on the Angular frontend
 - `--scope fullstack` (default) — scaffold both halves (`api/` + `frontend/`)
 - `--scope api` — backend only: skips the `frontend/` subtree and drops the `frontend` service from `docker-compose.yml`
 - `--scope frontend` — frontend only: base layer only, strips the `/api/` proxy block from `nginx.conf`; **cannot be combined with `--fastapi`/`--nestjs`/`--auth`** (those are api concerns)
@@ -27,7 +28,7 @@ project-initializer <name> [--fastapi | --nestjs] [--auth token | --auth supabas
 # Install CLI tool in development mode
 pip install -e .
 
-# Scaffold all 6 variants for testing
+# Scaffold all 8 variants for testing
 project-initializer test-fastapi --fastapi --force
 project-initializer test-fastapi-token --fastapi --auth token --force
 project-initializer test-fastapi-supabase --fastapi --auth supabase --force
@@ -79,6 +80,9 @@ project_initializer/
 ├── templates-supabase-fastapi/     # Layer 3a: supabase auth for FastAPI
 ├── templates-supabase-nestjs/      # Layer 3a: supabase auth for NestJS
 ├── templates-supabase-frontend/    # Layer 3b: supabase auth frontend (shared)
+├── templates-entra-fastapi/        # Layer 3a: entra auth for FastAPI
+├── templates-entra-nestjs/         # Layer 3a: entra auth for NestJS
+├── templates-entra-frontend/       # Layer 3b: entra auth frontend (shared)
 ├── cli.py                          # Entry point — copy_tree() merges layers
 ├── env_generator.py                # Generates variant-specific api/.env
 └── __init__.py
@@ -121,8 +125,8 @@ project-initializer/
 │   ├── cli.py                      # Entry point, argument parsing, copy_tree()
 │   ├── env_generator.py            # Variant-specific .env generation
 │   ├── py.typed                    # PEP 561 type marker
-│   └── templates*/                 # 9 template overlay directories (see above)
-├── .vscode/                        # VS Code debug configs for all 6 variants
+│   └── templates*/                 # 12 template overlay directories (see above)
+├── .vscode/                        # VS Code debug configs for all 8 variants
 │   ├── launch.json                 # One-click debug for each variant
 │   ├── tasks.json                  # Pre-launch: scaffold + env + BAML generate
 │   ├── settings.json               # Editor settings
@@ -135,7 +139,7 @@ project-initializer/
 
 ## VS Code Development Setup
 
-The `.vscode/` directory provides one-click debug for all 6 variants via `launch.json`. Each launch config has a `preLaunchTask` in `tasks.json` that:
+The `.vscode/` directory provides one-click debug for all 8 variants via `launch.json`. Each launch config has a `preLaunchTask` in `tasks.json` that:
 
 1. Scaffolds the test project (if not already present)
 2. Generates the `api/.env` from the root `.env`

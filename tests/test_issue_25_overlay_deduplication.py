@@ -48,9 +48,7 @@ def spec_content() -> str:
 
 @pytest.fixture(scope="module")
 def html_content() -> str:
-    assert COMPONENTS_HTML.exists(), (
-        f"components.html not found at {COMPONENTS_HTML}"
-    )
+    assert COMPONENTS_HTML.exists(), f"components.html not found at {COMPONENTS_HTML}"
     return COMPONENTS_HTML.read_text(encoding="utf-8")
 
 
@@ -102,8 +100,7 @@ def test_when_overlay_dedup_spec_is_read_then_active_overlay_is_set_before_dom_q
     together so the test actually exercises the rendering path.
     """
     has_signal_assignment = (
-        "activeOverlay" in spec_content
-        and "querySelectorAll" in spec_content
+        "activeOverlay" in spec_content and "querySelectorAll" in spec_content
     )
     assert has_signal_assignment, (
         "components.spec.ts must both assign activeOverlay (to trigger rendering) "

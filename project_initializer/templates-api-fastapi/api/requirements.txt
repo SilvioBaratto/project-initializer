@@ -36,4 +36,4 @@ pytest==9.0.3
 pytest-asyncio==1.4.0
 
 # AI/ML
-baml-py==0.222.0
+baml-py==0.223.0

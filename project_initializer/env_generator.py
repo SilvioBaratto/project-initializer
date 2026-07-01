@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+_DEFAULTS_PATH = Path(__file__).parent / "env_defaults.env"
+
 
 def parse_env(env_path: Path) -> dict[str, str]:
     """Parse a .env file into a dict, skipping comments and blanks."""
@@ -22,21 +24,26 @@ def parse_env(env_path: Path) -> dict[str, str]:
 def generate_env(
     framework: str,
     auth: str | None,
-    source_env: dict[str, str],
+    source_env: dict[str, str] | None = None,
     *,
     use_placeholders: bool = False,
+    dest: str | None = None,
 ) -> str:
     """Build a .env string for a given framework + auth combination.
 
     Args:
         framework: "fastapi" or "nestjs"
-        auth: None, "token", or "supabase"
-        source_env: parsed root .env dict (real values or placeholders)
+        auth: None, "token", "supabase", or "entra"
+        source_env: parsed root .env dict; defaults to env_defaults.env when None
         use_placeholders: if True, emit placeholder values for user-facing output
+        dest: optional file path; when supplied the result is also written there
     """
+    if source_env is None:
+        source_env = parse_env(_DEFAULTS_PATH)
     lines: list[str] = []
     is_supabase = auth == "supabase"
     is_token = auth == "token"
+    is_entra = auth == "entra"
     is_fastapi = framework == "fastapi"
 
     def val(key: str, fallback: str = "") -> str:
@@ -64,6 +71,16 @@ def generate_env(
         lines.append("# Supabase")
         lines.append(f"SUPABASE_URL={val('SUPABASE_URL')}")
         lines.append(f"SUPABASE_PUBLISHABLE_KEY={val('SUPABASE_PUBLISHABLE_KEY')}")
+
+    # --- Microsoft Entra ID ---
+    if is_entra:
+        lines.append("")
+        lines.append("# Microsoft Entra ID")
+        lines.append(f"ENTRA_TENANT_ID={val('ENTRA_TENANT_ID')}")
+        lines.append(f"ENTRA_API_CLIENT_ID={val('ENTRA_API_CLIENT_ID')}")
+        lines.append(f"ENTRA_API_AUDIENCE={val('ENTRA_API_AUDIENCE')}")
+        lines.append(f"ENTRA_API_SCOPE={val('ENTRA_API_SCOPE')}")
+        lines.append(f"ENTRA_SPA_CLIENT_ID={val('ENTRA_SPA_CLIENT_ID')}")
 
     # --- Auth ---
     if is_token:
@@ -112,7 +129,12 @@ def generate_env(
     )
 
     lines.append("")
-    return "\n".join(lines)
+    result = "\n".join(lines)
+    if dest is not None:
+        dest_path = Path(dest)
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        dest_path.write_text(result, encoding="utf-8")
+    return result
 
 
 def generate_env_file(
@@ -134,7 +156,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("framework", choices=("fastapi", "nestjs"))
-    parser.add_argument("--auth", choices=("token", "supabase"), default=None)
+    parser.add_argument("--auth", choices=("token", "supabase", "entra"), default=None)
     parser.add_argument("--source", default=".env", help="Path to root .env")
     parser.add_argument("--dest", required=True, help="Path to write output .env")
     args = parser.parse_args()

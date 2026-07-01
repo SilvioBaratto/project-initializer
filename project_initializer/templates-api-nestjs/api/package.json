@@ -24,7 +24,7 @@
     "postinstall": "npx prisma generate || true"
   },
   "dependencies": {
-    "@boundaryml/baml": "0.222.0",
+    "@boundaryml/baml": "0.223.0",
     "@bull-board/api": "8.0.0",
     "@bull-board/express": "8.0.0",
     "@bull-board/nestjs": "8.0.0",

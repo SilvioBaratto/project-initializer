@@ -2,6 +2,20 @@
 
 This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 20.3.3.
 
+## Installing dependencies
+
+Install packages with the `--legacy-peer-deps` flag:
+
+```bash
+npm install --legacy-peer-deps
+```
+
+> **Why `--legacy-peer-deps`?** `@angular/build` declares an optional peer dependency on
+> `vitest@^4`, but this project pins `vitest@^3`. npm 7+ treats this mismatch as a hard
+> `ERESOLVE` error and aborts a plain `npm install`. `--legacy-peer-deps` skips npm's
+> peer-dependency check and installs anyway. Safe here: `vitest` is a test-only devDependency and
+> Angular's build only optionally peers it, so app build/serve are unaffected.
+
 ## Development server
 
 To start a local development server, run:
