@@ -30,6 +30,10 @@ services:
         condition: service_healthy
     env_file:
       - ./api/.env
+    environment:
+      # Override the host-facing DATABASE_URL from api/.env so the container
+      # reaches Postgres over the compose network instead of localhost:5433.
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/app_db
     ports:
       - "8000:8000"
     volumes:
