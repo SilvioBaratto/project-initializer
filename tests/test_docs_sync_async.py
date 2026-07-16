@@ -9,21 +9,14 @@ token/supabase overlays do NOT ship their own CLAUDE.md, so guarding the base
 doc guards every variant.
 """
 
-from pathlib import Path
-
-_ROOT = Path(__file__).resolve().parent.parent
-API_CLAUDE_MD = (
-    _ROOT
-    / "project_initializer"
-    / "templates-api-fastapi"
-    / "api"
-    / ".claude"
-    / "CLAUDE.md"
-)
+from project_initializer.docs_generator import generate_api_claude
 
 
 def _doc() -> str:
-    return API_CLAUDE_MD.read_text(encoding="utf-8")
+    # Generated per-flag (docs_generator). async_db=True so the opt-in async-path
+    # note is present for the assertion that guards it; the sync rule + canonical
+    # citations are emitted for every FastAPI variant regardless.
+    return generate_api_claude("fastapi", None, async_db=True)
 
 
 def test_when_api_claude_md_read_sync_async_section_exists():

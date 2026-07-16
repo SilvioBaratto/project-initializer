@@ -22,7 +22,19 @@ NESTJS_BASE_APP_MODULE = (
 NESTJS_ENV_VALIDATION = (
     TEMPLATES / "templates-api-nestjs" / "api" / "src" / "config" / "env.validation.ts"
 )
-FILTER_DI_DOC = TEMPLATES / "templates-api-nestjs" / "api" / ".claude" / "CLAUDE.md"
+# api/.claude/CLAUDE.md is generated per-flag (docs_generator), not shipped
+# static — expose the generated NestJS api CLAUDE.md via a .read_text() shim.
+class _GeneratedDoc:
+    def exists(self) -> bool:
+        return True
+
+    def read_text(self, encoding: str = "utf-8") -> str:
+        from project_initializer.docs_generator import generate_api_claude
+
+        return generate_api_claude("nestjs", None)
+
+
+FILTER_DI_DOC = _GeneratedDoc()
 
 # Candidate paths for a response schema that proves field whitelisting (Zod).
 # The template's proof lives in the test module's item DTO; user/entity modules

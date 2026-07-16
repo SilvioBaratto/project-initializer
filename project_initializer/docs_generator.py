@@ -23,6 +23,126 @@ from __future__ import annotations
 
 _LICENSE = "MIT"
 
+# The NestJS production-readiness checklist is static, framework-fixed reference
+# content (9 concern sections + legend + global-criteria table + filter-DI note),
+# appended verbatim to the generated api/.claude/CLAUDE.md so the depth the
+# static doc carried is preserved.
+_NESTJS_READINESS_CHECKLIST = """\
+### Middleware Stack
+
+1. Helmet (security headers)
+2. CORS
+3. Throttler (rate limiting)
+4. nestjs-pino HTTP logging (request-id correlation via `x-request-id`)
+5. ZodValidationPipe (global)
+6. HttpExceptionFilter + PrismaClientExceptionFilter (global)
+7. TransformInterceptor (global)
+
+## Production-readiness acceptance checklist
+
+> **Research provenance:** deep research — 110 agents, 28 primary sources, 24 claims at 3-0 adversarial verification against official NestJS docs (https://docs.nestjs.com/). Statuses reflect **verified current state** of this template.
+>
+> **Legend:** ✅ done in template · ⚠️ partial / worth hardening · ❌ gap / not present (non-goal)
+
+### 1. Core building blocks & DI
+
+- ✅ `@Module()` with providers/controllers/imports/exports — feature modules under `src/modules/*`
+- ✅ `PrismaModule` is `@Global()` and exports `PrismaService`; never re-register in another `providers:` array
+- ✅ Type-based constructor injection; default singleton scope (use REQUEST only when strictly needed)
+- Citations: `/modules`, `/providers`, `/fundamentals/injection-scopes`
+
+### 2. Controllers & routing
+
+- ✅ `@Controller('prefix')` + HTTP-method decorators; request-data decorators (`@Body/@Query/@Param`) over raw `@Req()`
+- ✅ `app.setGlobalPrefix('api/v1')` in `main.ts`
+- ⚠️ URI/header versioning (`VersioningType`) — static `api/v1` prefix is sufficient for a single version (non-goal)
+- Citations: `/controllers`, `/techniques/versioning`
+
+### 3. DTOs, validation & serialization
+
+- ✅ Zod schemas via `nestjs-zod` as DTOs (not erased interfaces)
+- ✅ `ZodValidationPipe` registered as `APP_PIPE` — strips unknown fields from all incoming bodies
+- ✅ `ZodSerializerInterceptor` registered as `APP_INTERCEPTOR`; response schemas whitelist fields so Prisma rows cannot leak secret columns
+- ⚠️ Built-in transform pipes — Zod coercion covers primitive coercion; no `ParseIntPipe` needed
+- Citations: `/pipes`, `/techniques/validation`, `/techniques/serialization`
+
+### 4. Request pipeline — pipes, guards, interceptors, filters, middleware
+
+- ✅ Global Zod pipe, auth guards, `TransformInterceptor`, `ZodSerializerInterceptor`
+- ✅ `HttpExceptionFilter` + `PrismaClientExceptionFilter` registered via `useGlobalFilters()` in `main.ts`
+- ✅ `LoggingMiddleware` (nestjs-pino) applied globally; `@CurrentUser()`, `@Public()` custom decorators
+- ⚠️ **Filter DI caveat:** filters registered via `useGlobalFilters()` in `main.ts` live outside the Nest DI container and cannot inject providers. The current filters are dependency-free (`new`-instantiated in `main.ts`) — **no change is required today**.
+
+  If a filter gains a DI dependency (e.g. a logger service), move it to a module provider instead:
+
+  ```typescript
+  // app.module.ts — use when a filter needs DI (e.g. an injected LoggerService)
+  import { APP_FILTER } from '@nestjs/core';
+  import { MyLoggedFilter } from './common/filters/my-logged.filter';
+
+  @Module({
+    providers: [
+      { provide: APP_FILTER, useClass: MyLoggedFilter },
+    ],
+  })
+  export class AppModule {}
+  ```
+
+  Keep dependency-free filters in `main.ts` via `useGlobalFilters()` — switching them to `APP_FILTER` without a real DI need adds unnecessary indirection.
+
+- Citations: `/pipes`, `/guards`, `/interceptors`, `/exception-filters`, `/middleware`, `/custom-decorators`
+
+### 5. Authentication & authorization
+
+- ✅ Token auth: `AuthGuard` registered as `APP_GUARD`
+- ✅ Supabase JWT auth: `SupabaseAuthGuard` registered as `APP_GUARD`
+- ✅ `@Public()` opt-out via `Reflector.getAllAndOverride` — both guards honor it
+- ❌ RBAC / CASL — non-goal (add only when multi-role or fine-grained authz is needed)
+- Citations: `/security/authentication`, `/security/authorization`, `/guards`
+
+### 6. Security hardening
+
+- ✅ Helmet (`app.use(helmet())`) — `main.ts`
+- ✅ CORS restricted to `CORS_ORIGINS` env (not `*`), credentials/methods/headers configured — `main.ts`
+- ✅ Rate limiting: `ThrottlerModule` 100 req/60s + global `ThrottlerGuard` — `app.module.ts`
+- ✅ Secrets via `@nestjs/config` with `ConfigModule.forRoot({ isGlobal: true })`
+- ❌ CSRF — non-goal (bearer-token APIs are largely CSRF-immune; add `csurf` only if cookie auth is introduced)
+- Citations: `/security/helmet`, `/security/rate-limiting`, `/security/csrf`
+
+### 7. Operational concerns
+
+- ✅ Env validation: `src/config/env.validation.ts` — `validate()` throws on missing `DATABASE_URL`/`DIRECT_URL`; wired via `ConfigModule.forRoot({ validate })`
+- ✅ Structured logging: `nestjs-pino` with `x-request-id` correlation — `src/config/logger.config.ts`
+- ✅ Health checks: `@nestjs/terminus` liveness + readiness probes (DB, disk, memory) — `src/modules/health/health.controller.ts`
+- ✅ OpenAPI/Swagger at `/docs` with bearer auth and `cleanupOpenApiDoc` — `main.ts`
+- ✅ Graceful shutdown: `app.enableShutdownHooks()` + Prisma `$disconnect` on `onModuleDestroy`
+- Citations: `/techniques/configuration`, `/techniques/logger`, `/recipes/terminus`, `/openapi/introduction`, `/fundamentals/lifecycle-events`
+
+### 8. Database / ORM
+
+- ✅ `PrismaService extends PrismaClient` in `@Global() PrismaModule`; connect on `onModuleInit`, disconnect on `onModuleDestroy`
+- ✅ Migrations via `prisma migrate dev/deploy`; SSL via `deriveSslOption` util (with spec test); health probe runs `SELECT 1`
+- Citations: `/recipes/prisma`, `/techniques/database`
+
+### 9. Testing
+
+- ✅ Jest configured; `npm test` and `npm run test:e2e` scripts present
+- ✅ Service/controller unit specs: `chatbot.service.spec.ts`, `chat-job.service.spec.ts`, `health.controller.spec.ts`, `serialization.spec.ts`
+- ✅ e2e scaffold: `test/app.e2e-spec.ts` (supertest) + `test/jest-e2e.json`
+- Citations: `/fundamentals/testing`
+
+## Global acceptance criteria
+
+| # | Criterion | Status | Citation |
+|---|-----------|--------|----------|
+| 1 | Auth guard registered as `APP_GUARD` in both overlays — routes protected by default | ✅ | token/supabase `app.module.ts` (AuthGuard / SupabaseAuthGuard) |
+| 2 | `ConfigModule` validates env and fails fast on missing secrets (`DATABASE_URL`, `SUPABASE_*`) | ✅ | `src/config/env.validation.ts` — `validate()` throws; wired via `ConfigModule.forRoot({ validate })` |
+| 3 | Response schemas whitelist fields — Prisma rows cannot leak secret columns through the serializer | ✅ | `src/modules/test/serialization.spec.ts` — `ItemResponseSchema.parse({ password: 'leak' })` strips `password` |
+| 4 | Terminus health module: liveness/readiness probes (DB, disk, memory) | ✅ | `src/modules/health/health.controller.ts` — `@nestjs/terminus` |
+| 5 | e2e test scaffold + service unit specs | ✅ | `test/app.e2e-spec.ts`, `test/jest-e2e.json`; `chatbot.service.spec.ts` |
+| 6 | (Optional) Blocking BAML/LLM calls offloaded to BullMQ background jobs | ✅ | `src/modules/chatbot/chat-job.service.ts` + `chat.processor.ts`; `POST /chat/jobs` / `GET /chat/jobs/:id` |
+"""
+
 # The --legacy-peer-deps rationale is shared verbatim by every README that has a
 # frontend dev section, so it lives in one place.
 _LEGACY_PEER_DEPS_NOTE = (
@@ -506,7 +626,8 @@ def _fastapi_api_claude(auth: str | None, async_db: bool) -> str:
         "baml_client/                    # Auto-generated BAML Python client (don't edit)",
     ]
     async_note = (
-        "\n- An opt-in async DB path (async engine + `AsyncSession`) is included "
+        "\n- An opt-in async DB path (async engine + `AsyncSession`) is included, gated "
+        "behind the `--async-db` generator flag "
         "(`infrastructure/database_async.py`, `infrastructure/repositories/base_async.py`); "
         "the sync path above stays the default."
         if async_db
@@ -615,16 +736,6 @@ def _nestjs_api_claude(auth: str | None, async_db: bool) -> str:
             "",
             "**DTO Naming**: `Create<Entity>Dto`, `Update<Entity>Dto`, `<Entity>ResponseDto` pattern (Zod-based via nestjs-zod).",
             "",
-            "### Middleware Stack",
-            "",
-            "1. Helmet (security headers)",
-            "2. CORS",
-            "3. Throttler (rate limiting)",
-            "4. nestjs-pino HTTP logging (request-id correlation via `x-request-id`)",
-            "5. ZodValidationPipe (global)",
-            "6. HttpExceptionFilter + PrismaClientExceptionFilter (global)",
-            "7. TransformInterceptor (global)",
-            "",
             "## BAML Integration",
             "",
             "LLM functions are defined in `baml_src/*.baml`. The BAML compiler emits a generated TypeScript client into `baml_client/`. The generated client must not be hand-edited — always regenerate it after any `.baml` change:",
@@ -654,14 +765,7 @@ def _nestjs_api_claude(auth: str | None, async_db: bool) -> str:
             "",
             "`ChatbotService.chat` and `ChatbotService.streamChat` run on the request path. The `ChatProcessor` worker runs blocking BAML/LLM calls off the request path via BullMQ.",
             "",
-            "## Production-readiness notes",
-            "",
-            "- Auth guards register as `APP_GUARD` (token/supabase overlays) so routes are protected by default; `@Public()` opts out.",
-            "- `ConfigModule.forRoot({ validate })` fails fast on missing secrets (`DATABASE_URL`, `SUPABASE_*`).",
-            "- Response schemas whitelist fields (Zod + `ZodSerializerInterceptor`) so Prisma rows cannot leak secret columns.",
-            "- Health: `@nestjs/terminus` liveness/readiness probes. Logging: `nestjs-pino`. Rate limit: `ThrottlerModule`.",
-            "- Graceful shutdown via `app.enableShutdownHooks()` + Prisma `$disconnect` on `onModuleDestroy`.",
-            "",
+            _NESTJS_READINESS_CHECKLIST,
         ]
     )
 

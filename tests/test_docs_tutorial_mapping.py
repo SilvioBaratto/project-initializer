@@ -10,14 +10,14 @@ token/supabase overlays do NOT ship their own root CLAUDE.md, so guarding the
 base doc guards every variant.
 """
 
-from pathlib import Path
-
-_ROOT = Path(__file__).resolve().parent.parent
-CLAUDE_MD = _ROOT / "project_initializer" / "templates-api-fastapi" / "CLAUDE.md"
+from project_initializer.docs_generator import generate_root_claude
 
 
 def _doc() -> str:
-    return CLAUDE_MD.read_text(encoding="utf-8")
+    # Docs are generated per-flag (docs_generator), not shipped static. The
+    # tutorial-mapping note lives in the FastAPI root CLAUDE.md; auth is
+    # irrelevant to it, so the no-auth FastAPI variant is representative.
+    return generate_root_claude("fastapi", None)
 
 
 def test_when_claude_md_read_then_tutorial_mapping_section_exists():

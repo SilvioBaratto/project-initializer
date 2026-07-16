@@ -8,14 +8,13 @@ overlays ship no root CLAUDE.md of their own, so guarding the base doc guards
 every variant.
 """
 
-from pathlib import Path
-
-_ROOT = Path(__file__).resolve().parent.parent
-CLAUDE_MD = _ROOT / "project_initializer" / "templates-api-fastapi" / "CLAUDE.md"
+from project_initializer.docs_generator import generate_root_claude
 
 
 def _doc() -> str:
-    return CLAUDE_MD.read_text(encoding="utf-8")
+    # The /auth/validate probe note is emitted into the FastAPI root CLAUDE.md
+    # only for the token variant (docs are generated per-flag, not static).
+    return generate_root_claude("fastapi", "token")
 
 
 def test_when_claude_md_read_then_validate_probe_endpoint_documented():
