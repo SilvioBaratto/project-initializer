@@ -55,7 +55,7 @@ def _tree_hashes(root):
 def test_when_api_scope_api_and_env_exist_without_frontend(tmp_path, framework, auth):
     _scaffold(tmp_path, "api", framework, auth)
     assert (tmp_path / "api").exists()
-    assert (tmp_path / "api" / ".env").exists()
+    assert (tmp_path / ".env").exists()
     assert not (tmp_path / "frontend").exists()
 
 
@@ -121,7 +121,7 @@ def test_when_fullstack_scope_both_halves_present(tmp_path, framework, auth):
     _scaffold(tmp_path, "fullstack", framework, auth)
     assert (tmp_path / "api").exists()
     assert (tmp_path / "frontend").exists()
-    assert (tmp_path / "api" / ".env").exists()
+    assert (tmp_path / ".env").exists()
 
 
 @pytest.mark.parametrize("framework", FRAMEWORKS)

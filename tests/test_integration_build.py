@@ -85,6 +85,7 @@ def test_when_variant_scaffolded_cli_exits_zero(tmp_path, variant, flags):
         CLI + [str(tmp_path / variant), *flags, "--force"],
         capture_output=True,
         text=True,
+        stdin=subprocess.DEVNULL,  # non-TTY -> CLI runs non-interactively (no wizard)
     )
     assert result.returncode == 0, result.stderr
 

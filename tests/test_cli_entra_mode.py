@@ -7,12 +7,28 @@ source was read during authorship.
 import pytest
 from hypothesis import given, settings as hyp_settings, strategies as st
 
+import project_initializer.cli as cli
 from project_initializer.cli import (
     AUTH_MODES,
-    build_parser,
+    app,
     select_layers,
     validate_scope,
 )
+from typer.testing import CliRunner
+
+runner = CliRunner()
+
+
+def _resolved_auth(argv, monkeypatch):
+    """Run the CLI (non-interactive) and return the auth copy_template saw."""
+    calls = {}
+
+    def spy(dest_dir, project_name=None, **kwargs):
+        calls.update(kwargs)
+
+    monkeypatch.setattr(cli, "copy_template", spy)
+    result = runner.invoke(app, argv)
+    return result, calls
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -40,41 +56,53 @@ def test_when_auth_modes_inspected_then_entra_is_present():
 # ── Criterion: --auth entra parses without error ──────────────────────────────
 
 
-def test_when_auth_entra_flag_given_then_parser_accepts_it():
-    """--auth entra must be accepted by the argument parser without error."""
-    parser = build_parser()
-    args = parser.parse_args(["myproject", "--auth", "entra"])
-    assert args.auth == "entra"
+def test_when_auth_entra_flag_given_then_cli_accepts_it(monkeypatch):
+    """--auth entra must be accepted by the CLI without error."""
+    result, calls = _resolved_auth(["myproject", "--auth", "entra"], monkeypatch)
+    assert result.exit_code == 0
+    assert calls["auth"] == "entra"
 
 
-# ── Criterion: all AUTH_MODES values accepted by parser (never-raises property) ──
+# ── Criterion: all AUTH_MODES values accepted by the CLI (never-raises property) ──
 
 
 @given(st.sampled_from(AUTH_MODES))
 @hyp_settings(max_examples=20)
-def test_when_any_auth_mode_given_then_parser_accepts_it(mode):
-    """Every value in AUTH_MODES must parse without SystemExit — never-raises invariant."""
-    parser = build_parser()
-    args = parser.parse_args(["myproject", "--auth", mode])
-    assert args.auth == mode
+def test_when_any_auth_mode_given_then_cli_accepts_it(mode):
+    """Every value in AUTH_MODES must be accepted (exit 0) — never-raises invariant."""
+    calls = {}
+
+    def spy(dest_dir, project_name=None, **kwargs):
+        calls.update(kwargs)
+
+    import project_initializer.cli as cli_mod
+
+    original = cli_mod.copy_template
+    cli_mod.copy_template = spy
+    try:
+        result = runner.invoke(app, ["myproject", "--auth", mode])
+    finally:
+        cli_mod.copy_template = original
+    assert result.exit_code == 0, result.output
+    assert calls["auth"] == mode
 
 
 # ── Criterion: existing auth modes still parse (regression) ──────────────────
 
 
 @pytest.mark.parametrize("mode", ["token", "supabase"])
-def test_when_existing_auth_mode_given_then_parser_still_accepts_it(mode):
+def test_when_existing_auth_mode_given_then_cli_still_accepts_it(mode, monkeypatch):
     """Existing 'token' and 'supabase' modes must remain valid after adding 'entra'."""
-    parser = build_parser()
-    args = parser.parse_args(["myproject", "--auth", mode])
-    assert args.auth == mode
+    result, calls = _resolved_auth(["myproject", "--auth", mode], monkeypatch)
+    assert result.exit_code == 0
+    assert calls["auth"] == mode
 
 
-def test_when_no_auth_flag_given_then_auth_defaults_to_none():
-    """Omitting --auth must still default to None (none/no-auth mode unchanged)."""
-    parser = build_parser()
-    args = parser.parse_args(["myproject"])
-    assert args.auth is None
+def test_when_no_auth_flag_given_then_auth_defaults_to_none(monkeypatch):
+    """Omitting --auth must default to None (none/no-auth mode unchanged)."""
+    result, calls = _resolved_auth(["myproject"], monkeypatch)
+    assert result.exit_code == 0
+    assert calls["auth"] is None
 
 
 # ── Criterion: select_layers resolves templates-entra-fastapi path ────────────

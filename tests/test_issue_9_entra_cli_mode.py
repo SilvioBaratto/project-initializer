@@ -27,6 +27,7 @@ def _run(*args, cwd=None):
         capture_output=True,
         text=True,
         cwd=cwd or _ROOT,
+        stdin=subprocess.DEVNULL,  # non-TTY -> CLI runs non-interactively (no wizard)
     )
 
 
@@ -112,7 +113,11 @@ def test_when_unknown_auth_mode_passed_then_cli_rejects_it(tmp_path, bad_mode):
         pytest.skip("empty string is a shell concern, not a Python argparse concern")
     result = _run("project-bad", "--auth", bad_mode, "--force", cwd=tmp_path)
     assert result.returncode != 0
-    assert "invalid choice" in result.stderr
+    # The CLI rejects it with a usage error; the exact wording is parser-specific
+    # (argparse "invalid choice" / Typer-Click "Invalid value"), so assert the
+    # criterion (rejection) via the non-zero exit plus the offending value echoed.
+    combined = (result.stderr + result.stdout).lower()
+    assert bad_mode.lower() in combined or "invalid" in combined
 
 
 # ---------------------------------------------------------------------------

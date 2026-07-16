@@ -89,7 +89,7 @@ services:
       dockerfile: Dockerfile
     container_name: app_frontend
     ports:
-      - "4200:80"
+      - "${FRONTEND_HOST_PORT:-4200}:80"
     networks:
       - app_network
 

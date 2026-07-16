@@ -10,7 +10,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5433:5432"
+      - "${DB_HOST_PORT:-5433}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d app_db"]
       interval: 10s
@@ -28,6 +28,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # env_file feeds the container the whole root .env (LLM/BAML keys, auth
+    # secrets, etc.). The environment: block below is applied AFTER env_file and
+    # overrides it — it pins DATABASE_URL to the compose-network host (db:5432),
+    # not the localhost URL the app uses outside Docker.
+    env_file:
+      - .env
     environment:
       ENVIRONMENT: development
       DEBUG: "True"
@@ -36,7 +42,7 @@ services:
       CORS_ORIGINS: "http://localhost,http://localhost:4200,http://localhost:80"
       LOG_LEVEL: INFO
     ports:
-      - "8000:8000"
+      - "${API_HOST_PORT:-8000}:8000"
     volumes:
       - ./api:/app
     networks:
@@ -52,7 +58,7 @@ services:
     depends_on:
       - api
     ports:
-      - "4200:80"
+      - "${FRONTEND_HOST_PORT:-4200}:80"
     networks:
       - app_network
 

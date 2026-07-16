@@ -38,7 +38,7 @@ def test_when_transform_returns_text_transformed_content_is_written(tmp_path):
 def test_when_api_scope_api_dir_and_env_exist_and_frontend_is_absent(tmp_path):
     copy_template(tmp_path, "app", auth=None, framework="fastapi", scope="api")
     assert (tmp_path / "api").exists()
-    assert (tmp_path / "api" / ".env").exists()
+    assert (tmp_path / ".env").exists()
     assert (tmp_path / "docker-compose.yml").exists()
     assert not (tmp_path / "frontend").exists()
 
@@ -66,7 +66,7 @@ def test_when_fullstack_scope_both_halves_are_present(tmp_path, framework):
     copy_template(tmp_path, "app", auth=None, framework=framework, scope="fullstack")
     assert (tmp_path / "api").exists()
     assert (tmp_path / "frontend").exists()
-    assert (tmp_path / "api" / ".env").exists()
+    assert (tmp_path / ".env").exists()
 
 
 def test_when_scope_defaults_to_fullstack_both_halves_present(tmp_path):

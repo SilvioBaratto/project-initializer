@@ -93,7 +93,8 @@ def test_when_frontend_compose_generated_it_has_only_frontend_service():
 
 def test_when_frontend_compose_generated_it_exposes_port_and_network():
     text = generate_frontend_compose()
-    assert '- "4200:80"' in text
+    # Host port is parametrized via the compose-topology var, defaulting to 4200.
+    assert '- "${FRONTEND_HOST_PORT:-4200}:80"' in text
     assert "context: ./frontend" in text
     assert "\nnetworks:\n" in text
 
