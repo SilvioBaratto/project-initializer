@@ -127,8 +127,10 @@ def test_when_requirements_already_has_asyncpg_transform_is_idempotent():
 def test_when_scaffolded_with_async_db_async_files_exist(tmp_path, scope):
     """when scaffolded with --async-db, the async DB modules are present."""
     copy_template(tmp_path, "app", framework="fastapi", scope=scope, async_db=True)
-    assert (tmp_path / "api" / "app" / "database_async.py").exists()
-    assert (tmp_path / "api" / "app" / "repositories" / "base_async.py").exists()
+    assert (tmp_path / "api" / "app" / "infrastructure" / "database_async.py").exists()
+    assert (
+        tmp_path / "api" / "app" / "infrastructure" / "repositories" / "base_async.py"
+    ).exists()
 
 
 def test_when_scaffolded_with_async_db_requirements_has_async_deps(tmp_path):

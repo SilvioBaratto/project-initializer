@@ -1,4 +1,4 @@
-"""Unit tests for app.core.security — pure crypto primitives.
+"""Unit tests for app.infrastructure.security — pure crypto primitives.
 
 Each test names the exact behaviour under test:
   "when X, Y is returned/raised"
@@ -9,7 +9,7 @@ No settings or config imports: all secrets are literals scoped to this module.
 import pytest
 from jose import JWTError
 
-from app.core.security import (
+from app.infrastructure.security import (
     create_access_token,
     decode_token,
     hash_password,

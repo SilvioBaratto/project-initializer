@@ -13,10 +13,10 @@ from fastapi.security import (
 )
 from sqlalchemy.orm import Session
 
-from app.config import settings
-from app.core.security import decode_token
-from app.database import get_db
-from app.models import User
+from app.infrastructure.settings import settings
+from app.infrastructure.security import decode_token
+from app.infrastructure.database import get_db
+from app.infrastructure.orm import User
 from jose import JWTError
 
 logger = logging.getLogger(__name__)
@@ -206,7 +206,7 @@ class RateLimiter:
         ]
 
         if len(self._in_memory_cache[key]) >= self.requests:
-            from app.exceptions import RateLimitError
+            from app.domain.exceptions import RateLimitError
 
             raise RateLimitError(
                 message=f"Rate limit exceeded: {len(self._in_memory_cache[key])}/{self.requests} requests per {self.window}s"

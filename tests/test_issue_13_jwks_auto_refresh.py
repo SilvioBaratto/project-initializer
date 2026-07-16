@@ -18,7 +18,7 @@ OVERLAY_NESTJS = pathlib.Path("project_initializer/templates-entra-nestjs")
 
 
 def _fastapi_deps_text() -> str:
-    deps = OVERLAY_FASTAPI / "api" / "app" / "dependencies.py"
+    deps = OVERLAY_FASTAPI / "api" / "app" / "api" / "deps.py"
     return deps.read_text(encoding="utf-8")
 
 

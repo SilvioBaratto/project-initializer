@@ -1,12 +1,12 @@
-from app.models.base import (
+from app.infrastructure.orm.base import (
     Base,
     BaseModel,
     StringUUIDPrimaryKeyMixin,
     TimestampMixin,
     UUIDPrimaryKeyMixin,
 )
-from app.models.item import Item
-from app.models.user import User, UserProfile
+from app.infrastructure.orm.item import Item
+from app.infrastructure.orm.user import User, UserProfile
 
 __all__ = [
     "Base",

@@ -10,11 +10,11 @@ it does not open a connection.
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.database_async import async_session_factory, get_async_db, to_asyncpg_url
-from app.models.base import Base
-from app.models.item import Item
-from app.repositories.base_async import AsyncBaseRepository
-from app.schemas.item import ItemCreate, ItemUpdate
+from app.infrastructure.database_async import async_session_factory, get_async_db, to_asyncpg_url
+from app.infrastructure.orm.base import Base
+from app.infrastructure.orm.item import Item
+from app.infrastructure.repositories.base_async import AsyncBaseRepository
+from app.api.schemas.item import ItemCreate, ItemUpdate
 
 
 class ItemAsyncRepository(AsyncBaseRepository[Item, ItemCreate, ItemUpdate]):

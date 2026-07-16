@@ -19,7 +19,7 @@ from sqlalchemy import DateTime, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base
+from app.infrastructure.orm.base import Base
 
 
 class UserProfile(Base):

@@ -8,7 +8,7 @@ fixture (TestClient with `get_db` overridden) and plain `assert`.
 
 import pytest
 
-from app.config import settings
+from app.infrastructure.settings import settings
 
 API = "/api/v1"
 TOKEN = settings.auth_token

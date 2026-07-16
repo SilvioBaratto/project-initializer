@@ -31,7 +31,7 @@ def test_when_nestjs_env_example_is_read_then_no_client_secret_key_is_present():
 
 
 def test_when_fastapi_dependencies_are_read_then_no_client_secret_usage_is_present():
-    deps = OVERLAY_FASTAPI / "api" / "app" / "dependencies.py"
+    deps = OVERLAY_FASTAPI / "api" / "app" / "api" / "deps.py"
     text = deps.read_text(encoding="utf-8")
     assert not _SECRET_PATTERN.search(text), (
         "FastAPI dependencies.py must not use a client_secret"

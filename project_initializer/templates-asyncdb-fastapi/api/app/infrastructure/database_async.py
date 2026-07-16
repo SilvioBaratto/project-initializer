@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from app.config import settings
+from app.infrastructure.settings import settings
 
 
 def to_asyncpg_url(url: str) -> tuple[str, dict]:

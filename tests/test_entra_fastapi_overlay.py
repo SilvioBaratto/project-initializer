@@ -22,11 +22,11 @@ _CLI_PY = _REPO_ROOT / "project_initializer" / "cli.py"
 _OVERLAY_ROOT = _REPO_ROOT / "project_initializer" / "templates-entra-fastapi"
 _API_ROOT = _OVERLAY_ROOT / "api"
 _APP_ROOT = _API_ROOT / "app"
-_CONFIG_PY = _APP_ROOT / "config.py"
-_DEPENDENCIES_PY = _APP_ROOT / "dependencies.py"
+_CONFIG_PY = _APP_ROOT / "infrastructure/settings.py"
+_DEPENDENCIES_PY = _APP_ROOT / "api/deps.py"
 _REQUIREMENTS_TXT = _API_ROOT / "requirements.txt"
 _ENV_EXAMPLE = _API_ROOT / ".env.example"
-_AUTH_PY = _APP_ROOT / "api" / "v1" / "auth.py"
+_AUTH_PY = _APP_ROOT / "api" / "v1" / "endpoints" / "auth.py"
 
 # ---------------------------------------------------------------------------
 # Helper — AST-level name extraction; never imports or executes the module
@@ -70,11 +70,11 @@ def test_when_cli_py_is_read_then_entra_is_in_auth_modes():
 @pytest.mark.parametrize(
     "relative_path",
     [
-        "api/app/config.py",
-        "api/app/dependencies.py",
+        "api/app/infrastructure/settings.py",
+        "api/app/api/deps.py",
         "api/requirements.txt",
         "api/.env.example",
-        "api/app/api/v1/auth.py",
+        "api/app/api/v1/endpoints/auth.py",
     ],
 )
 def test_when_overlay_is_present_then_required_file_exists(relative_path: str):
@@ -282,7 +282,7 @@ def test_when_dependencies_py_is_read_then_tid_claim_is_checked():
 
 
 # ===========================================================================
-# Criterion: api/app/api/v1/auth.py exposes GET /auth/me returning CurrentUser
+# Criterion: api/app/api/v1/endpoints/auth.py exposes GET /auth/me returning CurrentUser
 # ===========================================================================
 
 

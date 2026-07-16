@@ -21,8 +21,8 @@ _TEMPLATES = _ROOT / "project_initializer"
 BASE_API = _TEMPLATES / "templates-api-fastapi" / "api"
 OVERLAY_API = _TEMPLATES / "templates-asyncdb-fastapi" / "api"
 
-DATABASE_ASYNC = "app/database_async.py"
-BASE_ASYNC = "app/repositories/base_async.py"
+DATABASE_ASYNC = "app/infrastructure/database_async.py"
+BASE_ASYNC = "app/infrastructure/repositories/base_async.py"
 OVERLAY_TEST = "tests/unit/test_async_db.py"
 
 

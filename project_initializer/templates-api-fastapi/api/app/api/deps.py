@@ -7,21 +7,9 @@ from typing import Any, Annotated, Optional
 from fastapi import Depends, Header, Query, Request
 from sqlalchemy.orm import Session
 
-from app.application.services.item_service import ItemService
 from app.infrastructure.database import get_db
-from app.infrastructure.repositories.item import ItemRepository
 
 logger = logging.getLogger(__name__)
-
-
-def get_item_service(db: Session = Depends(get_db)) -> ItemService:
-    """Provide an ItemService wired to the request-scoped session.
-
-    This is the composition root for the items use case: it constructs the
-    concrete ``ItemRepository`` adapter and injects it into the framework-free
-    ``ItemService`` (which only knows the ``ItemRepositoryPort``).
-    """
-    return ItemService(ItemRepository(db))
 
 
 # ===========================

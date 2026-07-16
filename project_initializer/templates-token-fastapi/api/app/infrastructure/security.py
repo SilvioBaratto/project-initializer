@@ -4,7 +4,7 @@ Design principles
 -----------------
 - Single Responsibility: each function does exactly one thing.
 - Dependency Inversion: callers supply the secret key and algorithm so this
-  module has NO coupling to ``app.config`` or ``settings``.
+  module has NO coupling to ``app.infrastructure.settings`` or ``settings``.
 - KISS / stateless: no class needed — four pure functions that are easy to
   compose, test, and replace.
 

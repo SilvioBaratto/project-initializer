@@ -9,11 +9,14 @@ HTTP — ``None``/``False`` from the service become ``404``.
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path, status
+from sqlalchemy.orm import Session
 
-from app.api.deps import CurrentUser, Pagination, get_item_service
+from app.api.deps import CurrentUser, Pagination
 from app.api.schemas.item import ItemCreate, ItemListResponse, ItemResponse, ItemUpdate
 from app.application.services.item_service import ItemService
 from app.infrastructure.audit import write_audit_log
+from app.infrastructure.database import get_db
+from app.infrastructure.repositories.item import ItemRepository
 
 # UUID string ids — Path(min_length=1) rejects an empty segment (a numeric
 # constraint like ge= would not apply to a str).
@@ -24,6 +27,16 @@ ItemId = Annotated[str, Path(min_length=1)]
 ITEM_NOT_FOUND_RESPONSE = {404: {"description": "Item not found"}}
 
 router = APIRouter(prefix="/items", tags=["Items"])
+
+
+def get_item_service(db: Session = Depends(get_db)) -> ItemService:
+    """Provide an ItemService for the request.
+
+    Composition root for the items use case: constructs the concrete
+    ``ItemRepository`` adapter and injects it into the framework-free
+    ``ItemService`` (which only knows the ``ItemRepositoryPort``).
+    """
+    return ItemService(ItemRepository(db))
 
 
 @router.get(

@@ -37,13 +37,13 @@ from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.config import settings
-from app.core.security import create_access_token, hash_password, verify_password
-from app.database import get_db
-from app.dependencies import ActiveJWTUser, CurrentUser
-from app.models import User
-from app.repositories.base import BaseRepository
-from app.schemas import UserCreate, UserPublic
+from app.infrastructure.settings import settings
+from app.infrastructure.security import create_access_token, hash_password, verify_password
+from app.infrastructure.database import get_db
+from app.api.deps import ActiveJWTUser, CurrentUser
+from app.infrastructure.orm import User
+from app.infrastructure.repositories.base import BaseRepository
+from app.api.schemas import UserCreate, UserPublic
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 

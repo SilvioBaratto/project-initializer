@@ -22,8 +22,8 @@ from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import QueuePool
 from sqlalchemy.exc import SQLAlchemyError, OperationalError, DisconnectionError
 
-from app.config import settings
-from app.models.base import Base
+from app.infrastructure.settings import settings
+from app.infrastructure.orm.base import Base
 
 # Configure module logger
 logger = logging.getLogger(__name__)

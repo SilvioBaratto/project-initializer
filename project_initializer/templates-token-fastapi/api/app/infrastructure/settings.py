@@ -8,8 +8,7 @@ from typing import List
 class Settings(BaseSettings):
     """Application settings with environment variable support"""
 
-    model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="ignore"
+    model_config = SettingsConfigDict( env_file_encoding="utf-8", case_sensitive=False, extra="ignore"
     )
 
     # Project Information
