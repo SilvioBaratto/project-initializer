@@ -69,29 +69,29 @@ def test_when_fastapi_overlay_read_pyjwt_crypto_is_declared_as_dependency():
 
 def test_when_fastapi_dependencies_read_rs256_algorithm_is_referenced():
     """dependencies.py must reference RS256 so the signature check is not skipped."""
-    deps_file = _find_file(ENTRA_FASTAPI, "dependencies.py")
+    deps_file = _find_file(ENTRA_FASTAPI, "api/deps.py")
     content = deps_file.read_text(encoding="utf-8")
     assert "RS256" in content, "RS256 algorithm not referenced in dependencies.py"
 
 
 def test_when_fastapi_dependencies_read_aud_claim_is_validated():
-    content = _read_dep(ENTRA_FASTAPI, "dependencies.py")
+    content = _read_dep(ENTRA_FASTAPI, "api/deps.py")
     assert "aud" in content, "audience claim not validated in FastAPI dependencies.py"
 
 
 def test_when_fastapi_dependencies_read_iss_claim_is_validated():
-    content = _read_dep(ENTRA_FASTAPI, "dependencies.py")
+    content = _read_dep(ENTRA_FASTAPI, "api/deps.py")
     assert "iss" in content, "issuer claim not validated in FastAPI dependencies.py"
 
 
 def test_when_fastapi_dependencies_read_tid_claim_is_validated():
     """Tenant pinning via tid must be explicit."""
-    content = _read_dep(ENTRA_FASTAPI, "dependencies.py")
+    content = _read_dep(ENTRA_FASTAPI, "api/deps.py")
     assert "tid" in content, "tid (tenant) pinning missing from FastAPI dependencies.py"
 
 
 def test_when_fastapi_dependencies_read_scp_scope_is_enforced():
-    content = _read_dep(ENTRA_FASTAPI, "dependencies.py")
+    content = _read_dep(ENTRA_FASTAPI, "api/deps.py")
     assert "scp" in content, (
         "scp scope enforcement missing from FastAPI dependencies.py"
     )
@@ -99,13 +99,13 @@ def test_when_fastapi_dependencies_read_scp_scope_is_enforced():
 
 def test_when_fastapi_auth_route_read_401_is_returned_on_auth_failure():
     """The 401 status code must be emitted on validation failure."""
-    content = _read_dep(ENTRA_FASTAPI, "dependencies.py")
+    content = _read_dep(ENTRA_FASTAPI, "api/deps.py")
     assert "401" in content, "HTTP 401 not referenced for auth failure in FastAPI"
 
 
 def test_when_fastapi_auth_route_read_403_is_returned_on_insufficient_scope():
     """The 403 status code must be emitted on scope failure."""
-    content = _read_dep(ENTRA_FASTAPI, "dependencies.py")
+    content = _read_dep(ENTRA_FASTAPI, "api/deps.py")
     assert "403" in content, "HTTP 403 not referenced for scope failure in FastAPI"
 
 
@@ -291,7 +291,7 @@ def test_when_manifest_in_read_entra_frontend_overlay_is_included():
 
 def test_when_fastapi_dependencies_read_pyjwkclient_is_used():
     """FastAPI must use PyJWKClient (not a manual key fetch) to get auto-refresh on rotation."""
-    content = _read_dep(ENTRA_FASTAPI, "dependencies.py")
+    content = _read_dep(ENTRA_FASTAPI, "api/deps.py")
     assert "PyJWKClient" in content, "PyJWKClient not used in FastAPI dependencies.py"
 
 
@@ -311,7 +311,7 @@ def test_when_nestjs_auth_service_read_jwks_rsa_rate_limit_option_is_set():
 
 def test_when_fastapi_dependencies_read_no_hard_coded_refresh_interval():
     """No fixed sleep/interval for JWKS refresh — auto-refresh must be library-driven."""
-    content = _read_dep(ENTRA_FASTAPI, "dependencies.py")
+    content = _read_dep(ENTRA_FASTAPI, "api/deps.py")
     assert not re.search(r"time\.sleep\s*\(", content), (
         "hard-coded sleep found in FastAPI dependencies.py (must not hard-code refresh schedule)"
     )

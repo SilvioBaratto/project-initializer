@@ -12,7 +12,7 @@ from types import SimpleNamespace
 import pytest
 from pydantic import ValidationError
 
-from app.schemas import UserBase, UserCreate, UserInDB, UserPublic
+from app.api.schemas import UserBase, UserCreate, UserInDB, UserPublic
 
 
 # ---------------------------------------------------------------------------

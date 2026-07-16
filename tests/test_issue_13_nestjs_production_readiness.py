@@ -54,7 +54,19 @@ SERIALIZATION_SPEC = (
     / "test"
     / "serialization.spec.ts"
 )
-CLAUDE_MD = TEMPLATES_ROOT / "templates-api-nestjs" / "api" / ".claude" / "CLAUDE.md"
+# api/.claude/CLAUDE.md is generated per-flag (docs_generator), not shipped
+# static — expose the generated NestJS api CLAUDE.md via a .read_text() shim.
+class _GeneratedDoc:
+    def exists(self) -> bool:
+        return True
+
+    def read_text(self, encoding: str = "utf-8") -> str:
+        from project_initializer.docs_generator import generate_api_claude
+
+        return generate_api_claude("nestjs", None)
+
+
+CLAUDE_MD = _GeneratedDoc()
 E2E_SPEC = TEMPLATES_ROOT / "templates-api-nestjs" / "api" / "test" / "app.e2e-spec.ts"
 E2E_JEST_CONFIG = (
     TEMPLATES_ROOT / "templates-api-nestjs" / "api" / "test" / "jest-e2e.json"

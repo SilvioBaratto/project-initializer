@@ -87,7 +87,7 @@ def test_when_token_has_bad_signature_then_401(make_token):
     other_private_key = generate_private_key(public_exponent=65537, key_size=2048)
     import jwt as _jwt
 
-    import app.config as cfg
+    import app.infrastructure.settings as cfg
     import time
 
     now = int(time.time())

@@ -9,21 +9,14 @@ token/supabase overlays do NOT ship their own CLAUDE.md, so guarding the base
 doc guards every variant.
 """
 
-from pathlib import Path
-
-_ROOT = Path(__file__).resolve().parent.parent
-API_CLAUDE_MD = (
-    _ROOT
-    / "project_initializer"
-    / "templates-api-fastapi"
-    / "api"
-    / ".claude"
-    / "CLAUDE.md"
-)
+from project_initializer.docs_generator import generate_api_claude
 
 
 def _doc() -> str:
-    return API_CLAUDE_MD.read_text(encoding="utf-8")
+    # Generated per-flag (docs_generator). async_db=True so the opt-in async-path
+    # note is present for the assertion that guards it; the sync rule + canonical
+    # citations are emitted for every FastAPI variant regardless.
+    return generate_api_claude("fastapi", None, async_db=True)
 
 
 def test_when_api_claude_md_read_sync_async_section_exists():
@@ -48,8 +41,8 @@ def test_when_api_claude_md_read_async_reserved_for_baml_documented():
 def test_when_api_claude_md_read_canonical_examples_cited():
     """when the doc is read, items.py (sync) and chatbot_service.py (async) are cited."""
     doc = _doc()
-    assert "app/api/v1/items.py" in doc
-    assert "app/services/chatbot_service.py" in doc
+    assert "app/api/v1/endpoints/items.py" in doc
+    assert "app/application/services/chatbot_service.py" in doc
 
 
 def test_when_api_claude_md_read_optin_flag_gated_async_path_noted():

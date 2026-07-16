@@ -13,20 +13,20 @@ Criteria covered:
          ENTRA_API_SCOPE, ENTRA_SPA_CLIENT_ID) and note no client secret required.
 """
 
-from pathlib import Path
-
 import pytest
 from hypothesis import given, strategies as st
+
+from project_initializer.docs_generator import generate_root_readme
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+# Docs are generated per-flag (docs_generator), not shipped static. The Entra
+# app-registration guidance lives in the generated root README for the entra
+# variant of each framework.
 
-REPO_ROOT = Path(__file__).parent.parent
-PKG_DIR = REPO_ROOT / "project_initializer"
-
-FASTAPI_README = PKG_DIR / "templates-entra-fastapi" / "README.md"
-NESTJS_README = PKG_DIR / "templates-entra-nestjs" / "README.md"
+FASTAPI_README = generate_root_readme("fastapi", "entra")
+NESTJS_README = generate_root_readme("nestjs", "entra")
 
 _BOTH_READMES = [
     ("fastapi", FASTAPI_README),
@@ -34,9 +34,10 @@ _BOTH_READMES = [
 ]
 
 
-def _read(path: Path) -> str:
-    assert path.exists(), f"README not found at {path}"
-    return path.read_text(encoding="utf-8")
+def _read(text: str) -> str:
+    # The parametrized value is now the generated README text itself (not a path).
+    assert text, "generated README is empty"
+    return text
 
 
 # ---------------------------------------------------------------------------

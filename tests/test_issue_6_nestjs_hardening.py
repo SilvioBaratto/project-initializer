@@ -37,6 +37,7 @@ def _scaffold(dest: Path, *extra_args: str) -> None:
         cwd=str(dest.parent),
         capture_output=True,
         text=True,
+        stdin=subprocess.DEVNULL,  # non-TTY -> CLI runs non-interactively (no wizard)
     )
     if result.returncode != 0:
         raise RuntimeError(

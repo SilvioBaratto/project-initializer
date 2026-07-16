@@ -10,14 +10,31 @@ import hashlib
 
 import pytest
 
+import project_initializer.cli as cli
 from project_initializer.cli import (
-    build_parser,
+    app,
     copy_template,
     get_asyncdb_overlay_dir,
     select_layers,
     validate_scope,
 )
 from project_initializer.file_transforms import append_async_requirements
+from typer.testing import CliRunner
+
+runner = CliRunner()
+
+
+def _resolved_async_db(argv, monkeypatch):
+    """Run the CLI (non-interactive) and return the async_db copy_template saw."""
+    calls = {}
+
+    def spy(dest_dir, project_name=None, **kwargs):
+        calls.update(kwargs)
+
+    monkeypatch.setattr(cli, "copy_template", spy)
+    result = runner.invoke(app, argv)
+    assert result.exit_code == 0, result.output
+    return calls["async_db"]
 
 
 def _srcs(layers):
@@ -35,14 +52,14 @@ def _tree_hashes(root):
 # --- flag parsing -----------------------------------------------------------
 
 
-def test_when_async_db_flag_given_it_is_true():
-    """when --async-db is given, the parsed flag is True."""
-    assert build_parser().parse_args(["--async-db"]).async_db is True
+def test_when_async_db_flag_given_it_is_true(monkeypatch):
+    """when --async-db is given, the resolved flag is True."""
+    assert _resolved_async_db(["myapp", "--async-db"], monkeypatch) is True
 
 
-def test_when_async_db_flag_omitted_it_is_false():
-    """when --async-db is omitted, the parsed flag is False."""
-    assert build_parser().parse_args([]).async_db is False
+def test_when_async_db_flag_omitted_it_is_false(monkeypatch):
+    """when --async-db is omitted, the resolved flag is False."""
+    assert _resolved_async_db(["myapp"], monkeypatch) is False
 
 
 # --- validation -------------------------------------------------------------
@@ -110,8 +127,10 @@ def test_when_requirements_already_has_asyncpg_transform_is_idempotent():
 def test_when_scaffolded_with_async_db_async_files_exist(tmp_path, scope):
     """when scaffolded with --async-db, the async DB modules are present."""
     copy_template(tmp_path, "app", framework="fastapi", scope=scope, async_db=True)
-    assert (tmp_path / "api" / "app" / "database_async.py").exists()
-    assert (tmp_path / "api" / "app" / "repositories" / "base_async.py").exists()
+    assert (tmp_path / "api" / "app" / "infrastructure" / "database_async.py").exists()
+    assert (
+        tmp_path / "api" / "app" / "infrastructure" / "repositories" / "base_async.py"
+    ).exists()
 
 
 def test_when_scaffolded_with_async_db_requirements_has_async_deps(tmp_path):

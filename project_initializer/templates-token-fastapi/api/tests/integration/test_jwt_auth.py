@@ -17,7 +17,7 @@ Distinct emails per test prevent cross-test collisions in the shared session.
 
 import pytest
 
-from app.config import settings
+from app.infrastructure.settings import settings
 
 API = "/api/v1"
 

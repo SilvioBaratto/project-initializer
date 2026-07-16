@@ -23,6 +23,11 @@ import { loggerConfig } from './config/logger.config';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      // The project .env lives at the repo root (one level above api/). Check it
+      // first, then a local api/.env fallback. In Docker no file is read — compose
+      // env_file injects the vars as real environment variables (validate() reads
+      // process.env either way).
+      envFilePath: ['../.env', '.env'],
       validate: validate,
     }),
     BullModule.forRoot({

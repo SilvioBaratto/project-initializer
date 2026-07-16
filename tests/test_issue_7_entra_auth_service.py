@@ -40,7 +40,7 @@ FRONTEND_OVERLAY = _PKG / "templates-entra-frontend"
 _FA_API = FASTAPI_OVERLAY / "api"
 FA_REQUIREMENTS = _FA_API / "requirements.txt"
 FA_ENV_EXAMPLE = _FA_API / ".env.example"
-FA_DEPENDENCIES = _FA_API / "app" / "dependencies.py"
+FA_DEPENDENCIES = _FA_API / "app" / "api" / "deps.py"
 
 # NestJS overlay paths
 _NJS_API = NESTJS_OVERLAY / "api"

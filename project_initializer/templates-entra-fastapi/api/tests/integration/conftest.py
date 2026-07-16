@@ -47,7 +47,7 @@ def rsa_keypair():
 @pytest.fixture(autouse=True)
 def patch_settings(monkeypatch):
     """Override settings singleton with known test values."""
-    import app.config as cfg
+    import app.infrastructure.settings as cfg
 
     monkeypatch.setattr(cfg.settings, "entra_tenant_id", _TENANT_ID)
     monkeypatch.setattr(cfg.settings, "entra_api_client_id", _CLIENT_ID)
@@ -61,7 +61,7 @@ def patch_jwks_client(monkeypatch, rsa_keypair):
     _, public_key = rsa_keypair
     stub = _SigningKeyStub(public_key)
 
-    import app.dependencies as deps
+    import app.api.deps as deps
 
     monkeypatch.setattr(
         deps._jwks_client, "get_signing_key_from_jwt", lambda _token: stub
@@ -78,7 +78,7 @@ def make_token(rsa_keypair):
     private_key, _ = rsa_keypair
 
     def _build(**overrides):
-        import app.config as cfg
+        import app.infrastructure.settings as cfg
 
         now = int(time.time())
         claims = {

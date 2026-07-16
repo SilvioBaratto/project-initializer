@@ -2,11 +2,11 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.auth import router as auth_router
-from app.api.v1.test import router as test_router
-from app.api.v1.chatbot import router as chatbot_router
-from app.api.v1.items import router as items_router
-from app.api.v1.users import router as users_router
+from app.api.v1.endpoints.auth import router as auth_router
+from app.api.v1.endpoints.test import router as test_router
+from app.api.v1.endpoints.chatbot import router as chatbot_router
+from app.api.v1.endpoints.items import router as items_router
+from app.api.v1.endpoints.users import router as users_router
 
 # Create the main API router
 api_router = APIRouter()

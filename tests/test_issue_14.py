@@ -29,8 +29,22 @@ NESTJS_BASE_API = PI / "templates-api-nestjs" / "api"
 NESTJS_TOKEN_API = PI / "templates-token-nestjs" / "api"
 NESTJS_SUPABASE_API = PI / "templates-supabase-nestjs" / "api"
 
-# Exact path required by the criterion text
-CLAUDE_MD_PATH = NESTJS_BASE_API / ".claude" / "CLAUDE.md"
+# api/.claude/CLAUDE.md is generated per-flag (docs_generator), not shipped
+# static. A tiny path-like shim exposes the generated NestJS api CLAUDE.md text
+# through the same ``.read_text()`` call the criterion tests use.
+
+
+class _GeneratedDoc:
+    def exists(self) -> bool:
+        return True
+
+    def read_text(self, encoding: str = "utf-8") -> str:
+        from project_initializer.docs_generator import generate_api_claude
+
+        return generate_api_claude("nestjs", None)
+
+
+CLAUDE_MD_PATH = _GeneratedDoc()
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────

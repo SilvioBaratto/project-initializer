@@ -25,6 +25,11 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Code Generators",
 ]
+dependencies = [
+    "typer>=0.12",
+    "questionary>=2.0",
+    "rich>=13.0",
+]
 
 [project.optional-dependencies]
 dev = [

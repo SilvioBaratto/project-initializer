@@ -8,7 +8,7 @@ Acceptance criteria:
 
 import pytest
 
-from app.dependencies import get_current_user
+from app.api.deps import get_current_user
 from app.main import app
 
 API = "/api/v1"

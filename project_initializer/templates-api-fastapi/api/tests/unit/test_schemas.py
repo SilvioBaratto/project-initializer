@@ -7,7 +7,7 @@ non-negative ``price``. Pure validation — no DB, no client, plain ``assert``.
 import pytest
 from pydantic import ValidationError
 
-from app.schemas import ItemCreate
+from app.api.schemas import ItemCreate
 
 
 @pytest.mark.unit

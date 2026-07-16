@@ -6,9 +6,9 @@ services:
       dockerfile: Dockerfile
     container_name: app_api
     env_file:
-      - ./api/.env
+      - .env
     ports:
-      - "8000:8000"
+      - "${API_HOST_PORT:-8000}:8000"
     volumes:
       - ./api:/app
     networks:
@@ -24,7 +24,7 @@ services:
     depends_on:
       - api
     ports:
-      - "4200:80"
+      - "${FRONTEND_HOST_PORT:-4200}:80"
     networks:
       - app_network
 

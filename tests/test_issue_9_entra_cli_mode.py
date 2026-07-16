@@ -27,6 +27,7 @@ def _run(*args, cwd=None):
         capture_output=True,
         text=True,
         cwd=cwd or _ROOT,
+        stdin=subprocess.DEVNULL,  # non-TTY -> CLI runs non-interactively (no wizard)
     )
 
 
@@ -111,8 +112,15 @@ def test_when_unknown_auth_mode_passed_then_cli_rejects_it(tmp_path, bad_mode):
     if bad_mode == "":
         pytest.skip("empty string is a shell concern, not a Python argparse concern")
     result = _run("project-bad", "--auth", bad_mode, "--force", cwd=tmp_path)
-    assert result.returncode != 0
-    assert "invalid choice" in result.stderr
+    # Exit code 2 is the usage-error code (Typer/Click BadParameter); a plain
+    # non-zero could also be an unrelated crash, so pin it to 2.
+    assert result.returncode == 2
+    # The rejection message must name the offending value AND flag it invalid —
+    # both, so the assertion cannot false-pass if validation were bypassed and
+    # some other error happened to mention the word "invalid".
+    combined = (result.stderr + result.stdout).lower()
+    assert bad_mode.lower() in combined
+    assert "invalid" in combined
 
 
 # ---------------------------------------------------------------------------

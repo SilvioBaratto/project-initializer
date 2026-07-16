@@ -109,7 +109,7 @@ class TestFastapiOverlayJwtValidation:
     """Tests against the template source files — not a running server."""
 
     def _deps(self) -> str:
-        path = FASTAPI_OVERLAY / "api" / "app" / "dependencies.py"
+        path = FASTAPI_OVERLAY / "api" / "app" / "api" / "deps.py"
         assert path.exists(), f"dependencies.py not found at {path}"
         return _read(path)
 
@@ -382,7 +382,7 @@ def test_when_fastapi_overlay_present_then_pyjwks_client_used():
     """
     Criterion: FastAPI uses PyJWKClient (auto-refreshes on key rotation; no schedule).
     """
-    deps_path = FASTAPI_OVERLAY / "api" / "app" / "dependencies.py"
+    deps_path = FASTAPI_OVERLAY / "api" / "app" / "api" / "deps.py"
     assert deps_path.exists(), f"dependencies.py not found at {deps_path}"
     src = _read(deps_path)
     assert "PyJWKClient" in src, "PyJWKClient not found in FastAPI dependencies.py"

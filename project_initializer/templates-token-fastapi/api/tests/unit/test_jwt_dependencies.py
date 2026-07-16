@@ -10,10 +10,10 @@ Markers: @pytest.mark.unit
 import pytest
 from fastapi import HTTPException
 
-from app.config import settings
-from app.core.security import create_access_token
-from app.dependencies import get_current_active_user, get_current_user_jwt
-from app.models import User
+from app.infrastructure.settings import settings
+from app.infrastructure.security import create_access_token
+from app.api.deps import get_current_active_user, get_current_user_jwt
+from app.infrastructure.orm import User
 
 
 # ---------------------------------------------------------------------------

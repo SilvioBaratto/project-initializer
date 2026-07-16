@@ -1,12 +1,32 @@
-"""CLI entry point for project-initializer."""
+"""CLI entry point for project-initializer.
 
-import argparse
+The user-facing CLI is a Typer single-command app (:func:`main`) that runs an
+interactive questionary wizard (:mod:`project_initializer.wizard`) for any option
+not supplied as a flag. When stdin is not a TTY, or ``-y/--yes`` is passed, the
+wizard is skipped and unset options fall back to their defaults — so CI and the
+``.vscode`` tasks stay non-interactive.
+"""
+
 import shutil
 import sys
+from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
 
+import typer
+from rich.console import Console
+from rich.panel import Panel
+from rich.tree import Tree
+
 from . import __version__
+from .docs_generator import (
+    generate_api_claude,
+    generate_api_readme,
+    generate_frontend_claude,
+    generate_frontend_readme,
+    generate_root_claude,
+    generate_root_readme,
+)
 from .env_generator import generate_env, parse_env
 from .file_transforms import (
     append_async_requirements,
@@ -14,6 +34,24 @@ from .file_transforms import (
     generate_frontend_compose,
     strip_nginx_proxy_block,
 )
+from .wizard import WizardResult, run_wizard
+
+console = Console()
+
+# Errors that mean "this terminal cannot host interactive prompts" — the only
+# case the wizard should fall back to non-interactive defaults for. questionary
+# is built on prompt_toolkit, which raises NoConsoleScreenBufferError on a
+# console it cannot drive (Git Bash / mintty on Windows). EOFError covers a
+# closed/empty stdin. Anything else is a real bug and must NOT be swallowed.
+_NO_TERMINAL_EXC: tuple[type[BaseException], ...] = (EOFError,)
+try:  # prompt_toolkit is a questionary dependency; guard in case it is absent
+    from prompt_toolkit.output.win32 import NoConsoleScreenBufferError
+
+    _NO_TERMINAL_EXC = (EOFError, NoConsoleScreenBufferError)
+except Exception:  # pragma: no cover - non-Windows / import shape differences
+    pass
+
+_NO_TERMINAL_ERRORS = _NO_TERMINAL_EXC
 
 FRAMEWORKS = ("fastapi", "nestjs")
 AUTH_MODES = ("token", "supabase", "entra")
@@ -176,14 +214,14 @@ def _next_steps_lines(auth: str | None, framework: str) -> list[str]:
 
     Declarative data construction — exempt from the <10-line rule.
     """
-    lines = ["  # Edit api/.env with your real keys"]
+    lines = ["  # Edit .env with your real keys (ships with working dev defaults)"]
     if auth == "supabase":
         lines.append(
-            "  # Configure SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in api/.env"
+            "  # Configure SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in .env"
         )
     elif auth == "entra":
         lines.append(
-            "  # Configure ENTRA_TENANT_ID, ENTRA_API_CLIENT_ID and ENTRA_SPA_CLIENT_ID in api/.env"
+            "  # Configure ENTRA_TENANT_ID, ENTRA_API_CLIENT_ID and ENTRA_SPA_CLIENT_ID in .env"
         )
         lines.append("  # Register a SPA app + an API app in Entra ID (see README)")
     lines.append("  docker-compose up -d")
@@ -198,6 +236,43 @@ def _next_steps_lines(auth: str | None, framework: str) -> list[str]:
     return lines
 
 
+def _config_panel(
+    dest_dir: Path, framework: str, auth: str | None, scope: str, async_db: bool
+) -> Panel:
+    """Render the leading configuration summary panel."""
+    auth_label = "none (open)" if auth is None else auth
+    db_label = "async SQLAlchemy" if async_db else "sync SQLAlchemy"
+    body = (
+        f"[bold]Project[/bold]    {dest_dir.name}\n"
+        f"[bold]Scope[/bold]      {scope}\n"
+        f"[bold]Framework[/bold]  {framework}\n"
+        f"[bold]Auth[/bold]       {auth_label}"
+    )
+    if scope != "frontend" and framework == "fastapi":
+        body += f"\n[bold]Database[/bold]   {db_label}"
+    return Panel(body, title="project-initializer", expand=False, border_style="cyan")
+
+
+def _summary_tree(dest_dir: Path, created: dict[str, bool]) -> Tree:
+    """Build a compact tree: top-level dirs with file counts, then root files."""
+    top_counts: Counter[str] = Counter()
+    root_files: list[str] = []
+    for rel in created:
+        head, sep, _ = rel.replace("\\", "/").partition("/")
+        if sep:
+            top_counts[head] += 1
+        else:
+            root_files.append(rel)
+
+    tree = Tree(f"[bold]{dest_dir.name}[/bold]")
+    for name in sorted(top_counts):
+        n = top_counts[name]
+        tree.add(f"{name}/  [dim]{n} file{'s' if n != 1 else ''}[/dim]")
+    for name in sorted(root_files):
+        tree.add(name)
+    return tree
+
+
 def copy_template(
     dest_dir: Path,
     project_name: str | None = None,
@@ -205,8 +280,14 @@ def copy_template(
     framework: str = "fastapi",
     scope: str = "fullstack",
     async_db: bool = False,
+    verbose: bool = False,
 ) -> None:
-    """Copy template files to destination directory."""
+    """Copy template files to destination directory.
+
+    Renders a leading config panel and a compact tree summary (top-level dirs
+    with file counts) instead of a line per file. ``verbose=True`` additionally
+    lists every distinct file created.
+    """
     skip_patterns = {
         "__pycache__",
         ".pyc",
@@ -224,6 +305,10 @@ def copy_template(
             name == pattern or name.endswith(pattern.lstrip("*"))
             for pattern in skip_patterns
         )
+
+    # relative-path -> True; a set-like dedup so files overwritten by a later
+    # overlay layer are counted once, not once per layer.
+    created: dict[str, bool] = {}
 
     def copy_tree(
         src: Path,
@@ -246,113 +331,84 @@ def copy_template(
                 copy_tree(item, dest_item, frozenset(), file_transform)
             else:
                 _copy_file(item, dest_item, file_transform)
-                print(f"  Created: {dest_item.relative_to(dest_dir)}")
+                created[str(dest_item.relative_to(dest_dir))] = True
 
     def require_dir(path: Path) -> None:
         if not path.exists():
-            print(f"Error: Templates directory not found at {path}")
+            console.print(f"[red]Error:[/red] templates directory not found at {path}")
             sys.exit(1)
 
-    auth_label = f" + {auth} auth" if auth else ""
-    print(f"Creating project in: {dest_dir}")
-    print(f"Framework: {framework}{auth_label}")
-    print("-" * 40)
+    console.print(_config_panel(dest_dir, framework, auth, scope, async_db))
 
     for src, skip, transform in select_layers(scope, framework, auth, async_db):
         require_dir(src)
         copy_tree(src, dest_dir, skip, transform)
 
-    # Generate .env for the API (only when the api layer is present)
+    # Generate the root .env + .env.example (single source of truth, only when
+    # the api layer is present). Both files are byte-identical: the placeholder
+    # values double as working dev defaults so `docker compose up` runs as-is.
+    # The root location lets docker-compose (env_file) and every subtree share
+    # one file — FastAPI walks up to it (infrastructure/config), NestJS points
+    # ConfigModule/Prisma at it.
     if scope in ("fullstack", "api"):
         env_example_path = TEMPLATES_ROOT / "env_defaults.env"
         source = parse_env(env_example_path) if env_example_path.exists() else {}
-        env_content = generate_env(framework, auth, source, use_placeholders=True)
-        api_env_path = dest_dir / "api" / ".env"
-        api_env_path.write_text(env_content, encoding="utf-8")
-        print(f"  Created: {api_env_path.relative_to(dest_dir)}")
+        env_content = generate_env(
+            framework, auth, source, frontend=(scope == "fullstack")
+        )
+        for filename in (".env", ".env.example"):
+            env_path = dest_dir / filename
+            env_path.write_text(env_content, encoding="utf-8")
+            created[filename] = True
 
     if scope == "frontend":
         compose_path = dest_dir / "docker-compose.yml"
         compose_path.write_text(generate_frontend_compose(), encoding="utf-8")
-        print(f"  Created: {compose_path.relative_to(dest_dir)}")
+        created["docker-compose.yml"] = True
 
-    print("-" * 40)
-    print("Project created successfully!")
+    # Generate the docs per-flag (single source of truth in docs_generator),
+    # rather than shipping static template copies that drift. Which docs depend
+    # on the scope: root README/CLAUDE always; api/* when the backend is present;
+    # frontend/* when the frontend is present.
+    include_api = scope in ("fullstack", "api")
+    include_frontend = scope in ("fullstack", "frontend")
+    docs: dict[str, str] = {
+        "README.md": generate_root_readme(
+            framework, auth, api=include_api, frontend=include_frontend, async_db=async_db
+        ),
+        "CLAUDE.md": generate_root_claude(
+            framework, auth, api=include_api, frontend=include_frontend, async_db=async_db
+        ),
+    }
+    if include_api:
+        docs["api/README.md"] = generate_api_readme(framework, async_db=async_db)
+        docs["api/.claude/CLAUDE.md"] = generate_api_claude(
+            framework, auth, async_db=async_db
+        )
+    if include_frontend:
+        docs["frontend/README.md"] = generate_frontend_readme()
+        docs["frontend/.claude/CLAUDE.md"] = generate_frontend_claude()
+    for rel, content in docs.items():
+        path = dest_dir / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+        created[rel] = True
+
+    if verbose:
+        for rel in sorted(created):
+            console.print(f"  [dim]created[/dim] {rel}")
+
+    console.print(_summary_tree(dest_dir, created))
+    console.print(
+        f"[green]Done[/green] - created [bold]{len(created)}[/bold] files "
+        f"in [bold]{dest_dir.name}[/bold]."
+    )
+    # Plain prints below (not console.print): tests capture these guidance
+    # strings via capsys, and they must stay stable, markup-free text.
     print("\nNext steps:")
     print(f"  cd {dest_dir.name}")
     for line in _next_steps_lines(auth, framework):
         print(line)
-
-
-def build_parser() -> argparse.ArgumentParser:
-    """Construct the CLI argument parser.
-
-    Declarative builder: registers all flags in a flat sequence and is
-    therefore exempt from the per-method line limit. ``framework`` defaults
-    to ``None`` (no ``set_defaults``) so callers can distinguish an explicit
-    ``--fastapi``/``--nestjs`` from the absent case; the ``"fastapi"`` default
-    is resolved in ``main()`` after parsing.
-    """
-    parser = argparse.ArgumentParser(
-        prog="project-initializer",
-        description="Initialize a new full-stack project with FastAPI or NestJS, Angular, and Docker",
-    )
-    parser.add_argument(
-        "project_name",
-        nargs="?",
-        default=".",
-        help="Name of the project directory to create (default: current directory)",
-    )
-    parser.add_argument(
-        "-v",
-        "--version",
-        action="version",
-        version=f"%(prog)s {__version__}",
-    )
-    parser.add_argument(
-        "-f",
-        "--force",
-        action="store_true",
-        help="Overwrite existing files without prompting",
-    )
-    parser.add_argument(
-        "--auth",
-        nargs="?",
-        const="token",
-        default=None,
-        choices=AUTH_MODES,
-        help="Auth mode: 'token' (simple token, default), 'supabase', or 'entra' (Microsoft Entra ID)",
-    )
-    parser.add_argument(
-        "--scope",
-        choices=SCOPES,
-        default="fullstack",
-        help="Layers to scaffold: 'fullstack' (default), 'api', or 'frontend'",
-    )
-    parser.add_argument(
-        "--async-db",
-        dest="async_db",
-        action="store_true",
-        help="Add the opt-in async SQLAlchemy path (FastAPI only)",
-    )
-
-    framework_group = parser.add_mutually_exclusive_group()
-    framework_group.add_argument(
-        "--fastapi",
-        action="store_const",
-        const="fastapi",
-        dest="framework",
-        help="Use FastAPI backend (default)",
-    )
-    framework_group.add_argument(
-        "--nestjs",
-        action="store_const",
-        const="nestjs",
-        dest="framework",
-        help="Use NestJS backend",
-    )
-
-    return parser
 
 
 def validate_scope(
@@ -379,36 +435,201 @@ def validate_scope(
     return []
 
 
-def main() -> None:
-    """Main entry point for the CLI."""
-    parser = build_parser()
-    args = parser.parse_args()
-    errors = validate_scope(args.scope, args.framework, args.auth, args.async_db)
+def _version_callback(value: bool) -> None:
+    """Print the version and exit (for the top-level --version option)."""
+    if value:
+        typer.echo(f"project-initializer {__version__}")
+        raise typer.Exit()
+
+
+def _noninteractive_defaults(
+    scope: str | None, framework: str | None, auth: str | None, async_db: bool
+) -> WizardResult:
+    """Resolve unset options to their defaults without prompting.
+
+    Mirrors the old argparse behaviour: scope -> fullstack, framework -> fastapi,
+    auth -> None (no auth), async_db -> False.
+    """
+    return WizardResult(
+        scope=scope if scope is not None else "fullstack",
+        framework=framework if framework is not None else "fastapi",
+        auth=auth,
+        async_db=async_db,
+    )
+
+
+def _resolve_choices(
+    scope: str | None,
+    framework: str | None,
+    auth: str | None,
+    auth_given: bool,
+    async_db: bool,
+    async_db_given: bool,
+    *,
+    interactive: bool,
+) -> WizardResult:
+    """Turn the raw CLI options into a resolved WizardResult.
+
+    Interactive (a TTY, no ``--yes``): prompt for anything not passed as a flag.
+    Non-interactive (piped stdin / ``--yes`` / fully-flagged): apply defaults for
+    unset options without prompting, so CI and the .vscode tasks never block.
+
+    Graceful degradation: if the wizard cannot run because the terminal cannot
+    host interactive prompts — no console screen buffer (Git Bash / mintty on
+    Windows), closed stdin, EOF — fall back to the non-interactive defaults
+    rather than crash. ``isatty()`` is not a reliable non-interactivity signal
+    on Windows (``NUL`` reports as a console), so this catch is the real guard.
+
+    The fallback is scoped to *terminal-hosting* failures only. A user cancel
+    (Ctrl-C -> ``SystemExit``) is re-raised, and any other error (a genuine bug
+    in the wizard) propagates instead of being silently masked as a fallback —
+    otherwise a broken prompt would look like "the user chose all defaults".
+    """
+    if not interactive:
+        return _noninteractive_defaults(scope, framework, auth, async_db)
+    try:
+        return run_wizard(
+            scope=scope,
+            framework=framework,
+            auth=auth,
+            auth_given=auth_given,
+            async_db=async_db,
+            async_db_given=async_db_given,
+        )
+    except _NO_TERMINAL_ERRORS:
+        # The terminal can't host prompts (unhostable console / closed stdin /
+        # EOF). Fall back to non-interactive defaults rather than crash.
+        return _noninteractive_defaults(scope, framework, auth, async_db)
+
+
+app = typer.Typer(
+    add_completion=False,
+    help="Initialize a full-stack project with FastAPI or NestJS, Angular, and Docker.",
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
+
+
+@app.command()
+def _scaffold(  # noqa: PLR0913 — flat flag surface mirrors the scaffold options
+    project_name: str = typer.Argument(
+        ".", help="Project directory to create (default: current directory)."
+    ),
+    version: bool = typer.Option(  # noqa: ARG001 — consumed by the eager callback
+        False,
+        "-v",
+        "--version",
+        help="Show the version and exit.",
+        callback=_version_callback,
+        is_eager=True,
+    ),
+    force: bool = typer.Option(
+        False, "-f", "--force", help="Overwrite existing files without prompting."
+    ),
+    yes: bool = typer.Option(
+        False,
+        "-y",
+        "--yes",
+        help="Non-interactive: skip prompts and use defaults for unset options.",
+    ),
+    scope: str = typer.Option(
+        None,
+        "--scope",
+        help="Layers to scaffold: 'fullstack' (default), 'api', or 'frontend'. "
+        "Given -> skips the prompt.",
+    ),
+    framework: str = typer.Option(
+        None,
+        "--framework",
+        help="Backend framework: 'fastapi' (default) or 'nestjs'. Given -> skips the prompt.",
+    ),
+    fastapi: bool = typer.Option(
+        False, "--fastapi", help="Shorthand for --framework fastapi."
+    ),
+    nestjs: bool = typer.Option(
+        False, "--nestjs", help="Shorthand for --framework nestjs."
+    ),
+    auth: str = typer.Option(
+        None,
+        "--auth",
+        help="Auth mode: 'token', 'supabase', or 'entra'. Given -> skips the prompt.",
+    ),
+    async_db: bool = typer.Option(
+        False,
+        "--async-db",
+        help="Add the opt-in async SQLAlchemy path (FastAPI only).",
+    ),
+    verbose: bool = typer.Option(
+        False,
+        "-V",
+        "--verbose",
+        help="List every file created (in addition to the summary tree).",
+    ),
+) -> None:
+    """Scaffold a new project, prompting for any options not supplied as flags."""
+    # --fastapi/--nestjs are shorthands for --framework; reject conflicts.
+    if fastapi and nestjs:
+        raise typer.BadParameter("--fastapi and --nestjs are mutually exclusive.")
+    if (fastapi or nestjs) and framework is not None:
+        raise typer.BadParameter("--framework cannot be combined with --fastapi/--nestjs.")
+    if fastapi:
+        framework = "fastapi"
+    elif nestjs:
+        framework = "nestjs"
+
+    if scope is not None and scope not in SCOPES:
+        raise typer.BadParameter(f"'{scope}' is not one of {SCOPES}.", param_hint="--scope")
+    if framework is not None and framework not in FRAMEWORKS:
+        raise typer.BadParameter(
+            f"'{framework}' is not one of {FRAMEWORKS}.", param_hint="--framework"
+        )
+    if auth is not None and auth not in AUTH_MODES:
+        raise typer.BadParameter(f"'{auth}' is not one of {AUTH_MODES}.", param_hint="--auth")
+
+    # Validate the explicitly-supplied flags BEFORE any prompt so an illegal
+    # combination fails fast with the exit-code-2 usage error (BadParameter),
+    # never reaching the wizard.
+    errors = validate_scope(scope, framework, auth, async_db)
     if errors:
-        parser.error(errors[0])
-    framework = args.framework if args.framework is not None else "fastapi"
+        raise typer.BadParameter(errors[0])
 
-    # Determine destination directory
-    if args.project_name == ".":
-        dest_dir = Path.cwd()
-    else:
-        dest_dir = Path.cwd() / args.project_name
+    interactive = sys.stdin.isatty() and not yes
+    choices = _resolve_choices(
+        scope,
+        framework,
+        auth,
+        auth_given=auth is not None,
+        async_db=async_db,
+        async_db_given=async_db,
+        interactive=interactive,
+    )
+    # No second validation here: validate_scope() treats a non-None framework as
+    # an *explicit* flag, but the resolver always fills a concrete framework
+    # (e.g. "fastapi" for a frontend scope), so re-validating resolved values
+    # would wrongly reject legal combos. The explicit-flag check above already
+    # covers the CLI, and the wizard never offers an illegal combination.
 
-    # Check if directory exists and has content
-    if dest_dir.exists() and any(dest_dir.iterdir()) and not args.force:
+    dest_dir = Path.cwd() if project_name == "." else Path.cwd() / project_name
+
+    if dest_dir.exists() and any(dest_dir.iterdir()) and not force:
         response = input(f"Directory '{dest_dir}' is not empty. Continue? [y/N]: ")
         if response.lower() != "y":
             print("Aborted.")
-            sys.exit(0)
+            raise typer.Exit()
 
     copy_template(
         dest_dir,
-        args.project_name,
-        auth=args.auth,
-        framework=framework,
-        scope=args.scope,
-        async_db=args.async_db,
+        project_name,
+        auth=choices.auth,
+        framework=choices.framework,
+        scope=choices.scope,
+        async_db=choices.async_db,
+        verbose=verbose,
     )
+
+
+def main() -> None:
+    """Console-script entry point — runs the Typer app over argv."""
+    app()
 
 
 if __name__ == "__main__":

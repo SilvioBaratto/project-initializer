@@ -55,6 +55,7 @@ def test_when_entra_and_fastapi_args_are_passed_then_cli_accepts_without_error(
         ],
         capture_output=True,
         text=True,
+        stdin=subprocess.DEVNULL,
     )
     assert result.returncode == 0, result.stderr
 
@@ -73,6 +74,7 @@ def test_when_entra_and_nestjs_args_are_passed_then_cli_accepts_without_error(tm
         ],
         capture_output=True,
         text=True,
+        stdin=subprocess.DEVNULL,
     )
     assert result.returncode == 0, result.stderr
 
@@ -93,6 +95,7 @@ def test_when_entra_with_scope_api_is_passed_then_cli_accepts_without_error(tmp_
         ],
         capture_output=True,
         text=True,
+        stdin=subprocess.DEVNULL,
     )
     assert result.returncode == 0, result.stderr
 
@@ -109,6 +112,7 @@ def test_when_existing_fastapi_no_auth_is_passed_then_cli_still_accepts(tmp_path
         ],
         capture_output=True,
         text=True,
+        stdin=subprocess.DEVNULL,
     )
     assert result.returncode == 0, result.stderr
 
@@ -127,6 +131,7 @@ def test_when_existing_nestjs_token_auth_is_passed_then_cli_still_accepts(tmp_pa
         ],
         capture_output=True,
         text=True,
+        stdin=subprocess.DEVNULL,
     )
     assert result.returncode == 0, result.stderr
 
@@ -145,6 +150,7 @@ def test_when_existing_supabase_fastapi_is_passed_then_cli_still_accepts(tmp_pat
         ],
         capture_output=True,
         text=True,
+        stdin=subprocess.DEVNULL,
     )
     assert result.returncode == 0, result.stderr
 
@@ -162,5 +168,6 @@ def test_when_scope_frontend_alone_is_passed_then_cli_still_accepts(tmp_path):
         ],
         capture_output=True,
         text=True,
+        stdin=subprocess.DEVNULL,
     )
     assert result.returncode == 0, result.stderr

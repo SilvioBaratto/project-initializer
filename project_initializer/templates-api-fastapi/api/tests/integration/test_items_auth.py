@@ -12,7 +12,7 @@ from each variant's ``dependencies.py``. These tests run in the BASE template:
 import pytest
 from fastapi import HTTPException, status
 
-from app.dependencies import get_current_user
+from app.api.deps import get_current_user
 from app.main import app
 
 API = "/api/v1"

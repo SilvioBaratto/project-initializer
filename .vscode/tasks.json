@@ -4,14 +4,14 @@
     {
       "label": "scaffold-fastapi",
       "type": "shell",
-      "command": "[ -d test-fastapi/api ] || python -m project_initializer.cli test-fastapi --fastapi --force",
+      "command": "[ -d test-fastapi/api ] || python -m project_initializer.cli test-fastapi --fastapi --force -y",
       "presentation": { "reveal": "silent", "close": true },
       "problemMatcher": []
     },
     {
       "label": "generate-env-fastapi",
       "type": "shell",
-      "command": "python -m project_initializer.env_generator fastapi --dest test-fastapi/api/.env",
+      "command": "python -m project_initializer.env_generator fastapi --dest test-fastapi/.env",
       "presentation": { "reveal": "silent", "close": true },
       "problemMatcher": []
     },
@@ -33,14 +33,14 @@
     {
       "label": "scaffold-fastapi-token",
       "type": "shell",
-      "command": "[ -d test-fastapi-token/api ] || python -m project_initializer.cli test-fastapi-token --fastapi --auth token --force",
+      "command": "[ -d test-fastapi-token/api ] || python -m project_initializer.cli test-fastapi-token --fastapi --auth token --force -y",
       "presentation": { "reveal": "silent", "close": true },
       "problemMatcher": []
     },
     {
       "label": "generate-env-fastapi-token",
       "type": "shell",
-      "command": "python -m project_initializer.env_generator fastapi --auth token --dest test-fastapi-token/api/.env",
+      "command": "python -m project_initializer.env_generator fastapi --auth token --dest test-fastapi-token/.env",
       "presentation": { "reveal": "silent", "close": true },
       "problemMatcher": []
     },
@@ -62,14 +62,14 @@
     {
       "label": "scaffold-fastapi-supabase",
       "type": "shell",
-      "command": "[ -d test-fastapi-supabase/api ] || python -m project_initializer.cli test-fastapi-supabase --fastapi --auth supabase --force",
+      "command": "[ -d test-fastapi-supabase/api ] || python -m project_initializer.cli test-fastapi-supabase --fastapi --auth supabase --force -y",
       "presentation": { "reveal": "silent", "close": true },
       "problemMatcher": []
     },
     {
       "label": "generate-env-fastapi-supabase",
       "type": "shell",
-      "command": "python -m project_initializer.env_generator fastapi --auth supabase --dest test-fastapi-supabase/api/.env",
+      "command": "python -m project_initializer.env_generator fastapi --auth supabase --dest test-fastapi-supabase/.env",
       "presentation": { "reveal": "silent", "close": true },
       "problemMatcher": []
     },
@@ -91,14 +91,14 @@
     {
       "label": "scaffold-nestjs",
       "type": "shell",
-      "command": "[ -d test-nestjs/api ] || python -m project_initializer.cli test-nestjs --nestjs --force",
+      "command": "[ -d test-nestjs/api ] || python -m project_initializer.cli test-nestjs --nestjs --force -y",
       "presentation": { "reveal": "silent", "close": true },
       "problemMatcher": []
     },
     {
       "label": "generate-env-nestjs",
       "type": "shell",
-      "command": "python -m project_initializer.env_generator nestjs --dest test-nestjs/api/.env",
+      "command": "python -m project_initializer.env_generator nestjs --dest test-nestjs/.env",
       "presentation": { "reveal": "silent", "close": true },
       "problemMatcher": []
     },
@@ -128,14 +128,14 @@
     {
       "label": "scaffold-nestjs-token",
       "type": "shell",
-      "command": "[ -d test-nestjs-token/api ] || python -m project_initializer.cli test-nestjs-token --nestjs --auth token --force",
+      "command": "[ -d test-nestjs-token/api ] || python -m project_initializer.cli test-nestjs-token --nestjs --auth token --force -y",
       "presentation": { "reveal": "silent", "close": true },
       "problemMatcher": []
     },
     {
       "label": "generate-env-nestjs-token",
       "type": "shell",
-      "command": "python -m project_initializer.env_generator nestjs --auth token --dest test-nestjs-token/api/.env",
+      "command": "python -m project_initializer.env_generator nestjs --auth token --dest test-nestjs-token/.env",
       "presentation": { "reveal": "silent", "close": true },
       "problemMatcher": []
     },
@@ -164,14 +164,14 @@
     {
       "label": "scaffold-nestjs-supabase",
       "type": "shell",
-      "command": "[ -d test-nestjs-supabase/api ] || python -m project_initializer.cli test-nestjs-supabase --nestjs --auth supabase --force",
+      "command": "[ -d test-nestjs-supabase/api ] || python -m project_initializer.cli test-nestjs-supabase --nestjs --auth supabase --force -y",
       "presentation": { "reveal": "silent", "close": true },
       "problemMatcher": []
     },
     {
       "label": "generate-env-nestjs-supabase",
       "type": "shell",
-      "command": "python -m project_initializer.env_generator nestjs --auth supabase --dest test-nestjs-supabase/api/.env",
+      "command": "python -m project_initializer.env_generator nestjs --auth supabase --dest test-nestjs-supabase/.env",
       "presentation": { "reveal": "silent", "close": true },
       "problemMatcher": []
     },

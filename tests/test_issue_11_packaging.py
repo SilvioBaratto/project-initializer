@@ -63,13 +63,13 @@ def test_when_fastapi_entra_overlay_checked_then_dependencies_py_provides_jwt_va
     None
 ):
     """
-    FastAPI entra overlay must contain app/dependencies.py to provide in-process JWKS validation.
+    FastAPI entra overlay must contain app/api/deps.py to provide in-process JWKS validation.
     Assumption: in-process validation means a dedicated dependencies module mirroring the supabase overlay.
     """
     assert (
-        _PKG / "templates-entra-fastapi" / "api" / "app" / "dependencies.py"
+        _PKG / "templates-entra-fastapi" / "api" / "app" / "api" / "deps.py"
     ).exists(), (
-        "templates-entra-fastapi/api/app/dependencies.py is required for in-process JWT validation"
+        "templates-entra-fastapi/api/app/api/deps.py is required for in-process JWT validation"
     )
 
 
