@@ -281,6 +281,20 @@ npx prisma migrate dev                # Create + apply migration
 npx prisma generate                   # Regenerate Prisma client
 ```
 
+### Prisma migrations — ship them, and mind the overlay
+
+The entrypoint runs `prisma migrate deploy`, which is a **no-op when no migration exists** ("No migration found in prisma/migrations", exit 0) — the stack then starts against an empty database and `/health/readiness` reports `database: down`. So a schema change must ship its migration in the same edit.
+
+Which overlay owns a migration follows its `schema.prisma`: `templates-api-nestjs` (base, `users`) and `templates-supabase-nestjs` (`profiles`) each carry one. `templates-entra-nestjs` has an identical schema to the base and `templates-token-nestjs` has none, so both inherit the base migration.
+
+**The supabase migration reuses the base migration's directory name on purpose.** Layers overwrite by path, so an identical name means supabase's `migration.sql` *replaces* the base's; a different name would leave both and a supabase scaffold would create a stray `users` table alongside `profiles`. Regenerate against a live DB from a scaffolded project (the standalone CLI needs the project's `prisma.config.ts` for the datasource URL):
+
+```bash
+docker compose run --rm --entrypoint sh api -c "npx prisma migrate dev --name init"
+```
+
+`tests/test_nestjs_migrations.py` asserts each variant's migrations create exactly the tables its schema maps to, which is also what catches the stacking mistake.
+
 ### package-lock.json — regenerate on linux
 
 The API Dockerfile runs `npm ci`, which hard-fails on **any** drift between `package.json` and its lock, so a stale lock means the image never builds. After changing a NestJS dependency, regenerate the lock **inside the build's own platform** — a lock resolved on macOS/arm64 pins different native/optional packages (`@emnapi/*`, …) and `npm ci` then rejects it on `node:22-alpine`:
