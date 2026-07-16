@@ -19,6 +19,14 @@ from rich.panel import Panel
 from rich.tree import Tree
 
 from . import __version__
+from .docs_generator import (
+    generate_api_claude,
+    generate_api_readme,
+    generate_frontend_claude,
+    generate_frontend_readme,
+    generate_root_claude,
+    generate_root_readme,
+)
 from .env_generator import generate_env, parse_env
 from .file_transforms import (
     append_async_requirements,
@@ -357,6 +365,34 @@ def copy_template(
         compose_path = dest_dir / "docker-compose.yml"
         compose_path.write_text(generate_frontend_compose(), encoding="utf-8")
         created["docker-compose.yml"] = True
+
+    # Generate the docs per-flag (single source of truth in docs_generator),
+    # rather than shipping static template copies that drift. Which docs depend
+    # on the scope: root README/CLAUDE always; api/* when the backend is present;
+    # frontend/* when the frontend is present.
+    include_api = scope in ("fullstack", "api")
+    include_frontend = scope in ("fullstack", "frontend")
+    docs: dict[str, str] = {
+        "README.md": generate_root_readme(
+            framework, auth, api=include_api, frontend=include_frontend, async_db=async_db
+        ),
+        "CLAUDE.md": generate_root_claude(
+            framework, auth, api=include_api, frontend=include_frontend, async_db=async_db
+        ),
+    }
+    if include_api:
+        docs["api/README.md"] = generate_api_readme(framework, async_db=async_db)
+        docs["api/.claude/CLAUDE.md"] = generate_api_claude(
+            framework, auth, async_db=async_db
+        )
+    if include_frontend:
+        docs["frontend/README.md"] = generate_frontend_readme()
+        docs["frontend/.claude/CLAUDE.md"] = generate_frontend_claude()
+    for rel, content in docs.items():
+        path = dest_dir / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+        created[rel] = True
 
     if verbose:
         for rel in sorted(created):
