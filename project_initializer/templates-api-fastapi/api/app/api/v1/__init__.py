@@ -22,10 +22,10 @@ Each domain module should follow this pattern:
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.database import get_db
-from app.schemas.user import UserCreate, UserResponse, UserUpdate
-from app.services.user_service import UserService
-from app.dependencies import get_current_user
+from app.infrastructure.database import get_db
+from app.api.schemas.user import UserCreate, UserResponse, UserUpdate
+from app.application.services.user_service import UserService
+from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -110,8 +110,8 @@ Router Registration (router.py)
 -------------------------------
 ```python
 from fastapi import APIRouter
-from app.api.v1.users import router as users_router
-from app.api.v1.items import router as items_router
+from app.api.v1.endpoints.users import router as users_router
+from app.api.v1.endpoints.items import router as items_router
 
 api_router = APIRouter()
 api_router.include_router(users_router)

@@ -4,22 +4,26 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Dict, Any
 
-from dotenv import load_dotenv
+# Load configuration into os.environ FIRST, before importing anything that
+# instantiates Settings. load_configuration() walks up to the project .env
+# (CWD-independent, so `cd api && uvicorn` finds the root-level .env); in Docker
+# it is a no-op because the vars are already real env vars injected by compose
+# env_file. Settings then read os.environ only.
+from app.infrastructure.config import load_configuration
+
+load_configuration()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 
-from app.config import settings
-from app.database import database_manager, init_db, close_db
-from app.exceptions import setup_exception_handlers
-from app.middleware.security import SecurityHeadersMiddleware
-from app.middleware.logging import LoggingMiddleware
-from app.middleware.rate_limiting import RateLimitingMiddleware
+from app.infrastructure.settings import settings
+from app.infrastructure.database import database_manager, init_db, close_db
+from app.api.handlers import setup_exception_handlers
+from app.api.middleware.security import SecurityHeadersMiddleware
+from app.api.middleware.logging import LoggingMiddleware
+from app.api.middleware.rate_limiting import RateLimitingMiddleware
 from app.api.v1.router import api_router
-
-# Load environment variables FIRST, before any other imports
-# This ensures libraries can access env vars
-load_dotenv()
 
 # Configure structured logging
 logging.basicConfig(

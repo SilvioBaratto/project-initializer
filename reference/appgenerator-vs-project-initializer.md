@@ -298,3 +298,29 @@ dependencies = [
 1. **Env** (lowest risk, isolated): refactor `env_generator.py` into section builders, write root `.env`+`.env.example`, re-point compose/tasks.json. Update tests.
 2. **Wizard** (isolated to `cli.py` + new `wizard.py`): add Typer/questionary, port wizard, keep validation. Update parser tests.
 3. **Hexagonal** (highest blast radius): restructure `templates-api-fastapi`, then re-path the 3 FastAPI auth overlays + asyncdb overlay, then port the architecture-fitness test. Verify all FastAPI variants still scaffold and boot.
+
+---
+
+## F. Implementation status & deviations from the plan
+
+Tracked against the branch `feat/appgen-patterns-env-wizard`.
+
+### Phase B — Env (DONE, committed)
+- `env_generator.py` split into section builders (`_database_section`, `_supabase_section`, `_entra_section`, `_token_section`, `_server_section`, `_redis_section`, `_topology_section`, `_llm_section`). `generate_env()` signature preserved (tests depend on it); gained a `frontend: bool` kwarg so `api` scope omits `FRONTEND_HOST_PORT`.
+- Writes **root** `.env` **and** `.env.example` (byte-identical; placeholders double as dev defaults). Was `api/.env`.
+- New compose-topology vars `API_HOST_PORT` / `FRONTEND_HOST_PORT` / `DB_HOST_PORT`, consumed by compose as `${VAR:-default}` — identical ports when unset.
+- **Deviation from plan:** did NOT make compose interpolate `DATABASE_URL` from `.env`. Instead each compose `api` service gained `env_file: .env` **while keeping** the explicit `environment:` `DATABASE_URL` override (compose precedence: `environment` > `env_file`). This preserves the container-networking fix from commit `28ef6c4` (host `.env` says `localhost:5433`; container must reach `db:5432`). This applies to base FastAPI, entra FastAPI, supabase FastAPI, and NestJS composes.
+- NestJS: `ConfigModule.forRoot({ envFilePath: ['../.env', '.env'] })` in all 4 `app.module.ts`; `prisma.config.ts` loads `['../.env', '.env']` via `dotenv`.
+- `.vscode/tasks.json` env dests → root `.env`; scaffold commands gained `-y`.
+
+### Phase C — Wizard (DONE, committed)
+- `build_parser()` (argparse) replaced by a **Typer single-command app** + `wizard.py` (questionary). `main()` is the console-script entry that invokes `app()`.
+- **Deviation from plan (kept the flat CLI, not a `generate` subcommand):** `project-initializer <name> --flags` UX is unchanged, so `tasks.json` / muscle memory keep working. Added `--framework fastapi|nestjs`; `--fastapi`/`--nestjs` are shorthands.
+- Wizard prompts only for unset options; frontend scope skips framework/auth/async prompts; NestJS skips async.
+- **Deviation (robustness, not in plan):** `sys.stdin.isatty()` is unreliable on Windows/Git-Bash (`NUL`/`DEVNULL` report as a console). So the interactive path is wrapped: any wizard failure to host prompts (`NoConsoleScreenBufferError`, EOF, closed stdin) falls back to non-interactive defaults instead of crashing. `-y/--yes` forces non-interactive.
+- Runtime deps added: `typer>=0.12`, `questionary>=2.0` (were zero).
+- Validation (`validate_scope`) runs on explicit flags before any prompt (fast exit-2 on illegal combos); the redundant post-resolution re-validation was dropped (it wrongly rejected resolved defaults like frontend→fastapi).
+- Tests migrated to Typer `CliRunner`; subprocess tests pass `stdin=DEVNULL`.
+
+### Phase A — Hexagonal (in progress)
+Being implemented in an isolated worktree (full ports/adapters). Adds a walk-up `.env` loader (`app/infrastructure/config.py`) so `cd api && uvicorn` resolves the root `.env` — the runtime counterpart to Phase B's root-`.env` move.
