@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **No NestJS variant could build its API image.** The Dockerfile runs `npm ci` when a lock is present, and `npm ci` hard-fails on any drift between `package.json` and `package-lock.json` — so `docker-compose up` was broken for all four NestJS variants (half the matrix). Three separate causes:
+  - The base lock never got the `@bull-board/*` + `express-basic-auth` deps that `package.json` declares (`Missing: @bull-board/api@8.0.0 from lock file`).
+  - `templates-token-nestjs` shipped an empty stub lock (`{"packages": {}}`, committed by accident in a gitignore chore) that overwrote the good base lock. Removed — the overlay ships no `package.json`, so the base lock is the correct one.
+  - `templates-entra-nestjs` added `jsonwebtoken` / `jwks-rsa` to `package.json` but shipped no lock, inheriting the base one. It now has its own.
+
+  All four variants' locks are regenerated and verified in sync after layering, guarded by `tests/test_nestjs_lockfile_sync.py`.
+
 ## [0.3.7] - 2026-07-16
 
 ### Fixed

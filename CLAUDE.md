@@ -281,6 +281,16 @@ npx prisma migrate dev                # Create + apply migration
 npx prisma generate                   # Regenerate Prisma client
 ```
 
+### package-lock.json — regenerate on linux
+
+The API Dockerfile runs `npm ci`, which hard-fails on **any** drift between `package.json` and its lock, so a stale lock means the image never builds. After changing a NestJS dependency, regenerate the lock **inside the build's own platform** — a lock resolved on macOS/arm64 pins different native/optional packages (`@emnapi/*`, …) and `npm ci` then rejects it on `node:22-alpine`:
+
+```bash
+docker run --rm -v "$PWD:/w" -w /w node:22-alpine npm install --package-lock-only --ignore-scripts
+```
+
+Which overlay owns a lock follows its `package.json`: `templates-api-nestjs` (base) and the overlays that ship their own `package.json` (`templates-supabase-nestjs`, `templates-entra-nestjs`) each carry one. `templates-token-nestjs` ships no `package.json`, so it must **not** carry a lock — it inherits the base pair. `tests/test_nestjs_lockfile_sync.py` checks the **layered** result for every auth mode, which is the only place the drift is visible.
+
 ## Frontend Template (`frontend/`)
 
 Angular 21 with Tailwind CSS. Key conventions:
