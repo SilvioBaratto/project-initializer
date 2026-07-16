@@ -22,12 +22,12 @@ services:
       redis:
         condition: service_healthy
     env_file:
-      - ./api/.env
+      - .env
     environment:
       REDIS_HOST: redis
       REDIS_PORT: 6379
     ports:
-      - "8000:8000"
+      - "${API_HOST_PORT:-8000}:8000"
     volumes:
       - ./api:/app
       - /app/node_modules
@@ -51,7 +51,7 @@ services:
       api:
         condition: service_healthy
     ports:
-      - "4200:80"
+      - "${FRONTEND_HOST_PORT:-4200}:80"
     networks:
       - app_network
 

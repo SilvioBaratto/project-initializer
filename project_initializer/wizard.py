@@ -98,14 +98,18 @@ def _prompt_auth() -> str | None:
 
 
 def _prompt_async_db() -> bool:
-    """Ask whether to add the opt-in async SQLAlchemy path (FastAPI only)."""
+    """Ask whether to add the opt-in async SQLAlchemy path (FastAPI only).
+
+    No ``default=`` is passed: questionary matches ``default`` against a choice
+    *value* (here booleans), not the title, and the first choice ("No") is the
+    default anyway — which is the intended sync-by-default behaviour.
+    """
     answer = questionary.select(
         "Async database (FastAPI async SQLAlchemy path)",
         choices=[
             questionary.Choice(title="No (sync SQLAlchemy)", value=False),
             questionary.Choice(title="Yes (async SQLAlchemy)", value=True),
         ],
-        default="No (sync SQLAlchemy)",
     ).ask()
     return bool(_abort_if_cancelled(answer))
 

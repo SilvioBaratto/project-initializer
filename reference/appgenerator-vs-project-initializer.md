@@ -322,5 +322,16 @@ Tracked against the branch `feat/appgen-patterns-env-wizard`.
 - Validation (`validate_scope`) runs on explicit flags before any prompt (fast exit-2 on illegal combos); the redundant post-resolution re-validation was dropped (it wrongly rejected resolved defaults like frontend→fastapi).
 - Tests migrated to Typer `CliRunner`; subprocess tests pass `stdin=DEVNULL`.
 
-### Phase A — Hexagonal (in progress)
-Being implemented in an isolated worktree (full ports/adapters). Adds a walk-up `.env` loader (`app/infrastructure/config.py`) so `cd api && uvicorn` resolves the root `.env` — the runtime counterpart to Phase B's root-`.env` move.
+### Phase A — Hexagonal (DONE)
+Full ports/adapters restructure of the FastAPI backend template.
+- **Layout:** `app/{domain,application,infrastructure,api}`.
+  - `domain/` — `entities/item.py` (pure dataclass), `ports/item_repository.py` (`ItemRepositoryPort`, a `@runtime_checkable` Protocol), `exceptions.py` (framework-free exception types using stdlib `HTTPStatus`).
+  - `application/` — `services/` (`ItemService` depends on `ItemRepositoryPort`, not the session/concrete repo), `dto/chatbot.py` (use-case contract, so the chatbot service never imports the API layer).
+  - `infrastructure/` — `settings.py` (reads `os.environ`), `config.py` (walk-up `find_dotenv`/`load_configuration`), `database.py`, `orm/` (SQLAlchemy), `repositories/` (adapters, `BaseRepository.commit()` lets the service own the transaction through the port), `security.py` (token overlay), `audit.py`.
+  - `api/` — `deps.py`, `handlers.py` (FastAPI exception handlers, the HTTP half of the old `exceptions.py`), `schemas/`, `middleware/`, `v1/router.py` + `v1/endpoints/`.
+- **Boundary enforced** by `tests/unit/test_architecture.py` (AST scan): domain imports no application/infrastructure/api/fastapi/sqlalchemy; application imports no infrastructure/api/fastapi. Verified in every generated variant.
+- **Walk-up `.env` loader** (`infrastructure/config.py`) is the runtime counterpart to Phase B's root-`.env` move: `main.py` calls `load_configuration()` before importing `settings`, so `cd api && uvicorn` finds the root `.env`; in Docker it's a no-op (compose `env_file` injects real env vars).
+- **All 4 overlays re-pathed** to overwrite the new hexagonal paths (token/supabase/entra/asyncdb); each auth overlay's `settings.py` dropped `env_file` (reads `os.environ`).
+- **Deviation from plan:** `get_item_service` lives in `api/v1/endpoints/items.py` (its original home), NOT `api/deps.py` — the auth overlays overwrite `api/deps.py` wholesale and would drop it. items.py is not overridden by any overlay, so the wiring is safe there.
+- **Verified:** full suite `1493 passed, 6 skipped`; all 5 FastAPI variants scaffold + AST-parse; runtime CRUD through the port/adapter works against SQLite; `ItemRepository` satisfies `ItemRepositoryPort` at runtime.
+- **Known env caveat (pre-existing, unrelated):** importing `chatbot_service`/`items` in a freshly-scaffolded project needs a matching `baml-py` (the checked-in `baml_client` is generator-pinned `0.222.0`); a mismatched local `baml-py` raises an import error until `baml-cli generate` is re-run. Not introduced by this refactor.

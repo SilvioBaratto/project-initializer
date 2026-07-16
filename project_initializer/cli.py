@@ -24,6 +24,21 @@ from .file_transforms import (
 )
 from .wizard import WizardResult, run_wizard
 
+# Errors that mean "this terminal cannot host interactive prompts" — the only
+# case the wizard should fall back to non-interactive defaults for. questionary
+# is built on prompt_toolkit, which raises NoConsoleScreenBufferError on a
+# console it cannot drive (Git Bash / mintty on Windows). EOFError covers a
+# closed/empty stdin. Anything else is a real bug and must NOT be swallowed.
+_NO_TERMINAL_EXC: tuple[type[BaseException], ...] = (EOFError,)
+try:  # prompt_toolkit is a questionary dependency; guard in case it is absent
+    from prompt_toolkit.output.win32 import NoConsoleScreenBufferError
+
+    _NO_TERMINAL_EXC = (EOFError, NoConsoleScreenBufferError)
+except Exception:  # pragma: no cover - non-Windows / import shape differences
+    pass
+
+_NO_TERMINAL_ERRORS = _NO_TERMINAL_EXC
+
 FRAMEWORKS = ("fastapi", "nestjs")
 AUTH_MODES = ("token", "supabase", "entra")
 SCOPES = ("fullstack", "api", "frontend")
@@ -369,7 +384,11 @@ def _resolve_choices(
     Windows), closed stdin, EOF — fall back to the non-interactive defaults
     rather than crash. ``isatty()`` is not a reliable non-interactivity signal
     on Windows (``NUL`` reports as a console), so this catch is the real guard.
-    A user cancel (Ctrl-C -> ``SystemExit`` from the wizard) is re-raised.
+
+    The fallback is scoped to *terminal-hosting* failures only. A user cancel
+    (Ctrl-C -> ``SystemExit``) is re-raised, and any other error (a genuine bug
+    in the wizard) propagates instead of being silently masked as a fallback —
+    otherwise a broken prompt would look like "the user chose all defaults".
     """
     if not interactive:
         return _noninteractive_defaults(scope, framework, auth, async_db)
@@ -382,9 +401,9 @@ def _resolve_choices(
             async_db=async_db,
             async_db_given=async_db_given,
         )
-    except (SystemExit, KeyboardInterrupt):
-        raise
-    except Exception:
+    except _NO_TERMINAL_ERRORS:
+        # The terminal can't host prompts (unhostable console / closed stdin /
+        # EOF). Fall back to non-interactive defaults rather than crash.
         return _noninteractive_defaults(scope, framework, auth, async_db)
 
 

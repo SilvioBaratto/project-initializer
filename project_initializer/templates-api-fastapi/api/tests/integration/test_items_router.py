@@ -216,12 +216,13 @@ def test_when_item_created_then_audit_log_background_task_fires(client, monkeypa
     the create action and the new item's id, and the 201 response is unchanged.
 
     Patch the name as bound in the handler module (the handler resolves
-    ``app.api.v1.items.write_audit_log``, not the source module). Starlette's
-    TestClient runs background tasks before returning, so the assertion is reliable.
+    ``app.api.v1.endpoints.items.write_audit_log``, not the source module).
+    Starlette's TestClient runs background tasks before returning, so the
+    assertion is reliable.
     """
     calls: list[tuple] = []
     monkeypatch.setattr(
-        "app.api.v1.items.write_audit_log",
+        "app.api.v1.endpoints.items.write_audit_log",
         lambda action, resource_id: calls.append((action, resource_id)),
     )
 

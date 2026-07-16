@@ -129,3 +129,24 @@ def test_when_version_flag_given_it_prints_version_and_exits():
     result = run(["--version"])
     assert result.exit_code == 0
     assert "project-initializer" in result.stdout
+
+
+def test_when_no_project_name_given_default_is_current_dir(captured, monkeypatch, tmp_path):
+    """Omitting the project name scaffolds into the current directory (project_name='.')."""
+    # cwd is non-empty in this repo; chdir to an empty tmp dir so the
+    # "directory not empty" guard does not prompt and abort.
+    monkeypatch.chdir(tmp_path)
+    result = run([])
+    assert result.exit_code == 0
+    assert captured["project_name"] == "."
+
+
+def test_when_force_flag_given_scaffold_runs_without_prompt(captured, monkeypatch, tmp_path):
+    """`-f/--force` scaffolds into a non-empty directory without the overwrite prompt."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "existing.txt").write_text("x", encoding="utf-8")
+    # Without --force this would call input() and, on an empty stdin, abort;
+    # with --force the guard is skipped and copy_template is reached.
+    result = run(["myapp", "--force"])
+    assert result.exit_code == 0
+    assert captured["project_name"] == "myapp"
