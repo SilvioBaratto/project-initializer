@@ -1,9 +1,10 @@
-"""Doc-drift guards for the FastAPI-tutorial → layered-layout mapping note (#27).
+"""Doc-drift guards for the FastAPI-tutorial → hexagonal-layout mapping note (#27).
 
-Reads the real generated root ``templates-api-fastapi/CLAUDE.md`` and asserts a
-note maps the tutorial's flat ``routers/`` concept onto this scaffold's layered
-``app/api/v1/`` layout (router -> service -> repository -> model -> schema), and
-that the note states plainly the mapping is conceptual — no code is moved.
+Reads the real ``templates-api-fastapi/CLAUDE.md`` and asserts a note maps the
+tutorial's flat ``routers/`` concept onto this scaffold's hexagonal layout
+(router -> service -> repository -> model -> schema across four layers), and that
+the note states plainly the code is physically restructured (not just conceptual)
+after the hexagonal migration.
 
 token/supabase overlays do NOT ship their own root CLAUDE.md, so guarding the
 base doc guards every variant.
@@ -38,8 +39,13 @@ def test_when_claude_md_read_then_layer_split_is_spelled_out():
         assert layer in doc
 
 
-def test_when_claude_md_read_then_note_states_no_code_is_moved():
-    """when the doc is read, the note states the mapping is conceptual with no code moved."""
+def test_when_claude_md_read_then_note_states_code_is_physically_restructured():
+    """when the doc is read, the note states the code is a real restructure across layers.
+
+    After the hexagonal migration the code IS physically split across
+    domain/application/infrastructure/api, so the doc must say so (not claim a
+    conceptual-only mapping, which would be stale/false).
+    """
     doc = _doc().lower()
-    assert "no code" in doc
-    assert "conceptual" in doc or "documentation only" in doc
+    assert "restructure" in doc
+    assert "domain" in doc and "application" in doc and "infrastructure" in doc

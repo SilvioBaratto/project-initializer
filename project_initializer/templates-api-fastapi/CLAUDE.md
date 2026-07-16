@@ -27,25 +27,25 @@ baml-cli generate                                 # Regenerate BAML client
 
 ## API Template (`api/`)
 
-FastAPI application with layered architecture:
+FastAPI application with clean / hexagonal architecture (four layers):
 
 | Layer | Purpose |
 |-------|---------|
-| `app/api/v1/` | Routes with `/api/v1` prefix |
-| `app/services/` | Business logic |
-| `app/repositories/` | Data access (BaseRepository with CRUD) |
-| `app/models/` | SQLAlchemy models (inherit BaseModel for UUID + timestamps) |
-| `app/schemas/` | Pydantic schemas (`<Entity>Create`, `<Entity>Update`, `<Entity>Response`) |
-| `app/middleware/` | Security, logging, rate limiting |
+| `app/domain/` | Pure core: `entities/` (dataclasses), `ports/` (repository interfaces), `services/`, `exceptions.py` — no framework/ORM imports |
+| `app/application/` | Use-case orchestration: `services/` (depend on domain ports), `dto/`, `commands/` — imports domain only |
+| `app/infrastructure/` | The only tech layer: `settings.py`, `config.py` (walk-up `.env` loader), `database.py`, `orm/` (SQLAlchemy), `repositories/` (port adapters), `audit.py` |
+| `app/api/` | HTTP surface: `deps.py` (composition root), `handlers.py` (exception handlers), `schemas/` (Pydantic), `middleware/`, `v1/router.py` + `v1/endpoints/` |
 | `baml_src/` | LLM function definitions (regenerate client with `baml-cli generate`) |
+
+Dependencies point strictly inward: `api → application → domain`, `infrastructure → domain`. The boundary is enforced by an AST fitness test (`api/tests/unit/test_architecture.py`).
 
 **Sync vs async**: DB endpoints are sync `def` (offloaded to a threadpool with the sync `Session`); `async def` is reserved for BAML/LLM calls. See `api/.claude/CLAUDE.md` for the full rule.
 
 ### Mapping from the FastAPI tutorial
 
-The official FastAPI "Bigger Applications" tutorial organizes path operations into a `routers/` package where each file creates an `APIRouter` and defines route functions — but those route functions also contain inline database queries, business logic, and raw return values. This scaffold maps the tutorial's `routers/` directly to `app/api/v1/`: each router file still owns an `APIRouter` and declares path operations (aggregated in `app/api/v1/router.py`, all under the `/api/v1` prefix), but nothing beyond that. What the tutorial keeps inline inside a route function is here split across four layers: router → `app/services/` (business logic) → `app/repositories/` (data access via the generic `BaseRepository`) → `app/models/` (SQLAlchemy) → `app/schemas/` (Pydantic `<Entity>Create`/`<Entity>Update`/`<Entity>Response`).
+The official FastAPI "Bigger Applications" tutorial organizes path operations into a `routers/` package where each file creates an `APIRouter` and defines route functions — but those route functions also contain inline database queries, business logic, and raw return values. This scaffold keeps the routers at `app/api/v1/endpoints/` (aggregated by `app/api/v1/router.py`, all under the `/api/v1` prefix) and splits what the tutorial keeps inline across the four hexagonal layers: router (`app/api/v1/endpoints/`) → application service (`app/application/services/`) → domain port (`app/domain/ports/`) implemented by an infrastructure repository (`app/infrastructure/repositories/`) → ORM model (`app/infrastructure/orm/`) → Pydantic schema (`app/api/schemas/`, `<Entity>Create`/`<Entity>Update`/`<Entity>Response`).
 
-This is a **conceptual documentation mapping only — no code is moved or restructured.** See `api/.claude/CLAUDE.md` for the deeper architecture doc.
+Unlike the tutorial's flat layout, **this is a real restructure — the code is physically split across `domain`/`application`/`infrastructure`/`api`, not just conceptually.** See `api/.claude/CLAUDE.md` for the deeper architecture doc.
 
 ## Token auth (`--auth token`)
 

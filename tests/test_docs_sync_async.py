@@ -48,8 +48,8 @@ def test_when_api_claude_md_read_async_reserved_for_baml_documented():
 def test_when_api_claude_md_read_canonical_examples_cited():
     """when the doc is read, items.py (sync) and chatbot_service.py (async) are cited."""
     doc = _doc()
-    assert "app/api/v1/items.py" in doc
-    assert "app/services/chatbot_service.py" in doc
+    assert "app/api/v1/endpoints/items.py" in doc
+    assert "app/application/services/chatbot_service.py" in doc
 
 
 def test_when_api_claude_md_read_optin_flag_gated_async_path_noted():
