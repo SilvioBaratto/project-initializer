@@ -40,8 +40,10 @@ RUN addgroup -g 1001 -S nginx-user && \
 EXPOSE 80
 
 # Health check
+# 127.0.0.1, not localhost: nginx.conf listens on IPv4 only (`listen 80;`), while
+# localhost resolves to ::1 first here — which would fail the check forever.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://127.0.0.1/health || exit 1
 
 # Start nginx
 USER nginx-user
