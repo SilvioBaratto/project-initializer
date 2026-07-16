@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.7] - 2026-07-16
+
 ### Fixed
 - **Two scaffolded projects could not run at the same time.** Two independent daemon-global collisions:
   - Every compose service pinned a fixed `container_name` (`app_db`, `app_api`, `app_frontend`, `app_adminer`, `app_redis`), so a second project — or any unrelated project already using those names — failed with `Conflict. The container name "/app_db" is already in use`. The `container_name` keys are dropped across all six compose files and the generated frontend-only compose; Compose now derives `<project>-<service>-1` from the project directory, which is unique per scaffold. The `app_db` **database** name is unchanged.
