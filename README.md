@@ -25,9 +25,14 @@ pip install -e .
 ```bash
 project-initializer my-project
 cd my-project
-# Edit api/.env with your real keys
-docker-compose up -d
+# .env is generated at the project root with working dev defaults — edit for real keys
+docker compose up -d --build
 ```
+
+Run `project-initializer` with no flags in a terminal and an **interactive wizard**
+(Typer + questionary) prompts for scope, framework, auth, and the async-DB option.
+Pass any of those as flags to skip its prompt; pass `-y/--yes` (or pipe stdin) to
+run fully non-interactive with defaults.
 
 ## Framework Selection
 
@@ -44,7 +49,7 @@ project-initializer my-app --nestjs     # NestJS backend
 | ORM | SQLAlchemy + Alembic | Prisma |
 | AI/LLM | BAML (Python) | BAML (TypeScript) |
 | API style | REST with Pydantic | REST with class-validator |
-| Architecture | Layered (routes/services/repos) | Modular (controllers/services/modules) |
+| Architecture | Clean / hexagonal (domain/application/infrastructure/api) | Modular (controllers/services/modules) |
 
 ## Authentication Modes
 
@@ -71,7 +76,7 @@ project-initializer my-app --scope api          # backend only — no frontend/,
 project-initializer my-app --scope frontend     # frontend only — Angular app, no api/
 ```
 
-- **`--scope api`** — emits `api/` + `docker-compose.yml` (without the `frontend` service) + `api/.env`. Combine with `--fastapi`/`--nestjs`/`--auth` as usual.
+- **`--scope api`** — emits `api/` + `docker-compose.yml` (without the `frontend` service) + the root `.env`/`.env.example`. Combine with `--fastapi`/`--nestjs`/`--auth` as usual.
 - **`--scope frontend`** — emits just the Angular `frontend/` (nginx `/api/` proxy stripped). Cannot be combined with `--fastapi`/`--nestjs`/`--auth` (those are backend concerns).
 - **`--scope fullstack`** (default) — both halves, current behavior.
 
@@ -110,6 +115,8 @@ project-initializer my-project --scope api       # Backend only
 project-initializer my-project --scope frontend  # Frontend only
 project-initializer my-project --async-db        # FastAPI async SQLAlchemy path (opt-in)
 project-initializer my-project --force           # Overwrite existing files
+project-initializer my-project -y                # Non-interactive (defaults for unset options)
+project-initializer my-project -V                # Verbose: list every file created
 project-initializer .                            # Scaffold in current directory
 project-initializer --version                    # Show version
 ```
@@ -119,17 +126,28 @@ project-initializer --version                    # Show version
 ```
 my-project/
 ├── api/                    # Backend (FastAPI or NestJS)
-│   ├── .env                # Auto-generated from variant
+│   ├── app/ (FastAPI)      # domain / application / infrastructure / api (hexagonal)
+│   ├── src/ (NestJS)       # modules / prisma / common / config (modular)
 │   ├── Dockerfile
-│   └── ...
+│   ├── README.md           # generated backend quick-start
+│   └── .claude/CLAUDE.md   # generated deep architecture guide
 ├── frontend/               # Angular + Tailwind CSS
 │   ├── Dockerfile
 │   ├── nginx.conf
-│   └── src/
+│   ├── src/
+│   ├── README.md           # generated Angular quick-start
+│   └── .claude/CLAUDE.md   # generated Angular guidance
 ├── docker-compose.yml      # Full-stack orchestration
-├── .env.example            # Reference for environment variables
-└── CLAUDE.md               # AI assistant guidance
+├── .env                    # Generated at the ROOT with working dev defaults
+├── .env.example            # Committed reference (byte-identical to .env)
+├── README.md               # generated per-flag
+└── CLAUDE.md               # generated AI-assistant guidance
 ```
+
+Docs (`README.md` + `CLAUDE.md` at the root, in `api/`, and in `frontend/`) are
+**generated per-flag** from a single source, not copied from static templates —
+so a NestJS project never mentions SQLAlchemy, a no-auth project never documents
+Entra, and the docs cannot drift from the code.
 
 ## Docker Services
 
@@ -142,9 +160,16 @@ my-project/
 
 ## Environment Configuration
 
-The CLI auto-generates `api/.env` based on the chosen variant. A root `.env.example` documents all possible variables.
+The CLI generates a single `.env` (plus a byte-identical `.env.example`) at the
+**project root** — the one source of truth for both `docker compose` and the app.
+Docker Compose loads it via `env_file`; the FastAPI backend walks up to it
+(`infrastructure/config.py`) so `cd api && uvicorn` resolves it too, and NestJS
+points `ConfigModule`/Prisma at it. The placeholder values double as working dev
+defaults, so `docker compose up` runs with no edits. Host ports are parametrized
+(`API_HOST_PORT`, `FRONTEND_HOST_PORT`, `DB_HOST_PORT`) with the previous fixed
+ports as defaults.
 
-For Supabase variants, configure these in `api/.env`:
+For Supabase variants, configure these in the root `.env`:
 ```
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_PUBLISHABLE_KEY=sb_publishable_...   # client-side (replaces legacy anon key)
