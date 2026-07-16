@@ -15,8 +15,8 @@ from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
 
 from app.main import app
-from app.database import get_db
-from app.models.base import Base
+from app.infrastructure.database import get_db
+from app.infrastructure.orm.base import Base
 
 
 # Test database URL - use SQLite for fast tests

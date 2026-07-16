@@ -8,15 +8,21 @@ so the router layer can map them to HTTP 404.
 
 import pytest
 
-from app.schemas import ItemCreate, ItemUpdate
-from app.services.item_service import ItemService
+from app.api.schemas import ItemCreate, ItemUpdate
+from app.application.services.item_service import ItemService
+from app.infrastructure.repositories.item import ItemRepository
+
+
+def _svc(session) -> ItemService:
+    """Wire an ItemService onto the session-backed repository adapter."""
+    return ItemService(ItemRepository(session))
 
 
 def _make(session, **overrides):
     """Create an item through the service and return it."""
     payload = {"name": "Widget", "description": "A widget", "price": 9.99}
     payload.update(overrides)
-    return ItemService(session).create(ItemCreate(**payload))
+    return _svc(session).create(ItemCreate(**payload))
 
 
 @pytest.mark.unit
@@ -34,7 +40,7 @@ def test_when_existing_id_fetched_then_item_is_returned(db_session):
     """when an existing id is fetched, the matching item is returned."""
     created = _make(db_session)
 
-    fetched = ItemService(db_session).get(created.id)
+    fetched = _svc(db_session).get(created.id)
 
     assert fetched is not None
     assert fetched.id == created.id
@@ -43,7 +49,7 @@ def test_when_existing_id_fetched_then_item_is_returned(db_session):
 @pytest.mark.unit
 def test_when_missing_id_fetched_then_none_is_returned(db_session):
     """when a missing id is fetched, None is returned."""
-    assert ItemService(db_session).get("does-not-exist") is None
+    assert _svc(db_session).get("does-not-exist") is None
 
 
 @pytest.mark.unit
@@ -52,7 +58,7 @@ def test_when_items_listed_then_all_created_items_are_returned(db_session):
     _make(db_session, name="A")
     _make(db_session, name="B")
 
-    items = ItemService(db_session).list()
+    items = _svc(db_session).list()
 
     assert len(items) >= 2
 
@@ -62,7 +68,7 @@ def test_when_existing_item_updated_then_updated_item_is_returned(db_session):
     """when an existing item is updated, the updated item is returned."""
     created = _make(db_session)
 
-    updated = ItemService(db_session).update(
+    updated = _svc(db_session).update(
         created.id, ItemUpdate(name="Renamed", price=1.0)
     )
 
@@ -74,7 +80,7 @@ def test_when_existing_item_updated_then_updated_item_is_returned(db_session):
 @pytest.mark.unit
 def test_when_missing_item_updated_then_none_is_returned(db_session):
     """when a missing item is updated, None is returned."""
-    result = ItemService(db_session).update("nope", ItemUpdate(name="x"))
+    result = _svc(db_session).update("nope", ItemUpdate(name="x"))
 
     assert result is None
 
@@ -83,7 +89,7 @@ def test_when_missing_item_updated_then_none_is_returned(db_session):
 def test_when_existing_item_deleted_then_true_is_returned(db_session):
     """when an existing item is deleted, True is returned and it is gone."""
     created = _make(db_session)
-    service = ItemService(db_session)
+    service = _svc(db_session)
 
     assert service.delete(created.id) is True
     assert service.get(created.id) is None
@@ -92,4 +98,4 @@ def test_when_existing_item_deleted_then_true_is_returned(db_session):
 @pytest.mark.unit
 def test_when_missing_item_deleted_then_false_is_returned(db_session):
     """when a missing item is deleted, False is returned."""
-    assert ItemService(db_session).delete("nope") is False
+    assert _svc(db_session).delete("nope") is False

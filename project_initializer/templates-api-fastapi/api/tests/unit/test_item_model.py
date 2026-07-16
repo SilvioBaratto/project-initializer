@@ -2,7 +2,7 @@
 
 Scope: issue #7 (persistence foundation). Covers the SQLAlchemy ``Item`` model,
 its registration on ``Base.metadata`` (so ``create_all`` builds the ``items``
-table on the SQLite test engine), and the ``app.schemas.item`` module re-exports.
+table on the SQLite test engine), and the ``app.api.schemas.item`` module re-exports.
 Full ``ItemCreate`` validation matrices live in the dedicated schema test suite.
 """
 
@@ -36,7 +36,7 @@ def test_when_item_model_imported_then_columns_match_schema(test_engine):
 @pytest.mark.unit
 def test_when_item_persisted_then_fields_round_trip(db_session):
     """when an Item is saved, its generated id and timestamps round-trip from the DB."""
-    from app.models import Item
+    from app.infrastructure.orm import Item
 
     item = Item(name="Widget", description="A widget", price=9.99, is_active=True)
     db_session.add(item)
@@ -51,8 +51,8 @@ def test_when_item_persisted_then_fields_round_trip(db_session):
 
 @pytest.mark.unit
 def test_when_item_schemas_imported_from_package_then_they_resolve():
-    """when Item schemas are imported from app.schemas, the package re-exports resolve."""
-    from app.schemas import (  # noqa: F401
+    """when Item schemas are imported from app.api.schemas, the package re-exports resolve."""
+    from app.api.schemas import (  # noqa: F401
         ItemBase,
         ItemCreate,
         ItemUpdate,
@@ -66,7 +66,7 @@ def test_when_item_schemas_imported_from_package_then_they_resolve():
 @pytest.mark.unit
 def test_when_itemcreate_given_invalid_input_then_validation_error():
     """when ItemCreate gets an empty name or negative price, ValidationError is raised."""
-    from app.schemas import ItemCreate
+    from app.api.schemas import ItemCreate
 
     with pytest.raises(ValidationError):
         ItemCreate(name="", price=1.0)
