@@ -9,10 +9,14 @@ wizard is skipped and unset options fall back to their defaults — so CI and th
 
 import shutil
 import sys
+from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
 
 import typer
+from rich.console import Console
+from rich.panel import Panel
+from rich.tree import Tree
 
 from . import __version__
 from .env_generator import generate_env, parse_env
@@ -23,6 +27,8 @@ from .file_transforms import (
     strip_nginx_proxy_block,
 )
 from .wizard import WizardResult, run_wizard
+
+console = Console()
 
 # Errors that mean "this terminal cannot host interactive prompts" — the only
 # case the wizard should fall back to non-interactive defaults for. questionary
@@ -222,6 +228,43 @@ def _next_steps_lines(auth: str | None, framework: str) -> list[str]:
     return lines
 
 
+def _config_panel(
+    dest_dir: Path, framework: str, auth: str | None, scope: str, async_db: bool
+) -> Panel:
+    """Render the leading configuration summary panel."""
+    auth_label = "none (open)" if auth is None else auth
+    db_label = "async SQLAlchemy" if async_db else "sync SQLAlchemy"
+    body = (
+        f"[bold]Project[/bold]    {dest_dir.name}\n"
+        f"[bold]Scope[/bold]      {scope}\n"
+        f"[bold]Framework[/bold]  {framework}\n"
+        f"[bold]Auth[/bold]       {auth_label}"
+    )
+    if scope != "frontend" and framework == "fastapi":
+        body += f"\n[bold]Database[/bold]   {db_label}"
+    return Panel(body, title="project-initializer", expand=False, border_style="cyan")
+
+
+def _summary_tree(dest_dir: Path, created: dict[str, bool]) -> Tree:
+    """Build a compact tree: top-level dirs with file counts, then root files."""
+    top_counts: Counter[str] = Counter()
+    root_files: list[str] = []
+    for rel in created:
+        head, sep, _ = rel.replace("\\", "/").partition("/")
+        if sep:
+            top_counts[head] += 1
+        else:
+            root_files.append(rel)
+
+    tree = Tree(f"[bold]{dest_dir.name}[/bold]")
+    for name in sorted(top_counts):
+        n = top_counts[name]
+        tree.add(f"{name}/  [dim]{n} file{'s' if n != 1 else ''}[/dim]")
+    for name in sorted(root_files):
+        tree.add(name)
+    return tree
+
+
 def copy_template(
     dest_dir: Path,
     project_name: str | None = None,
@@ -229,8 +272,14 @@ def copy_template(
     framework: str = "fastapi",
     scope: str = "fullstack",
     async_db: bool = False,
+    verbose: bool = False,
 ) -> None:
-    """Copy template files to destination directory."""
+    """Copy template files to destination directory.
+
+    Renders a leading config panel and a compact tree summary (top-level dirs
+    with file counts) instead of a line per file. ``verbose=True`` additionally
+    lists every distinct file created.
+    """
     skip_patterns = {
         "__pycache__",
         ".pyc",
@@ -248,6 +297,10 @@ def copy_template(
             name == pattern or name.endswith(pattern.lstrip("*"))
             for pattern in skip_patterns
         )
+
+    # relative-path -> True; a set-like dedup so files overwritten by a later
+    # overlay layer are counted once, not once per layer.
+    created: dict[str, bool] = {}
 
     def copy_tree(
         src: Path,
@@ -270,17 +323,14 @@ def copy_template(
                 copy_tree(item, dest_item, frozenset(), file_transform)
             else:
                 _copy_file(item, dest_item, file_transform)
-                print(f"  Created: {dest_item.relative_to(dest_dir)}")
+                created[str(dest_item.relative_to(dest_dir))] = True
 
     def require_dir(path: Path) -> None:
         if not path.exists():
-            print(f"Error: Templates directory not found at {path}")
+            console.print(f"[red]Error:[/red] templates directory not found at {path}")
             sys.exit(1)
 
-    auth_label = f" + {auth} auth" if auth else ""
-    print(f"Creating project in: {dest_dir}")
-    print(f"Framework: {framework}{auth_label}")
-    print("-" * 40)
+    console.print(_config_panel(dest_dir, framework, auth, scope, async_db))
 
     for src, skip, transform in select_layers(scope, framework, auth, async_db):
         require_dir(src)
@@ -301,15 +351,24 @@ def copy_template(
         for filename in (".env", ".env.example"):
             env_path = dest_dir / filename
             env_path.write_text(env_content, encoding="utf-8")
-            print(f"  Created: {env_path.relative_to(dest_dir)}")
+            created[filename] = True
 
     if scope == "frontend":
         compose_path = dest_dir / "docker-compose.yml"
         compose_path.write_text(generate_frontend_compose(), encoding="utf-8")
-        print(f"  Created: {compose_path.relative_to(dest_dir)}")
+        created["docker-compose.yml"] = True
 
-    print("-" * 40)
-    print("Project created successfully!")
+    if verbose:
+        for rel in sorted(created):
+            console.print(f"  [dim]created[/dim] {rel}")
+
+    console.print(_summary_tree(dest_dir, created))
+    console.print(
+        f"[green]Done[/green] - created [bold]{len(created)}[/bold] files "
+        f"in [bold]{dest_dir.name}[/bold]."
+    )
+    # Plain prints below (not console.print): tests capture these guidance
+    # strings via capsys, and they must stay stable, markup-free text.
     print("\nNext steps:")
     print(f"  cd {dest_dir.name}")
     for line in _next_steps_lines(auth, framework):
@@ -463,6 +522,12 @@ def _scaffold(  # noqa: PLR0913 — flat flag surface mirrors the scaffold optio
         "--async-db",
         help="Add the opt-in async SQLAlchemy path (FastAPI only).",
     ),
+    verbose: bool = typer.Option(
+        False,
+        "-V",
+        "--verbose",
+        help="List every file created (in addition to the summary tree).",
+    ),
 ) -> None:
     """Scaffold a new project, prompting for any options not supplied as flags."""
     # --fastapi/--nestjs are shorthands for --framework; reject conflicts.
@@ -522,6 +587,7 @@ def _scaffold(  # noqa: PLR0913 — flat flag surface mirrors the scaffold optio
         framework=choices.framework,
         scope=choices.scope,
         async_db=choices.async_db,
+        verbose=verbose,
     )
 
 
