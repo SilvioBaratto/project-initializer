@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.9] - 2026-07-16
+
 ### Fixed
 - **NestJS `GET /api/v1/test/items` always returned 500.** The handler returns an array but was decorated `@ZodSerializerDto(ItemResponseDto)`, whose schema is a single `z.object` — so the serializer rejected the response with "expected object, received array" before looking at any element, failing even for an empty list. List responses now use their own `ItemListResponseDto` (`z.array(ItemResponseSchema)`), which still strips unknown fields from every element, so the response whitelist is unchanged. The shipped `serialization.spec.ts` now covers the list path it previously missed.
 
