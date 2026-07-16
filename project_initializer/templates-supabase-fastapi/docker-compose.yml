@@ -4,7 +4,6 @@ services:
     build:
       context: ./api
       dockerfile: Dockerfile
-    container_name: app_api
     env_file:
       - .env
     ports:
@@ -20,7 +19,6 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: app_frontend
     depends_on:
       - api
     ports:

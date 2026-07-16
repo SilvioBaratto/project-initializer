@@ -2,7 +2,6 @@ services:
   # Redis (BullMQ queue backend)
   redis:
     image: redis:7-alpine
-    container_name: app_redis
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -17,7 +16,6 @@ services:
       context: ./api
       dockerfile: Dockerfile
       target: dev
-    container_name: app_api
     depends_on:
       redis:
         condition: service_healthy
@@ -46,7 +44,6 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: app_frontend
     depends_on:
       api:
         condition: service_healthy

@@ -159,7 +159,7 @@ Generates the `api/.env` file at scaffold time, assembling per-variant sections.
 - **Auth**: `AUTH_TOKEN` for token variants; `SUPABASE_URL` + `SUPABASE_PUBLISHABLE_KEY` for supabase; tenant/client/JWKS settings for entra
 - **Server**: `ENVIRONMENT`/`DEBUG` for FastAPI; `NODE_ENV` for NestJS
 - **Redis**: `REDIS_HOST` / `REDIS_PORT` (NestJS BullMQ)
-- **Compose topology**: `API_HOST_PORT`, `FRONTEND_HOST_PORT` (frontend scopes), `DB_HOST_PORT` (omitted for supabase — no local `db` service). Read by `docker-compose.yml` as `${VAR:-default}`, not by the app; an unset var falls back to the same fixed port used before the vars existed.
+- **Compose topology**: `API_HOST_PORT`, `FRONTEND_HOST_PORT` (frontend scopes), `DB_HOST_PORT` + `ADMINER_HOST_PORT` (both omitted for supabase — no local `db`/`adminer` services). Read by `docker-compose.yml` as `${VAR:-default}`, not by the app; an unset var falls back to the same fixed port used before the vars existed. Every published host port belongs here — a literal one collides across projects.
 - **LLM**: Azure OpenAI + alternative provider keys (shared across all variants)
 
 Can be run standalone: `python -m project_initializer.env_generator fastapi --auth token --dest api/.env`
@@ -305,11 +305,13 @@ Non-supabase variants:
 | Service | Host port | Description |
 |---------|-----------|-------------|
 | `db` | `${DB_HOST_PORT:-5433}`:5432 | PostgreSQL 16 |
-| `adminer` | 8080:8080 | Database management UI |
+| `adminer` | `${ADMINER_HOST_PORT:-8080}`:8080 | Database management UI |
 | `api` | `${API_HOST_PORT:-8000}`:8000 | Backend with hot reload |
 | `frontend` | `${FRONTEND_HOST_PORT:-4200}`:80 | Angular + nginx (proxies `/api/` to backend) |
 
 Host ports are overridable via the generated `.env` (see the topology section in `env_generator.py`); unset vars fall back to the defaults above. Supabase variants omit `db` and `adminer` (Supabase hosts the database), and `--scope api` drops the `frontend` service.
+
+**Every published host port must stay parametrized, and no service may pin a `container_name`.** Both are global to the Docker daemon, so a literal makes a second scaffolded project fail to `docker compose up` — with `port is already allocated` or `container name is already in use`. Without `container_name`, Compose derives `<project>-<service>-1` from the project directory, which is unique per scaffold. `tests/test_docker_runtime_invariants.py` enforces both.
 
 ## Template Sync
 

@@ -83,6 +83,65 @@ def test_nestjs_baml_client_matches_generator_and_pin():
 
 
 @pytest.mark.unit
+def test_no_compose_file_hardcodes_container_names():
+    """No shipped compose may pin container_name — it collides across projects.
+
+    A fixed `container_name: app_db` is global to the Docker daemon, so a second
+    scaffolded project (or any unrelated project using the same name) fails to
+    start with "container name is already in use". Without it, compose derives
+    `<project>-<service>-1` from the directory, which is unique per project.
+    """
+    offenders = []
+    for compose in _TEMPLATES.rglob("docker-compose*.yml"):
+        for lineno, line in enumerate(
+            compose.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            if line.strip().startswith("container_name:"):
+                offenders.append(f"{compose.relative_to(_TEMPLATES)}:{lineno}")
+    assert offenders == [], (
+        "compose files pin container_name, which collides across projects:\n"
+        + "\n".join(offenders)
+    )
+
+
+@pytest.mark.unit
+def test_every_published_host_port_is_parametrized():
+    """Published host ports must come from a ${VAR:-default}, never a literal.
+
+    A fixed host port is as much a cross-project collision as a fixed container
+    name: the second `docker compose up` dies with "port is already allocated".
+    Adminer shipped a literal `8080:8080` while every other service was already
+    parametrized, which is exactly how it slipped through.
+    """
+    offenders = []
+    for compose in _TEMPLATES.rglob("docker-compose*.yml"):
+        for lineno, line in enumerate(
+            compose.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            stripped = line.strip()
+            # A ports entry looks like: - "<host>:<container>"
+            if not stripped.startswith("- \""):
+                continue
+            if ":" not in stripped:
+                continue
+            host_side = stripped.split('"')[1].split(":")[0]
+            if "${" not in host_side:
+                offenders.append(f"{compose.relative_to(_TEMPLATES)}:{lineno} -> {stripped}")
+    assert offenders == [], (
+        "compose files publish literal host ports, which collide across projects:\n"
+        + "\n".join(offenders)
+    )
+
+
+@pytest.mark.unit
+def test_generated_frontend_compose_has_no_container_name():
+    """The synthesised frontend-only compose must not pin container_name either."""
+    from project_initializer.file_transforms import generate_frontend_compose
+
+    assert "container_name:" not in generate_frontend_compose()
+
+
+@pytest.mark.unit
 def test_frontend_healthcheck_targets_ipv4():
     """The frontend HEALTHCHECK must not use localhost — nginx is IPv4-only."""
     dockerfile = _FRONTEND_DOCKERFILE.read_text(encoding="utf-8")

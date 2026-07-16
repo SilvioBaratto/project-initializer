@@ -87,7 +87,6 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: app_frontend
     ports:
       - "${FRONTEND_HOST_PORT:-4200}:80"
     networks:

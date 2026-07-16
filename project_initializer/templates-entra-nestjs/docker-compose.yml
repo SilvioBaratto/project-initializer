@@ -2,7 +2,6 @@ services:
   # PostgreSQL Database
   db:
     image: postgres:16-alpine
-    container_name: app_db
     environment:
       POSTGRES_DB: app_db
       POSTGRES_USER: postgres
@@ -22,7 +21,6 @@ services:
   # Redis (BullMQ queue backend)
   redis:
     image: redis:7-alpine
-    container_name: app_redis
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -37,7 +35,6 @@ services:
       context: ./api
       dockerfile: Dockerfile
       target: dev
-    container_name: app_api
     depends_on:
       db:
         condition: service_healthy
@@ -72,7 +69,6 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: app_frontend
     depends_on:
       api:
         condition: service_healthy
@@ -84,14 +80,13 @@ services:
   # Database Admin UI
   adminer:
     image: adminer:latest
-    container_name: app_adminer
     restart: always
     depends_on:
       - db
     environment:
       ADMINER_DEFAULT_SERVER: db
     ports:
-      - "8080:8080"
+      - "${ADMINER_HOST_PORT:-8080}:8080"
     networks:
       - app_network
 

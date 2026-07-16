@@ -137,8 +137,10 @@ def _topology_section(val: _Lookup, *, is_supabase: bool, frontend: bool) -> lis
 
     Compose consumes these as ``${VAR:-default}``; an unset var falls back to
     the same fixed port used before the vars existed, so behaviour is unchanged
-    when the section is absent. ``DB_HOST_PORT`` is omitted for supabase variants
-    (they have no local ``db`` service).
+    when the section is absent. Every published host port is parametrized here:
+    a fixed one would make two scaffolded projects collide on `docker compose up`.
+    ``DB_HOST_PORT``/``ADMINER_HOST_PORT`` are omitted for supabase variants
+    (they have no local ``db``/``adminer`` services).
     """
     lines = [
         "",
@@ -149,6 +151,7 @@ def _topology_section(val: _Lookup, *, is_supabase: bool, frontend: bool) -> lis
         lines.append(f"FRONTEND_HOST_PORT={val('FRONTEND_HOST_PORT', '4200')}")
     if not is_supabase:
         lines.append(f"DB_HOST_PORT={val('DB_HOST_PORT', '5433')}")
+        lines.append(f"ADMINER_HOST_PORT={val('ADMINER_HOST_PORT', '8080')}")
     return lines
 
 

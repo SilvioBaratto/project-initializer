@@ -47,7 +47,6 @@ def test_when_supabase_compose_filtered_fullstack_it_is_unchanged():
 @pytest.mark.parametrize("framework", ["fastapi", "nestjs"])
 def test_when_api_scope_frontend_service_is_removed(framework):
     result = filter_compose(_api_compose(framework), "api")
-    assert "container_name: app_frontend" not in result
     assert "context: ./frontend" not in result
     assert "\n  frontend:\n" not in result
 
@@ -55,9 +54,9 @@ def test_when_api_scope_frontend_service_is_removed(framework):
 @pytest.mark.parametrize("framework", ["fastapi", "nestjs"])
 def test_when_api_scope_db_api_adminer_are_retained(framework):
     result = filter_compose(_api_compose(framework), "api")
-    assert "container_name: app_api" in result
-    assert "container_name: app_db" in result
-    assert "container_name: app_adminer" in result
+    assert "\n  api:\n" in result
+    assert "\n  db:\n" in result
+    assert "\n  adminer:\n" in result
 
 
 @pytest.mark.parametrize("framework", ["fastapi", "nestjs"])
@@ -71,9 +70,10 @@ def test_when_api_scope_top_level_sections_are_kept(framework):
 @pytest.mark.parametrize("framework", ["fastapi", "nestjs"])
 def test_when_supabase_api_scope_only_api_service_remains(framework):
     result = filter_compose(_supabase_compose(framework), "api")
-    assert "container_name: app_frontend" not in result
-    assert "container_name: app_api" in result
-    assert "container_name: app_db" not in result
+    assert "\n  frontend:\n" not in result
+    assert "\n  api:\n" in result
+    # Supabase hosts the database, so these overlays ship no local db service.
+    assert "\n  db:\n" not in result
 
 
 def test_when_api_scope_no_dangling_frontend_anywhere():
@@ -87,8 +87,8 @@ def test_when_api_scope_no_dangling_frontend_anywhere():
 def test_when_frontend_compose_generated_it_has_only_frontend_service():
     text = generate_frontend_compose()
     assert "  frontend:" in text
-    assert "container_name: app_db" not in text
-    assert "container_name: app_api" not in text
+    assert "\n  db:\n" not in text
+    assert "\n  api:\n" not in text
 
 
 def test_when_frontend_compose_generated_it_exposes_port_and_network():
@@ -109,22 +109,22 @@ def test_when_frontend_compose_generated_it_has_no_depends_on():
 def test_when_api_scope_scaffolded_compose_has_no_frontend_service(tmp_path):
     copy_template(tmp_path, "app", auth=None, framework="fastapi", scope="api")
     compose = (tmp_path / "docker-compose.yml").read_text(encoding="utf-8")
-    assert "app_frontend" not in compose
-    assert "app_api" in compose
+    assert "\n  frontend:\n" not in compose
+    assert "\n  api:\n" in compose
 
 
 def test_when_supabase_api_scope_scaffolded_compose_is_api_only(tmp_path):
     copy_template(tmp_path, "app", auth="supabase", framework="fastapi", scope="api")
     compose = (tmp_path / "docker-compose.yml").read_text(encoding="utf-8")
-    assert "app_frontend" not in compose
-    assert "app_api" in compose
+    assert "\n  frontend:\n" not in compose
+    assert "\n  api:\n" in compose
 
 
 def test_when_frontend_scope_a_frontend_only_compose_is_generated(tmp_path):
     copy_template(tmp_path, "app", auth=None, framework="fastapi", scope="frontend")
     compose = (tmp_path / "docker-compose.yml").read_text(encoding="utf-8")
     assert "  frontend:" in compose
-    assert "app_api" not in compose
+    assert "\n  api:\n" not in compose
 
 
 def test_when_fullstack_scope_scaffolded_compose_is_byte_identical(tmp_path):
