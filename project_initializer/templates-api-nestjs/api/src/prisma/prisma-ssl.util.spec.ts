@@ -38,4 +38,38 @@ describe('deriveSslOption', () => {
     const url = 'postgresql://user:localhost-pw@aws-0-eu-west-1.pooler.supabase.com:6543/postgres';
     expect(deriveSslOption(url)).toEqual({ rejectUnauthorized: false });
   });
+
+  // The compose network case: the API reaches Postgres at the *service name*,
+  // not localhost, and postgres:16-alpine serves no TLS. Requiring TLS here
+  // fails every query with "The server does not support SSL connections", which
+  // surfaces as `database: down` in the readiness probe.
+  it('when host is the compose service name, no ssl is returned', () => {
+    const url = 'postgresql://postgres:postgres@db:5432/app_db?schema=public';
+    expect(deriveSslOption(url)).toBeUndefined();
+  });
+
+  it('when host is any other single-label hostname, no ssl is returned', () => {
+    const url = 'postgresql://postgres:postgres@postgres:5432/app_db';
+    expect(deriveSslOption(url)).toBeUndefined();
+  });
+
+  it('when sslmode is disable, no ssl is returned even for a remote host', () => {
+    const url = 'postgresql://user:pw@db.example.com:5432/postgres?sslmode=disable';
+    expect(deriveSslOption(url)).toBeUndefined();
+  });
+
+  it('when sslmode requires TLS, ssl is returned even for a single-label host', () => {
+    const url = 'postgresql://postgres:postgres@db:5432/app_db?sslmode=require';
+    expect(deriveSslOption(url)).toEqual({ rejectUnauthorized: false });
+  });
+
+  it('when sslmode is verify-full, ssl is returned', () => {
+    const url = 'postgresql://user:pw@db.example.com:5432/postgres?sslmode=verify-full';
+    expect(deriveSslOption(url)).toEqual({ rejectUnauthorized: false });
+  });
+
+  it('when a non-loopback IPv6 literal is used, ssl is returned', () => {
+    const url = 'postgresql://user:pw@[2001:db8::1]:5432/postgres';
+    expect(deriveSslOption(url)).toEqual({ rejectUnauthorized: false });
+  });
 });

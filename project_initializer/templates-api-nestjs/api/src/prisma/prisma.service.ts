@@ -31,7 +31,13 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     try {
       await this.$queryRaw`SELECT 1`;
       return true;
-    } catch {
+    } catch (error) {
+      // Log before swallowing: this only reports up as `database: down` in the
+      // readiness probe, so without the reason a failure here is undiagnosable
+      // from the outside. The driver error carries no credentials.
+      this.logger.error(
+        `Database health check failed: ${(error as Error).message}`,
+      );
       return false;
     }
   }
