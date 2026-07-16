@@ -43,23 +43,19 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    # env_file feeds the container the whole root .env (LLM/BAML keys, etc.).
-    # The environment: block below is applied AFTER env_file and overrides it —
-    # it pins DATABASE_URL/DIRECT_URL/REDIS_HOST to the compose-network hosts
-    # (db, redis), not the localhost values the app uses outside Docker.
+    # env_file feeds the container the whole root .env (NODE_ENV, PORT,
+    # LOG_LEVEL, CORS_ORIGINS, LLM/BAML keys, ...). The environment: block is
+    # applied AFTER env_file and overrides ONLY the values that must point at
+    # compose-network hosts (db, redis) instead of the localhost values the app
+    # uses outside Docker. Everything else must come from .env, not be hardcoded.
     env_file:
       - .env
     environment:
-      NODE_ENV: development
       DATABASE_URL: "postgresql://postgres:postgres@db:5432/app_db?schema=public"
       DIRECT_URL: "postgresql://postgres:postgres@db:5432/app_db?schema=public"
       DATABASE_HOST: db
       DATABASE_PORT: 5432
       REDIS_HOST: redis
-      REDIS_PORT: 6379
-      PORT: 8000
-      CORS_ORIGINS: "http://localhost,http://localhost:4200,http://localhost:80"
-      LOG_LEVEL: info
     ports:
       - "${API_HOST_PORT:-8000}:8000"
     volumes:
