@@ -1,4 +1,8 @@
 """FastAPI application factory for FastAPI Template"""
+# ruff: noqa: E402 — load_configuration() MUST run before the imports that
+# instantiate Settings (see the comment on the call below), so those imports
+# intentionally sit after a statement. This is the documented app-factory order,
+# not a lint slip.
 
 import logging
 from contextlib import asynccontextmanager
