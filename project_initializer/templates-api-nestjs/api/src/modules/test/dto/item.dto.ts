@@ -16,6 +16,16 @@ export const ItemResponseSchema = z.object({
   updated_at: z.string(),
 });
 
+/**
+ * List responses need their own schema: `ZodSerializerDto` parses the handler's
+ * return value with the DTO's schema as-is, and `ItemResponseSchema` is an
+ * object — handing it an array fails with "expected object, received array" and
+ * the request 500s. Wrapping in `z.array` still strips unknown fields from every
+ * element, so the response whitelist holds.
+ */
+export const ItemListResponseSchema = z.array(ItemResponseSchema);
+
 export class CreateItemDto extends createZodDto(CreateItemSchema) {}
 export class UpdateItemDto extends createZodDto(UpdateItemSchema) {}
 export class ItemResponseDto extends createZodDto(ItemResponseSchema) {}
+export class ItemListResponseDto extends createZodDto(ItemListResponseSchema) {}

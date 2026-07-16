@@ -12,7 +12,12 @@ import {
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ZodSerializerDto } from 'nestjs-zod';
 import { TestService } from './test.service';
-import { CreateItemDto, UpdateItemDto, ItemResponseDto } from './dto/item.dto';
+import {
+  CreateItemDto,
+  UpdateItemDto,
+  ItemResponseDto,
+  ItemListResponseDto,
+} from './dto/item.dto';
 import { EchoRequestDto, EchoResponseDto } from './dto/echo.dto';
 
 @ApiTags('Test')
@@ -41,7 +46,7 @@ export class TestController {
   }
 
   @Get('items')
-  @ZodSerializerDto(ItemResponseDto)
+  @ZodSerializerDto(ItemListResponseDto)
   @ApiOperation({ summary: 'List all items' })
   findAll(): ItemResponseDto[] {
     return this.testService.findAll();

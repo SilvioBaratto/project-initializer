@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **NestJS `GET /api/v1/test/items` always returned 500.** The handler returns an array but was decorated `@ZodSerializerDto(ItemResponseDto)`, whose schema is a single `z.object` — so the serializer rejected the response with "expected object, received array" before looking at any element, failing even for an empty list. List responses now use their own `ItemListResponseDto` (`z.array(ItemResponseSchema)`), which still strips unknown fields from every element, so the response whitelist is unchanged. The shipped `serialization.spec.ts` now covers the list path it previously missed.
+
 ## [0.3.8] - 2026-07-16
 
 Every NestJS variant is now usable in Docker. Three chained bugs each hid the next: the API image would not build, so nothing reached the database; once it built, no migration existed so the database stayed empty; once the tables existed, every query still failed on TLS.
