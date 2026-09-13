@@ -18,13 +18,16 @@ Skipped (not runtime-verifiable):
   SOLID / clean-code prose
 
 Design note: these tests scaffold a frontend-only project and inspect the generated
-FormField component template/TS. They FAIL today (Red) because the FormField
-component's label-control wiring is not yet correctly implemented. They will PASS
-once the FormField sets [for] on its label, and wires aria-invalid / aria-describedby
-to the projected control.
+FormField component (.html + .ts + .css). The contract has two paths:
+  - A projected <app-input> / <app-select> injects FORM_FIELD_CONTEXT (provided by the
+    form field) and renders the label, hint and error in its own Material form field
+    with the context's controlId / helpId / errorId; Material owns the ARIA wiring.
+  - A projected native control gets the form field's own <label [for]>, help / error
+    text, and aria-invalid / aria-describedby set from form-field.ts, because projected
+    content can't take bindings from the form field's template.
 
 Path of the generated component (relative to scaffolded root):
-  frontend/src/app/shared/ui/form-field/form-field.ts
+  frontend/src/app/shared/ui/form-field/form-field.{html,ts,css}
 """
 
 import subprocess
@@ -47,14 +50,20 @@ FORM_FIELD_DIR = Path("frontend/src/app/shared/ui/form-field")
 
 def _read_template(root: Path) -> str:
     """
-    Return the template content for the FormField component.
-    Prefers a separate .html file; falls back to the inline template in .ts.
+    Return the FormField component sources: form-field .html + .ts + .css.
+
+    The template lives in form-field.html, while the ARIA wiring for a projected
+    native control lives in form-field.ts, so template-level checks read the three
+    files together (specs excluded).
     """
-    html_path = root / FORM_FIELD_DIR / "form-field.html"
-    if html_path.exists():
-        return html_path.read_text(encoding="utf-8")
-    ts_path = root / FORM_FIELD_DIR / "form-field.ts"
-    return ts_path.read_text(encoding="utf-8")
+    folder = root / FORM_FIELD_DIR
+    parts = [
+        path
+        for suffix in (".html", ".ts", ".css")
+        for path in sorted(folder.glob(f"*{suffix}"))
+        if ".spec." not in path.name
+    ]
+    return "\n".join(path.read_text(encoding="utf-8") for path in parts)
 
 
 def _read_ts(root: Path) -> str:
@@ -162,10 +171,10 @@ class TestLabelForBinding:
     ) -> None:
         """
         Criterion: 'label.htmlFor === control.id'.
-        The TypeScript must write the generated id to the projected control so that
-        label.htmlFor === control.id holds at runtime.
-        Assumption: FormField uses ContentChild / ElementRef / a directive to set
-        the `id` attribute on the projected control element.
+        The TypeScript must get the generated id onto the projected control so that
+        label.htmlFor === control.id holds at runtime: a native control receives it
+        through ElementRef, and <app-input> / <app-select> read `controlId` from
+        FORM_FIELD_CONTEXT.
         """
         content = _read_ts(scaffolded)
         has_id_projection = any(
@@ -192,15 +201,16 @@ class TestLabelForBinding:
 
 
 class TestAriaInvalidOwnership:
-    """FormField is the sole owner of aria-invalid on the projected control."""
+    """aria-invalid has one owner per path: FormField for a projected native control,
+    and the Material control (driven by the context's errorText) for app-input/app-select."""
 
     def test_when_form_field_template_is_generated_then_aria_invalid_binding_is_present(
         self, scaffolded: Path
     ) -> None:
         """
         Criterion: 'aria-invalid has a single, unambiguous owner'.
-        The template must contain an aria-invalid binding that FormField controls,
-        so the projected control reflects the FormField's error state.
+        The FormField sources must set aria-invalid on a projected native control,
+        so the control reflects the FormField's error state.
         """
         content = _read_template(scaffolded)
         assert "aria-invalid" in content, (
@@ -338,6 +348,31 @@ class TestAriaDescribedBy:
             "(e.g. @if (errorText())). aria-describedby should only point to an "
             "element that is actually in the DOM."
         )
+
+
+class TestFormFieldContextProvision:
+    """Projected Material controls get the label, ids and texts from FORM_FIELD_CONTEXT."""
+
+    def test_when_form_field_ts_is_generated_then_form_field_context_is_provided(
+        self, scaffolded: Path
+    ) -> None:
+        """
+        Criterion: 'label.htmlFor === control.id … for <app-input>/<app-select>'.
+        Material's form field lives inside those controls, so FormField must provide
+        FORM_FIELD_CONTEXT (label / helpText / errorText signals plus controlId, helpId
+        and errorId) from its component providers, where projected controls inject it.
+        """
+        ts = _read_ts(scaffolded)
+        assert "provide: FORM_FIELD_CONTEXT" in ts, (
+            "form-field.ts must provide FORM_FIELD_CONTEXT to projected controls"
+        )
+        contract = (scaffolded / FORM_FIELD_DIR / "form-field-context.ts").read_text(
+            encoding="utf-8"
+        )
+        for member in ("label", "helpText", "errorText", "controlId", "helpId", "errorId"):
+            assert f"readonly {member}:" in contract, (
+                f"FormFieldContext must declare {member}"
+            )
 
 
 # ===========================================================================

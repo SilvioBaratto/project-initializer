@@ -1,0 +1,9 @@
+// Global overlay-panel styles owned by shared/ui/slide-over.
+// Material renders this panel in the body-level .cdk-overlay-container, so the
+// component's own slide-over.css cannot reach it (Angular Material gotcha: overlay panels).
+// Select the panelClass the component passes to Material; tokens only, no literals.
+//
+// Intentionally empty: app-slide-over composes app-drawer, so its pane carries the
+// `app-drawer-panel` panelClass and is styled by _drawer.scss (M3 modal side sheet, at most
+// 400px wide, full block size, trailing-edge slide). Add rules here only for a look that
+// must differ from the drawer's.

@@ -1,6 +1,126 @@
-.login-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
+/*
+ * Microsoft Entra ID sign-in view: a full routed view outside the app shell with one centered pane.
+ *   compact (< 600px): the card fills the width inside 16px margins.
+ *   medium and up (>= 600px): 24px margins; the card caps at 400px and centers.
+ * Colors, type and shape come from --mat-sys-* tokens, mostly through Material's outlined card
+ * and filled button. The button keeps its 48px touch target at density 0, so nothing here
+ * shrinks it.
+ */
+:host {
+  display: block;
+}
+
+/*
+ * Grid items stretch to the inline size, so the card fills the width at compact. Safe-area
+ * insets are physical edges, so the side padding uses left/right rather than logical sides.
+ */
+.login {
+  box-sizing: border-box;
+  display: grid;
+  align-content: center;
+  min-block-size: 100vh;
+  min-block-size: 100dvh;
+  padding-block: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-bottom));
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+  background-color: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+}
+
+/* The page title uses headline-small; the subtitle is body text in on-surface-variant. */
+.login-card {
+  --mat-card-title-text-font: var(--mat-sys-headline-small-font);
+  --mat-card-title-text-line-height: var(--mat-sys-headline-small-line-height);
+  --mat-card-title-text-size: var(--mat-sys-headline-small-size);
+  --mat-card-title-text-tracking: var(--mat-sys-headline-small-tracking);
+  --mat-card-title-text-weight: var(--mat-sys-headline-small-weight);
+  --mat-card-subtitle-text-color: var(--mat-sys-on-surface-variant);
+  --mat-card-subtitle-text-font: var(--mat-sys-body-medium-font);
+  --mat-card-subtitle-text-line-height: var(--mat-sys-body-medium-line-height);
+  --mat-card-subtitle-text-size: var(--mat-sys-body-medium-size);
+  --mat-card-subtitle-text-tracking: var(--mat-sys-body-medium-tracking);
+  --mat-card-subtitle-text-weight: var(--mat-sys-body-medium-weight);
+}
+
+/* Three classes outrank Material's own card padding rules, which include :last-child variants. */
+.login .login-card .login-header {
+  padding: 24px 24px 0;
+}
+
+.login-header [matCardSubtitle] {
+  margin-block-start: 4px;
+}
+
+.login .login-card .login-content {
+  padding: 24px;
+}
+
+/* Error summary: the error container role with its on-container text. */
+.login-error {
+  margin-block: 0 16px;
+  margin-inline: 0;
+  padding-block: 12px;
+  padding-inline: 16px;
+  border-radius: var(--mat-sys-corner-medium);
+  background-color: var(--mat-sys-error-container);
+  color: var(--mat-sys-on-error-container);
+  font: var(--mat-sys-body-medium);
+  letter-spacing: var(--mat-sys-body-medium-tracking);
+}
+
+.login-submit {
+  inline-size: 100%;
+}
+
+/*
+ * The logo and the spinner share the button's leading icon slot. Material's icon offset, spacing
+ * and stacking target .mat-icon only, so repeat them here: the icon sits above the state layer,
+ * like the label, instead of being tinted by it.
+ */
+.login-button-icon {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  margin-inline: var(--mat-button-filled-icon-offset, -8px) var(--mat-button-filled-icon-spacing, 8px);
+}
+
+/*
+ * Microsoft shows its logo only on a light or dark neutral button, and its fixed colors vanish on
+ * the primary container (yellow is 1.01:1 on dark-scheme primary). So the 18px mark sits on a
+ * neutral 24px tile inside the filled button: white in the light scheme, near black in the dark.
+ */
+.login-logo {
+  display: block;
+  box-sizing: content-box;
+  inline-size: 18px;
+  block-size: 18px;
+  padding: 3px;
+  border-radius: var(--mat-sys-corner-extra-small);
+  background-color: var(--mat-sys-surface-container-lowest);
+}
+
+/*
+ * The spinner stroke follows the label color, which is the disabled label color while loading.
+ * Material sizes the spinner's layers to its padding box, so the tile's 24px footprint comes from
+ * 3px wider margins instead of padding; the label doesn't shift when the spinner swaps in.
+ */
+.login-spinner {
+  --mat-progress-spinner-active-indicator-color: currentColor;
+  min-inline-size: 18px;
+  margin-inline: calc(var(--mat-button-filled-icon-offset, -8px) + 3px)
+    calc(var(--mat-button-filled-icon-spacing, 8px) + 3px);
+}
+
+@media (min-width: 600px) {
+  .login {
+    padding-left: max(24px, env(safe-area-inset-left));
+    padding-right: max(24px, env(safe-area-inset-right));
+  }
+
+  /* Auto margins stop the grid stretch, so the width is set explicitly and capped. */
+  .login-card {
+    inline-size: 100%;
+    max-inline-size: 400px;
+    margin-inline: auto;
+  }
 }

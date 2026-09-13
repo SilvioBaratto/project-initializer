@@ -1,0 +1,118 @@
+/*
+ * M3 navigation bar (compact window size class). Angular Material has no navigation bar,
+ * so the bar is built on --mat-sys-* tokens, following the M3 navigation bar component spec
+ * (m3.material.io):
+ * - surface-container container, on-surface-variant content
+ * - 56x32 active indicator in secondary-container, fully rounded
+ * - label-medium labels that always stay visible
+ * - hover and focus state layers from the system opacity tokens, a matRipple for pressed
+ * - a focus ring outside the indicator, with a gap
+ *
+ * Block size: at least 64px + env(safe-area-inset-bottom). The bar pads itself by the insets
+ * inside its border box, and larger text grows the bar instead of clipping its labels.
+ * bottom-tab-bar.ts publishes the rendered block size as --app-nav-bar-block-size on <html>,
+ * which styles/overlays/_toast.scss lifts compact snackbars by.
+ */
+:host {
+  display: block;
+}
+
+.nav-bar {
+  box-sizing: border-box;
+  display: flex;
+  align-items: stretch;
+  min-block-size: calc(64px + env(safe-area-inset-bottom));
+  /* Physical on purpose: safe-area insets are physical edges, whatever the text direction. */
+  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  background-color: var(--mat-sys-surface-container);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.nav-bar-item {
+  flex: 1 1 0;
+  /* Each destination is at least a 48x48 target; the bar gives it the full 64px height. */
+  min-inline-size: 48px;
+  min-block-size: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding-block: 6px;
+  padding-inline: 4px;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-label-medium);
+  letter-spacing: var(--mat-sys-label-medium-tracking);
+  text-align: center;
+  text-decoration: none;
+  /* The focus ring is drawn on the indicator instead (see :focus-visible below). */
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.nav-bar-indicator {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
+  inline-size: 56px;
+  block-size: 32px;
+  border-radius: var(--mat-sys-corner-full);
+  overflow: hidden;
+}
+
+/* State layer in the content color; only one state shows at a time. */
+.nav-bar-indicator::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background-color: currentColor;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms linear;
+}
+
+@media (hover: hover) {
+  .nav-bar-item:hover .nav-bar-indicator::before {
+    opacity: var(--mat-sys-hover-state-layer-opacity);
+  }
+}
+
+.nav-bar-item:focus-visible .nav-bar-indicator::before {
+  opacity: var(--mat-sys-focus-state-layer-opacity);
+}
+
+/* Same ring as mat.strong-focus-indicators(): outside the indicator, with a gap. */
+.nav-bar-item:focus-visible .nav-bar-indicator {
+  outline: var(--mat-focus-indicator-border-width, 3px) solid
+    var(--mat-focus-indicator-border-color, var(--mat-sys-secondary));
+  outline-offset: 2px;
+}
+
+.nav-bar-icon {
+  /* Grid host: the 24px svg leaves no inline baseline gap. */
+  display: grid;
+}
+
+/* Enlarged text wraps at a hyphenation point first (index.html sets lang), mid-word only as a last resort. */
+.nav-bar-label {
+  max-inline-size: 100%;
+  hyphens: auto;
+  overflow-wrap: anywhere;
+}
+
+/* Current destination: filled indicator, secondary label (5.51:1 light, 9.63:1 dark on surface-container). */
+.nav-bar-item-active {
+  color: var(--mat-sys-secondary);
+}
+
+.nav-bar-item-active .nav-bar-indicator {
+  background-color: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+}
+
+.nav-bar-item-active .nav-bar-label {
+  font-weight: var(--mat-sys-label-medium-weight-prominent, var(--mat-sys-label-large-weight));
+}

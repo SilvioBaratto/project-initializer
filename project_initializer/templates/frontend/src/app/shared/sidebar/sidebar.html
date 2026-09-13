@@ -1,55 +1,135 @@
-<app-drawer [side]="'left'" [open]="showSidebar()" drawerId="sidebar-drawer" [trapFocus]="isMobile()" (close)="closeSidebar.emit()">
-
-  <!-- Brand (desktop) -->
-  <div class="hidden md:flex items-center h-14 px-5 border-b border-border">
-    <span class="text-base font-display font-semibold tracking-tight text-text">Acme</span>
-  </div>
-
-  <!-- Brand + mobile close -->
-  <div class="flex items-center justify-between h-14 px-4 border-b border-border md:hidden">
-    <span class="text-base font-display font-semibold tracking-tight text-text">Acme</span>
-    <button (click)="closeSidebar.emit()" class="p-1.5 rounded-md text-text-secondary hover:text-text hover:bg-surface-inset transition-colors" aria-label="Close menu">
-      <lucide-icon name="X" class="w-4 h-4" aria-hidden="true" />
-    </button>
-  </div>
-
-  <!-- Navigation -->
-  <nav class="flex-1 px-3 py-3">
-    @for (item of navItems; track item.route) {
-      <a [routerLink]="item.route"
-         routerLinkActive="bg-primary-light text-primary font-medium"
-         ariaCurrentWhenActive="page"
-         [routerLinkActiveOptions]="{ exact: item.route === '/home' }"
-         class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm text-text-secondary hover:text-text hover:bg-surface-inset transition-colors mb-0.5"
-         (click)="onNavClick()">
-        <lucide-icon [name]="item.icon" class="w-4 h-4 shrink-0" aria-hidden="true" />
-        <span>{{ item.name }}</span>
-      </a>
+<div class="sidebar" [class.sidebar-collapsed]="collapsed()">
+  @if (showDestinations()) {
+    @if (collapsed()) {
+      <!-- Collapsed rail: custom icon-over-label items (Angular Material has no rail). -->
+      <nav class="rail-nav" aria-label="Primary">
+        @for (item of navItems; track item.route) {
+          <a
+            #link
+            class="rail-item"
+            [routerLink]="item.route"
+            routerLinkActive="rail-item-active"
+            ariaCurrentWhenActive="page"
+            (click)="onNavClick()"
+          >
+            <span class="rail-indicator" matRipple [matRippleTrigger]="link">
+              <lucide-icon class="rail-icon" [name]="item.icon" aria-hidden="true" />
+            </span>
+            <span class="rail-label">{{ item.name }}</span>
+          </a>
+        }
+      </nav>
+    } @else {
+      <!-- Expanded rail: mat-nav-list renders role="navigation" itself, so it takes the label. -->
+      <mat-nav-list class="sidebar-list" aria-label="Primary">
+        @for (item of navItems; track item.route) {
+          <a
+            mat-list-item
+            [routerLink]="item.route"
+            routerLinkActive
+            #rla="routerLinkActive"
+            [activated]="rla.isActive"
+            (click)="onNavClick()"
+          >
+            <lucide-icon matListItemIcon class="sidebar-icon" [name]="item.icon" aria-hidden="true" />
+            <span matListItemTitle>{{ item.name }}</span>
+          </a>
+        }
+      </mat-nav-list>
     }
-  </nav>
+  }
 
-  <!-- Footer -->
-  <footer class="mt-auto flex flex-col gap-1 border-t border-border p-3">
-    <button (click)="toggleTheme()" aria-label="Toggle theme"
-            class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm text-text-secondary hover:text-text hover:bg-surface-inset transition-colors">
-      @switch (theme()) {
-        @case ('light') { <lucide-icon name="Sun" class="w-4 h-4 shrink-0" aria-hidden="true" /> }
-        @case ('dark') { <lucide-icon name="Moon" class="w-4 h-4 shrink-0" aria-hidden="true" /> }
-        @default { <lucide-icon name="Monitor" class="w-4 h-4 shrink-0" aria-hidden="true" /> }
-      }
-      <span class="capitalize">{{ theme() }}</span>
-    </button>
-
-    <div class="flex items-center justify-between gap-2.5 px-2.5 py-1.5">
-      <div class="flex items-center gap-2.5 min-w-0">
-        <lucide-icon name="User" class="w-4 h-4 shrink-0 text-text-secondary" aria-hidden="true" />
-        <span class="text-sm text-text truncate">User</span>
-      </div>
-      <button aria-label="Log out"
-              class="p-1.5 rounded-md text-text-secondary hover:text-text hover:bg-surface-inset transition-colors">
-        <lucide-icon name="LogOut" class="w-4 h-4" aria-hidden="true" />
+  <div class="sidebar-footer">
+    @if (collapsed()) {
+      <button
+        matIconButton
+        type="button"
+        class="sidebar-theme-toggle"
+        aria-label="Change theme"
+        matTooltip="Change theme"
+        matTooltipPosition="after"
+        [matMenuTriggerFor]="themeMenu"
+      >
+        <!-- One icon for the action in every mode: the menu, not the icon, shows the current choice. -->
+        <lucide-icon class="sidebar-icon" name="SunMoon" aria-hidden="true" />
       </button>
-    </div>
-  </footer>
+      @if (canSignOut()) {
+        <button
+          matIconButton
+          type="button"
+          class="sidebar-logout"
+          aria-label="Sign out"
+          matTooltip="Sign out"
+          matTooltipPosition="after"
+          (click)="onLogout()"
+        >
+          <lucide-icon class="sidebar-icon sidebar-icon-directional" name="LogOut" aria-hidden="true" />
+        </button>
+      }
+    } @else {
+      @if (accountName(); as name) {
+        <div class="sidebar-account">
+          <lucide-icon class="sidebar-icon" name="User" aria-hidden="true" />
+          <span class="sidebar-account-name">{{ name }}</span>
+        </div>
+      }
+      @if (modal()) {
+        <!-- Compact sheet: the choices sit inline, with a radio on the current one. -->
+        <h2 class="sidebar-subheader" id="sidebar-theme-heading">Theme</h2>
+        <mat-selection-list
+          class="sidebar-list sidebar-theme-options"
+          aria-labelledby="sidebar-theme-heading"
+          [multiple]="false"
+          (selectionChange)="setTheme($event.options[0].value)"
+        >
+          @for (option of themeOptions; track option.mode) {
+            <mat-list-option [value]="option.mode" [selected]="theme() === option.mode">
+              <lucide-icon matListItemIcon class="sidebar-icon" [name]="option.icon" aria-hidden="true" />
+              <span matListItemTitle>{{ option.label }}</span>
+            </mat-list-option>
+          }
+        </mat-selection-list>
+      }
+      @if (!modal() || canSignOut()) {
+        <mat-action-list class="sidebar-list">
+          @if (!modal()) {
+            <button mat-list-item type="button" class="sidebar-theme-toggle" [matMenuTriggerFor]="themeMenu">
+              <lucide-icon matListItemIcon class="sidebar-icon" name="SunMoon" aria-hidden="true" />
+              <span matListItemTitle>Change theme</span>
+              <!-- Points where the menu opens, so the row reads as a menu button rather than a destination. -->
+              <lucide-icon matListItemMeta class="sidebar-icon" name="ChevronUp" aria-hidden="true" />
+            </button>
+          }
+          @if (canSignOut()) {
+            <button mat-list-item type="button" class="sidebar-logout" (click)="onLogout()">
+              <lucide-icon matListItemIcon class="sidebar-icon sidebar-icon-directional" name="LogOut" aria-hidden="true" />
+              <span matListItemTitle>Sign out</span>
+            </button>
+          }
+        </mat-action-list>
+      }
+    }
+  </div>
+</div>
 
-</app-drawer>
+<!-- Theme menu of the docked rails: it opens upward from the footer, and the current mode is the checked radio item. -->
+<mat-menu #themeMenu="matMenu" class="sidebar-theme-menu" yPosition="above">
+  @for (option of themeOptions; track option.mode) {
+    <button
+      mat-menu-item
+      type="button"
+      role="menuitemradio"
+      [attr.aria-checked]="theme() === option.mode"
+      (click)="setTheme(option.mode)"
+    >
+      <!-- The current mode shows a check mark in place of its icon, as on the Settings page. -->
+      <lucide-icon
+        matMenuItemIcon
+        class="sidebar-menu-icon"
+        [name]="theme() === option.mode ? 'Check' : option.icon"
+        aria-hidden="true"
+      />
+      {{ option.label }}
+    </button>
+  }
+</mat-menu>

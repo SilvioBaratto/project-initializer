@@ -1,0 +1,16 @@
+/*
+ * One outlined container whose rows are the expansion panels. The panels' own shape and
+ * elevation tokens are flattened so they read as rows, and the host clips them to
+ * corner-medium. The clip follows the inside of the 1px border, so its radius is one pixel
+ * smaller; --ui-accordion-inner-corner hands that radius to the outer rows' focus ring and
+ * state layers (accordion-item.css).
+ */
+:host {
+  --mat-expansion-container-shape: 0;
+  --mat-expansion-container-elevation-shadow: none;
+  --ui-accordion-inner-corner: calc(var(--mat-sys-corner-medium) - 1px);
+  display: block;
+  overflow: hidden;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: var(--mat-sys-corner-medium);
+}

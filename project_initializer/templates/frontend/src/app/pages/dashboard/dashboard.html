@@ -1,27 +1,67 @@
-<div class="mx-auto max-w-5xl space-y-6 animate-fade-in-up">
-  <div>
-    <h1 class="text-2xl font-display font-semibold tracking-tight text-text">Dashboard</h1>
-    <p class="mt-1 text-sm text-text-secondary">An overview of your key metrics.</p>
-  </div>
+<!-- Page content is capped and centered inside the shell's <main>. -->
+<div class="dashboard">
+  <header class="dashboard-header">
+    <h1 class="dashboard-title">Dashboard</h1>
+    <p class="dashboard-supporting-text">An overview of your key metrics</p>
+  </header>
 
-  <!-- Metric grid -->
-  <section class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-    @for (metric of metrics; track metric.label) {
-      <div class="rounded-2xl border border-border bg-surface-raised p-5">
-        <p class="text-sm text-text-secondary">{{ metric.label }}</p>
-        <p class="mt-2 text-3xl font-display font-semibold text-text">{{ metric.value }}</p>
-        <p class="mt-1 text-xs text-text-tertiary">{{ metric.hint }}</p>
+  <section class="dashboard-section" aria-labelledby="dashboard-metrics-heading">
+    <h2 id="dashboard-metrics-heading" class="cdk-visually-hidden">Key metrics</h2>
+
+    <!--
+      The live region stays in the DOM and only its text changes, so screen readers announce the
+      loading state when it starts. It sits outside the busy container, which assistive technology
+      may skip while aria-busy is true, and says nothing while no request is running.
+    -->
+    <p class="cdk-visually-hidden" role="status">
+      @if (isLoading()) {
+        Loading metrics…
+      }
+    </p>
+
+    @if (isLoading()) {
+      <!-- Placeholder tiles hold the feed's layout while the request runs. app-skeleton is aria-hidden. -->
+      <div class="metric-feed" aria-busy="true">
+        @for (placeholder of placeholders; track placeholder) {
+          <mat-card class="metric-card">
+            <mat-card-content class="skeleton-stack">
+              <app-skeleton width="50%" />
+              <app-skeleton width="66%" height="40px" />
+              <app-skeleton width="75%" />
+            </mat-card-content>
+          </mat-card>
+        }
       </div>
+    } @else {
+      <!--
+        role="list": list-style none makes WebKit drop the implicit list semantics.
+        Values are numbers: the locale pipes add the grouping separator, currency symbol and percent sign.
+      -->
+      <ul class="metric-feed" role="list">
+        @for (metric of metrics; track metric.label) {
+          <li class="metric-feed-item">
+            <mat-card class="metric-card">
+              <mat-card-content>
+                <h3 class="metric-label">{{ metric.label }}</h3>
+                <p class="metric-value">
+                  @switch (metric.format) {
+                    @case ('currency') {
+                      {{ metric.value | currency: 'USD' : 'symbol' : '1.0-0' }}
+                    }
+                    @case ('percent') {
+                      {{ metric.value | percent: '1.1-1' }}
+                    }
+                    @default {
+                      {{ metric.value | number }}
+                    }
+                  }
+                </p>
+                <p class="metric-hint">{{ metric.hint }}</p>
+              </mat-card-content>
+            </mat-card>
+          </li>
+        }
+      </ul>
     }
-  </section>
-
-  <!-- Loading skeleton example -->
-  <section class="rounded-2xl border border-border bg-surface-raised p-5">
-    <p class="text-sm text-text-secondary mb-4">Loading example</p>
-    <div class="space-y-3">
-      <div class="h-4 w-2/3 rounded-md animate-shimmer"></div>
-      <div class="h-4 w-1/2 rounded-md animate-shimmer"></div>
-      <div class="h-4 w-3/4 rounded-md animate-shimmer"></div>
-    </div>
   </section>
 </div>

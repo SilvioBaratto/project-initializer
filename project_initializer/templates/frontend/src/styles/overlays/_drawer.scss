@@ -1,0 +1,60 @@
+// Global overlay-panel styles owned by shared/ui/drawer.
+// Material renders this panel in the body-level .cdk-overlay-container, so the
+// component's own drawer.css cannot reach it (Angular Material gotcha: overlay panels).
+// Select the panelClass the component passes to Material; tokens only, no literals.
+//
+// M3 modal side sheet on MatDialog: full block size, at most 400px wide (side sheets have a
+// default maximum width of 400dp, M3 layout/scaffold page line 202), surface-container-low at level 1,
+// large corners on the inner edge only. 56px of scrim stays tappable on narrow windows.
+// `--start` / `--end` are the leading / trailing edge. CDK writes the direction from the dialog
+// config as `dir` on .cdk-global-overlay-wrapper, the pane's parent, so the rules below key on
+// that host and never on an ancestor such as <html dir>.
+
+.cdk-overlay-pane.app-drawer-panel {
+  --mat-dialog-container-color: var(--mat-sys-surface-container-low);
+  --mat-dialog-container-elevation-shadow: var(--mat-sys-level1);
+  --mat-dialog-container-shape: 0;
+  --mat-dialog-container-min-width: 0;
+  --mat-dialog-container-max-width: 400px;
+  --mat-dialog-container-small-max-width: 400px;
+
+  inline-size: min(400px, calc(100vw - 56px));
+  block-size: 100vh;
+  block-size: 100dvh;
+}
+
+// Logical corners resolve from the host's dir, so they mirror under RTL on their own.
+.cdk-overlay-pane.app-drawer-panel--start .mat-mdc-dialog-surface {
+  border-start-end-radius: var(--mat-sys-corner-large);
+  border-end-end-radius: var(--mat-sys-corner-large);
+}
+
+.cdk-overlay-pane.app-drawer-panel--end .mat-mdc-dialog-surface {
+  border-start-start-radius: var(--mat-sys-corner-large);
+  border-end-start-radius: var(--mat-sys-corner-large);
+}
+
+// Physical-edge rules: env() safe-area insets are physical, and so is the slide direction.
+// The sheet pads the edge it is pinned to (index.html uses viewport-fit=cover, so a landscape
+// notch sits over that edge) and enters by sliding in from it instead of the dialog's scale-up.
+// Material's own transition timing and the global reduced-motion rule still apply.
+
+// Pinned to the physical left: leading edge in LTR, trailing edge in RTL.
+.cdk-global-overlay-wrapper:not([dir='rtl']) > .cdk-overlay-pane.app-drawer-panel--start .mat-mdc-dialog-surface,
+.cdk-global-overlay-wrapper[dir='rtl'] > .cdk-overlay-pane.app-drawer-panel--end .mat-mdc-dialog-surface {
+  padding-left: env(safe-area-inset-left);
+  transform: translateX(-100%);
+}
+
+// Pinned to the physical right: trailing edge in LTR, leading edge in RTL.
+.cdk-global-overlay-wrapper:not([dir='rtl']) > .cdk-overlay-pane.app-drawer-panel--end .mat-mdc-dialog-surface,
+.cdk-global-overlay-wrapper[dir='rtl'] > .cdk-overlay-pane.app-drawer-panel--start .mat-mdc-dialog-surface {
+  padding-right: env(safe-area-inset-right);
+  transform: translateX(100%);
+}
+
+// Kept last with the same specificity (0,5,0) as the edge rules above, so source order decides.
+.cdk-overlay-pane.app-drawer-panel .mat-mdc-dialog-container.mdc-dialog--open .mat-mdc-dialog-surface,
+.cdk-overlay-pane.app-drawer-panel .mat-mdc-dialog-container.mdc-dialog--closing .mat-mdc-dialog-surface {
+  transform: none;
+}

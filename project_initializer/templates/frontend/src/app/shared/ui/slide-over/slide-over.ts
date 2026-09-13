@@ -1,67 +1,63 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  ElementRef,
-  afterEveryRender,
-  computed,
-  inject,
   input,
+  model,
   output,
+  viewChild,
 } from '@angular/core';
-import { FocusTrapDirective } from '../focus-trap/focus-trap.directive';
+import { DrawerComponent, DrawerSide } from '../drawer/drawer';
 
-export type SlideOverSide = 'left' | 'right';
+/**
+ * Edge the panel opens from. `right` (the default) is the trailing edge and `left` the leading
+ * edge, so both mirror under RTL. Same values as `DrawerSide`.
+ */
+export type SlideOverSide = DrawerSide;
 
-const PANEL_BASE =
-  'fixed top-0 z-50 h-dvh w-80 max-w-full flex flex-col ' +
-  'bg-surface-raised dark:bg-surface-raised border-border dark:border-border shadow-xl pt-safe pb-safe';
-
-const SLIDE_CLASSES: Record<SlideOverSide, string> = {
-  left:  'left-0 animate-slide-in border-r',
-  right: 'right-0 border-l',
-};
-
-/** Inerts all body-level siblings of `host`'s top-level ancestor. */
-function setBodySiblingsInert(host: HTMLElement, inert: boolean): void {
-  let node: HTMLElement = host;
-  while (node.parentElement && node.parentElement !== document.body) {
-    node = node.parentElement;
-  }
-  if (node.parentElement !== document.body) return;
-  Array.from(document.body.children).forEach((sibling) => {
-    if (sibling === node) return;
-    inert ? sibling.setAttribute('inert', '') : sibling.removeAttribute('inert');
-  });
-}
-
+/**
+ * Modal side sheet (M3) at the trailing edge.
+ *
+ * A thin wrapper around `<app-drawer>`, which opens the projected content as a `MatDialog` side
+ * sheet: the scrim, the focus trap, Esc, focus restore to the trigger and hiding the rest of the
+ * page from assistive technology all come from there, and so do the pane styles
+ * (`src/styles/overlays/_drawer.scss`). The sheet header shows `label` as its `h2` headline, which
+ * also names the dialog, and a close icon button named "Close panel".
+ *
+ * Every user dismissal (Esc, scrim click, the close button, a route change) sets `open` to false
+ * and emits `closed`. Setting `open` to false from the parent closes the panel without emitting.
+ * Bind `[(open)]`, or `[open]` plus `(closed)` to clear the parent's own state.
+ *
+ * The trigger that opens the panel takes `aria-haspopup="dialog"`. It needs no `aria-expanded`:
+ * while the panel is open, MatDialog hides the trigger from assistive technology.
+ *
+ * The open panel renders the lucide `X` icon in its close button, so the injector needs a lucide
+ * icon provider that registers `X`: `ICON_PROVIDER` from `src/app/icons.ts`, which `app.config.ts`
+ * already provides. A TestBed that opens the panel must add `ICON_PROVIDER` to its providers,
+ * otherwise lucide-angular throws "The "X" icon has not been provided by any available icon
+ * providers."
+ */
 @Component({
   selector: 'app-slide-over',
-  templateUrl: './slide-over.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FocusTrapDirective],
-  host: { '(document:keydown)': 'onDocumentKeydown($event)' },
+  imports: [DrawerComponent],
+  templateUrl: './slide-over.html',
+  styleUrl: './slide-over.css',
 })
 export class SlideOverComponent {
-  readonly open = input(false);
+  readonly open = model(false);
   readonly side = input<SlideOverSide>('right');
-  readonly label = input('Panel');
+  /**
+   * Required. Visible `h2` headline of the panel, which also names the dialog. There is no default:
+   * a generic title such as "Panel" would not describe the content. Pass a specific, sentence-case
+   * title such as "Order details".
+   */
+  readonly label = input.required<string>();
   readonly closed = output<void>();
 
-  private readonly el = inject(ElementRef<HTMLElement>);
+  private readonly drawer = viewChild.required(DrawerComponent);
 
-  readonly allPanelClasses = computed(() => `${PANEL_BASE} ${SLIDE_CLASSES[this.side()]}`);
-
-  constructor() {
-    afterEveryRender(() => setBodySiblingsInert(this.el.nativeElement, this.open()));
-  }
-
+  /** Dismisses the panel as the user would: closes it, then sets `open` to false and emits `closed`. */
   handleClose(): void {
-    this.closed.emit();
-  }
-
-  onDocumentKeydown(event: KeyboardEvent): void {
-    if (this.open() && event.key === 'Escape' && !event.defaultPrevented) {
-      this.handleClose();
-    }
+    this.drawer().handleClose();
   }
 }

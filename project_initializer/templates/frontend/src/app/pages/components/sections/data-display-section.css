@@ -1,0 +1,29 @@
+/*
+ * Data display catalog section. Demo groups stack on the 8px grid, each with an h3 heading above
+ * its light and dark preview. The demos take color, type, shape and state layers from their own
+ * components (Material table, list, expansion panel, card and buttons), and each preview region
+ * (theme-preview.css) paints the surface, padding and frame around a copy, so the pagination's
+ * transparent buttons never sit on the page ground of the other scheme. This sheet lays the groups
+ * out and sets the heading type from --mat-sys-* roles.
+ */
+
+/* 32px between demo groups. */
+:host {
+  display: grid;
+  gap: 32px;
+}
+
+.demo-group {
+  display: grid;
+  gap: 12px;
+  /* Grid items default to min-width: auto; let the table and pagination shrink with the page. */
+  min-inline-size: 0;
+}
+
+/* h3 under the page's h2: the element follows the outline, the type role follows visual hierarchy. */
+.demo-heading {
+  margin: 0;
+  font: var(--mat-sys-title-medium);
+  letter-spacing: var(--mat-sys-title-medium-tracking);
+  color: var(--mat-sys-on-surface);
+}

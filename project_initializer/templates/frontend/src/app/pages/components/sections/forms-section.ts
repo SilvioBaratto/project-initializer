@@ -1,16 +1,34 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { ReactiveFormsModule } from '@angular/forms';
+import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { ButtonComponent } from '../../../shared/ui/button/button';
-import { InputComponent } from '../../../shared/ui/input/input';
-import { SelectComponent } from '../../../shared/ui/select/select';
-import { RadioComponent } from '../../../shared/ui/radio/radio';
 import { CheckboxComponent } from '../../../shared/ui/checkbox/checkbox';
 import { FormFieldComponent } from '../../../shared/ui/form-field/form-field';
+import { InputComponent } from '../../../shared/ui/input/input';
+import { RadioComponent } from '../../../shared/ui/radio/radio';
+import { SelectComponent, SelectOption } from '../../../shared/ui/select/select';
 import { StackComponent } from '../../../shared/ui/stack/stack';
 
 import { ThemePreviewComponent } from '../theme-preview';
 
+/** Keeps radio set names unique app-wide, even if the section is mounted more than once. */
+let nextSectionId = 0;
+
+/**
+ * Forms group of the /components catalog: button variants and states, the input and select inside
+ * a form field, and checkbox and radio controls, each under an h3 and previewed in a light and a
+ * dark region.
+ *
+ * The page owns the `h1` and the group's `h2`; this section adds one `h3` per demo group.
+ *
+ * `app-theme-preview` stamps each demo twice, and each copy keeps its own state. Material links
+ * radios with the same `name` across the whole app, and a `FormControl` bound to two controls does
+ * not sync a change made in one of them. So the size radios take a set name, and the status and
+ * country selects a form control, that belong to the root element of their stamped copy.
+ *
+ * The status select is required and starts empty. Its error comes from that validation, and only
+ * once the control is touched, so an untouched field never renders as invalid.
+ */
 @Component({
   selector: 'app-forms-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -25,56 +43,59 @@ import { ThemePreviewComponent } from '../theme-preview';
     CheckboxComponent,
     FormFieldComponent,
   ],
-  template: `
-    <app-theme-preview label="Button variants">
-      <ng-template>
-      <app-stack direction="row" [gap]="2" align="center" [wrap]="true">
-        <app-button variant="primary">Primary</app-button>
-        <app-button variant="secondary">Secondary</app-button>
-        <app-button variant="ghost">Ghost</app-button>
-        <app-button variant="danger">Danger</app-button>
-        <app-button [loading]="true">Loading</app-button>
-        <app-button [disabled]="true">Disabled</app-button>
-      </app-stack>
-      </ng-template>
-    </app-theme-preview>
-
-    <app-theme-preview label="Input / Select / Form field">
-      <ng-template>
-      <app-stack [gap]="3">
-        <app-form-field label="Name" helpText="Enter your full name">
-          <app-input />
-        </app-form-field>
-        <app-form-field label="Status" errorText="Required field">
-          <app-select [options]="statusOptions" />
-        </app-form-field>
-        <app-form-field label="Country">
-          <app-select [options]="countryOptions" />
-        </app-form-field>
-      </app-stack>
-      </ng-template>
-    </app-theme-preview>
-
-    <app-theme-preview label="Checkbox / Radio">
-      <ng-template>
-      <app-stack [gap]="2">
-        <app-checkbox label="Accept terms" />
-        <app-checkbox label="Subscribe to newsletter" [checked]="true" />
-        <app-radio name="size-demo" value="sm" label="Small" />
-        <app-radio name="size-demo" value="lg" label="Large" [checked]="true" />
-      </app-stack>
-      </ng-template>
-    </app-theme-preview>
-  `,
+  templateUrl: './forms-section.html',
+  styleUrl: './forms-section.css',
 })
 export class FormsSectionComponent {
-  readonly statusOptions = [
+  readonly statusOptions: SelectOption[] = [
     { value: 'active', label: 'Active' },
     { value: 'inactive', label: 'Inactive' },
   ];
 
-  readonly countryOptions = [
+  readonly countryOptions: SelectOption[] = [
     { value: 'us', label: 'United States' },
     { value: 'gb', label: 'United Kingdom' },
   ];
+
+  private readonly sectionId = `app-forms-section-${nextSectionId++}`;
+  private nextCopyId = 0;
+  private readonly sizeSetNames = new WeakMap<Element, string>();
+  private readonly statusControls = new WeakMap<Element, FormControl<string>>();
+  private readonly countryControls = new WeakMap<Element, FormControl<string>>();
+
+  /** Radio set name for one stamped copy of the size demo, keyed by that copy's fieldset. */
+  protected sizeSetName(copy: Element): string {
+    let name = this.sizeSetNames.get(copy);
+    if (name === undefined) {
+      name = `${this.sectionId}-size-${this.nextCopyId++}`;
+      this.sizeSetNames.set(copy, name);
+    }
+    return name;
+  }
+
+  /** Required status control for one stamped copy of the field demo. Starts empty. */
+  protected statusControl(copy: Element): FormControl<string> {
+    let control = this.statusControls.get(copy);
+    if (control === undefined) {
+      control = new FormControl('', { nonNullable: true, validators: Validators.required });
+      this.statusControls.set(copy, control);
+    }
+    return control;
+  }
+
+  /** Error for one copy's status field: shown once the control is touched and still empty. */
+  protected statusErrorText(copy: Element): string {
+    const control = this.statusControl(copy);
+    return control.touched && control.invalid ? 'Choose a status' : '';
+  }
+
+  /** Country control for one stamped copy of the field demo. Starts on United Kingdom. */
+  protected countryControl(copy: Element): FormControl<string> {
+    let control = this.countryControls.get(copy);
+    if (control === undefined) {
+      control = new FormControl('gb', { nonNullable: true });
+      this.countryControls.set(copy, control);
+    }
+    return control;
+  }
 }

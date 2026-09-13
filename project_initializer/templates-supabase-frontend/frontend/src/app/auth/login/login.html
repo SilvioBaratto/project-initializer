@@ -1,108 +1,190 @@
-<div class="min-h-screen bg-surface flex items-center justify-center px-4">
-  <div class="w-full max-w-sm">
-    <!-- Header -->
-    <div class="mb-8">
-      <h1 class="text-xl font-semibold tracking-tight text-text">
-        @if (mode() === 'login') { Sign in } @else { Create account }
-      </h1>
-      <p class="mt-1 text-sm text-text-secondary">
-        @if (mode() === 'login') {
-          Enter your credentials to continue.
-        } @else {
-          Fill in your details to get started.
-        }
-      </p>
-    </div>
+<main class="page">
+  <div class="pane">
+    <mat-card appearance="outlined" class="card">
+      <mat-card-header class="header">
+        <h1 matCardTitle>{{ mode() === 'login' ? 'Sign in' : 'Create account' }}</h1>
+        <p matCardSubtitle class="subtitle">
+          {{ mode() === 'login' ? 'Enter your email and password to continue' : 'Enter your email and choose a password' }}
+        </p>
+      </mat-card-header>
 
-    <!-- Form -->
-    <div class="border border-border rounded-lg p-6 bg-surface-raised">
-      <!-- Google OAuth -->
-      <button type="button" (click)="onGoogleLogin()" [disabled]="isLoading()"
-        class="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium border border-border rounded-md bg-surface-raised text-text hover:bg-surface disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-        <svg class="w-4 h-4" viewBox="0 0 24 24">
-          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
-          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-        </svg>
-        Sign in with Google
-      </button>
-
-      <div class="relative my-4">
-        <div class="absolute inset-0 flex items-center">
-          <div class="w-full border-t border-border"></div>
-        </div>
-        <div class="relative flex justify-center text-xs">
-          <span class="bg-surface-raised px-2 text-text-tertiary">or</span>
-        </div>
-      </div>
-
-      <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4">
-        <div>
-          <label for="email" class="block text-sm font-medium text-text mb-1.5">Email</label>
-          <input id="email" type="email" formControlName="email" placeholder="you@example.com"
-            class="w-full px-3 py-2 text-sm border border-border rounded-md bg-surface-raised text-text placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-zinc-300 transition-colors"
-            [class.border-danger]="errorMessage()"
-            autocomplete="email">
-        </div>
-
-        <div>
-          <label for="password" class="block text-sm font-medium text-text mb-1.5">Password</label>
-          <input id="password" type="password" formControlName="password" placeholder="Enter your password"
-            class="w-full px-3 py-2 text-sm border border-border rounded-md bg-surface-raised text-text placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-zinc-300 transition-colors"
-            [class.border-danger]="errorMessage()"
-            [autocomplete]="mode() === 'login' ? 'current-password' : 'new-password'">
-        </div>
-
-        @if (mode() === 'signup') {
-          <div>
-            <label for="confirmPassword" class="block text-sm font-medium text-text mb-1.5">Confirm Password</label>
-            <input id="confirmPassword" type="password" formControlName="confirmPassword" placeholder="Confirm your password"
-              class="w-full px-3 py-2 text-sm border border-border rounded-md bg-surface-raised text-text placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-zinc-300 transition-colors"
-              [class.border-danger]="errorMessage()"
-              autocomplete="new-password">
-          </div>
-        }
-
-        @if (errorMessage()) {
-          <p class="text-sm text-danger" aria-live="polite">{{ errorMessage() }}</p>
-        }
-
-        @if (successMessage()) {
-          <p class="text-sm text-green-600" aria-live="polite">{{ successMessage() }}</p>
-        }
-
-        @if (mode() === 'login') {
-          <div class="flex justify-end">
-            <a routerLink="/auth/forgot-password" class="text-xs text-text-secondary hover:text-text transition-colors">
-              Forgot password?
-            </a>
-          </div>
-        }
-
-        <button type="submit" [disabled]="form.controls.email.invalid || form.controls.password.invalid || isLoading()"
-          class="w-full px-3 py-2 text-sm font-medium text-white bg-accent hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed rounded-md transition-colors">
-          @if (isLoading()) {
-            <span class="flex items-center justify-center gap-2">
-              <span class="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-              @if (mode() === 'login') { Signing in... } @else { Creating account... }
-            </span>
+      <mat-card-content class="content">
+        <!--
+          disabledInteractive while any request runs: a natively disabled button drops keyboard
+          focus to <body>. Only the Google request marks this button busy.
+        -->
+        <button
+          matButton="outlined"
+          type="button"
+          class="full-width"
+          [disabled]="isLoading()"
+          [disabledInteractive]="isLoading()"
+          [attr.aria-busy]="pending() === 'google' || null"
+          (click)="onGoogleLogin()"
+        >
+          @if (pending() === 'google') {
+            <!-- MatProgressSpinner sets tabindex="-1" on its host; a <button> may not contain one. -->
+            <mat-progress-spinner
+              matButtonIcon
+              class="button-spinner"
+              mode="indeterminate"
+              [diameter]="18"
+              [attr.tabindex]="null"
+              aria-hidden="true"
+            />
           } @else {
-            @if (mode() === 'login') { Sign in } @else { Create account }
+            <!-- Google's multicolor "G" brand mark: its fills are fixed by Google's sign-in branding guidelines. -->
+            <svg
+              matButtonIcon
+              class="brand-mark"
+              viewBox="0 0 24 24"
+              width="18"
+              height="18"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+            </svg>
           }
+          <!-- Sign-up mode says "Continue", so "Create account" stays the only verb for creating one. -->
+          {{ mode() === 'login' ? 'Sign in with Google' : 'Continue with Google' }}
         </button>
-      </form>
-    </div>
 
-    <!-- Mode toggle -->
-    <p class="mt-6 text-xs text-text-tertiary text-center">
-      @if (mode() === 'login') {
-        Don't have an account?
-        <button type="button" (click)="toggleMode()" class="text-text-secondary hover:text-text font-medium transition-colors">Sign up</button>
-      } @else {
-        Already have an account?
-        <button type="button" (click)="toggleMode()" class="text-text-secondary hover:text-text font-medium transition-colors">Sign in</button>
-      }
+        <div class="divider">Or</div>
+
+        <form class="form" [formGroup]="form" (ngSubmit)="onSubmit()">
+          <mat-form-field appearance="outline" class="field">
+            <mat-label>Email</mat-label>
+            <input
+              #emailInput
+              matInput
+              type="email"
+              formControlName="email"
+              autocomplete="username"
+              inputmode="email"
+              autocapitalize="none"
+              spellcheck="false"
+            />
+            @if (form.controls.email.hasError('required')) {
+              <mat-error>Enter your email</mat-error>
+            } @else if (form.controls.email.hasError('email')) {
+              <mat-error>Enter an email address like name&#64;example.com</mat-error>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="field">
+            <mat-label>Password</mat-label>
+            <input
+              #passwordInput
+              matInput
+              type="password"
+              formControlName="password"
+              [attr.autocomplete]="mode() === 'login' ? 'current-password' : 'new-password'"
+            />
+            @if (mode() === 'signup') {
+              <mat-hint>Use at least {{ minPasswordLength }} characters</mat-hint>
+            }
+            @if (form.controls.password.hasError('required')) {
+              <mat-error>{{ mode() === 'login' ? 'Enter your password' : 'Enter a password' }}</mat-error>
+            } @else if (form.controls.password.hasError('minlength')) {
+              <mat-error>Enter at least {{ minPasswordLength }} characters</mat-error>
+            }
+          </mat-form-field>
+
+          @if (mode() === 'signup') {
+            <mat-form-field appearance="outline" class="field">
+              <mat-label>Confirm password</mat-label>
+              <input
+                #confirmPasswordInput
+                matInput
+                type="password"
+                formControlName="confirmPassword"
+                autocomplete="new-password"
+                [errorStateMatcher]="confirmPasswordErrorMatcher"
+              />
+              @if (form.controls.confirmPassword.hasError('required')) {
+                <mat-error>Enter the password again</mat-error>
+              } @else if (form.hasError('passwordMismatch')) {
+                <mat-error>Passwords don't match</mat-error>
+              }
+            </mat-form-field>
+          }
+
+          <!--
+            Live regions stay in the DOM so screen readers announce content added to them, and sit
+            outside any aria-busy element so assistive tech doesn't hold back their updates.
+          -->
+          <div class="live-region" role="alert">
+            @if (errorMessage()) {
+              <div class="message message-error">
+                <lucide-icon class="message-icon" name="CircleAlert" [size]="20" />
+                <p class="message-text">{{ errorMessage() }}</p>
+              </div>
+            }
+          </div>
+
+          <div class="live-region" role="status">
+            @if (successMessage()) {
+              <div class="message message-success">
+                <lucide-icon class="message-icon" name="CircleCheckBig" [size]="20" />
+                <p class="message-text">{{ successMessage() }}</p>
+              </div>
+            } @else if (pending() === 'google') {
+              <span class="cdk-visually-hidden">Opening Google sign-in…</span>
+            } @else if (pending() === 'email') {
+              <span class="cdk-visually-hidden">
+                {{ mode() === 'login' ? 'Signing in…' : 'Creating account…' }}
+              </span>
+            }
+          </div>
+
+          @if (mode() === 'login') {
+            <div class="reset-row">
+              <a matButton routerLink="/auth/forgot-password">Reset password</a>
+            </div>
+          }
+
+          <!--
+            Enabled while the form is invalid, so Enter and click reveal what's missing (a disabled
+            default button also blocks implicit submission). While busy it's disabled but stays
+            focusable (disabledInteractive renders aria-disabled instead of the native attribute,
+            which would drop keyboard focus to <body>); onSubmit ignores activation until the
+            request settles.
+          -->
+          <button
+            matButton="filled"
+            type="submit"
+            class="full-width submit"
+            [disabled]="isLoading()"
+            [disabledInteractive]="isLoading()"
+            [attr.aria-busy]="pending() === 'email' || null"
+          >
+            @if (pending() === 'email') {
+              <!-- MatProgressSpinner sets tabindex="-1" on its host; a <button> may not contain one. -->
+              <mat-progress-spinner
+                matButtonIcon
+                class="button-spinner"
+                mode="indeterminate"
+                [diameter]="18"
+                [attr.tabindex]="null"
+                aria-hidden="true"
+              />
+            }
+            {{ mode() === 'login' ? 'Sign in' : 'Create account' }}
+          </button>
+        </form>
+      </mat-card-content>
+    </mat-card>
+
+    <p class="switch">
+      <span>{{ mode() === 'login' ? "Don't have an account?" : 'Already have an account?' }}</span>
+      <!-- One element for both modes, so keyboard focus stays on it after switching. -->
+      <button matButton type="button" (click)="toggleMode()">
+        {{ mode() === 'login' ? 'Create account' : 'Sign in' }}
+      </button>
     </p>
   </div>
-</div>
+</main>

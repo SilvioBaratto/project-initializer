@@ -1,0 +1,67 @@
+/*
+ * Content of a Material 3 snackbar (MatSnackBar.openFromComponent).
+ * Material paints the container (inverse-surface), the text (inverse-on-surface), shape,
+ * body-medium type and the bottom-center placement. The container is an overlay outside
+ * this component, so its offset above the navigation bar lives in the global partial
+ * src/styles/overlays/_toast.scss.
+ */
+:host {
+  display: flex;
+  align-items: center;
+
+  /* The dismiss button follows the snackbar's inverse roles: icon, state layer, ripple and focus ring. */
+  --mat-icon-button-icon-color: var(--mat-sys-inverse-on-surface);
+  --mat-icon-button-state-layer-color: var(--mat-sys-inverse-on-surface);
+  --mat-icon-button-ripple-color: color-mix(
+    in srgb,
+    var(--mat-sys-inverse-on-surface) calc(var(--mat-sys-pressed-state-layer-opacity) * 100%),
+    transparent
+  );
+  --mat-focus-indicator-border-color: var(--mat-sys-inverse-primary);
+}
+
+.toast-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-inline-size: 0;
+  letter-spacing: var(--mat-sys-body-medium-tracking);
+}
+
+lucide-icon.toast-icon {
+  display: flex;
+  flex-shrink: 0;
+  /* 24px icon centred on the 20px first line keeps the 48px single-line snackbar. */
+  margin-block: -2px;
+}
+
+/*
+ * Status tint over the inverse surface. The container roles resolve to the status tone
+ * that contrasts with inverse-surface in each scheme (tone 90 on neutral 20, tone 30 on
+ * neutral 90). The icon shape and the visually hidden status label carry the meaning too.
+ */
+:host(.toast-info) lucide-icon.toast-icon {
+  color: var(--app-info-container);
+}
+
+:host(.toast-success) lucide-icon.toast-icon {
+  color: var(--app-success-container);
+}
+
+:host(.toast-warning) lucide-icon.toast-icon {
+  color: var(--app-warning-container);
+}
+
+:host(.toast-error) lucide-icon.toast-icon {
+  color: var(--mat-sys-error-container);
+}
+
+.toast-message {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+.toast-actions {
+  flex-shrink: 0;
+}

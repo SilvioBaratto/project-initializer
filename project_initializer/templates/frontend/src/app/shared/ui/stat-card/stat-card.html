@@ -1,0 +1,17 @@
+<app-card>
+  <div class="stat-card-layout">
+    <span class="stat-card-label">{{ label() }}</span>
+    <span class="stat-card-metric">{{ metric() }}</span>
+    @if (delta()) {
+      <span class="stat-card-delta" [attr.data-direction]="resolvedDirection()">
+        @if (deltaIcon(); as icon) {
+          <lucide-icon class="stat-card-delta-icon" [name]="icon" [size]="20" />
+        }
+        @if (deltaLabel(); as directionLabel) {
+          <span class="cdk-visually-hidden">{{ directionLabel }}&ngsp;</span>
+        }
+        <span class="stat-card-delta-value">{{ delta() }}</span>
+      </span>
+    }
+  </div>
+</app-card>

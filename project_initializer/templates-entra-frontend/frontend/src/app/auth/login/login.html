@@ -1,39 +1,68 @@
-<div class="min-h-screen bg-surface flex items-center justify-center px-4">
-  <div class="w-full max-w-sm">
-    <!-- Header -->
-    <div class="mb-8">
-      <h1 class="text-xl font-semibold tracking-tight text-text">Sign in</h1>
-      <p class="mt-1 text-sm text-text-secondary">Use your Microsoft account to continue.</p>
-    </div>
+<main class="login">
+  <mat-card class="login-card" appearance="outlined">
+    <mat-card-header class="login-header">
+      <h1 matCardTitle>Sign in</h1>
+      <p matCardSubtitle>Use your Microsoft account to continue</p>
+    </mat-card-header>
 
-    <!-- Card -->
-    <div class="border border-border rounded-lg p-6 bg-surface-raised">
+    <mat-card-content class="login-content">
       @if (errorMessage()) {
-        <p class="mb-4 text-sm text-danger" aria-live="polite">{{ errorMessage() }}</p>
+        <p class="login-error" role="alert">{{ errorMessage() }}</p>
       }
 
+      <!--
+        While the redirect starts, the button is disabled but stays focusable (disabledInteractive
+        renders aria-disabled instead of the native attribute, which would drop keyboard focus to
+        <body>). onMicrosoftLogin ignores activation until the attempt settles.
+      -->
       <button
+        class="login-submit"
+        matButton="filled"
         type="button"
-        (click)="onMicrosoftLogin()"
         [disabled]="isLoading()"
-        aria-label="Sign in with Microsoft"
-        class="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium border border-border rounded-md bg-surface-raised text-text hover:bg-surface disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-        <!-- Microsoft logo -->
-        <svg class="w-4 h-4" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
-          <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
-          <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
-          <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
-          <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
-        </svg>
+        [disabledInteractive]="isLoading()"
+        [attr.aria-busy]="isLoading() || null"
+        (click)="onMicrosoftLogin()"
+      >
         @if (isLoading()) {
-          <span class="flex items-center gap-2">
-            <span class="inline-block w-3.5 h-3.5 border-2 border-text/30 border-t-text rounded-full animate-spin"></span>
-            Signing in...
-          </span>
+          <!-- MatProgressSpinner sets tabindex="-1" on its host; a <button> may not contain one. -->
+          <mat-progress-spinner
+            matButtonIcon
+            class="login-button-icon login-spinner"
+            mode="indeterminate"
+            [diameter]="18"
+            [attr.tabindex]="null"
+            aria-hidden="true"
+          />
         } @else {
-          Sign in with Microsoft
+          <!--
+            Microsoft logo: a brand mark whose colors are fixed by Microsoft, so it stays untinted.
+            login.css puts it on a neutral tile, because the colors vanish on the primary container.
+          -->
+          <svg
+            matButtonIcon
+            class="login-button-icon login-logo"
+            viewBox="0 0 21 21"
+            width="18"
+            height="18"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+            <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+            <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+            <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+          </svg>
         }
+        Sign in with Microsoft
       </button>
-    </div>
-  </div>
-</div>
+
+      <!-- Outside the aria-busy button so the in-progress status is announced. -->
+      <p class="cdk-visually-hidden" role="status">
+        @if (isLoading()) {
+          Signing in with Microsoft…
+        }
+      </p>
+    </mat-card-content>
+  </mat-card>
+</main>

@@ -1,0 +1,134 @@
+<!--
+  The page owns the h1 and this section's h2, so each demo group is an h3.
+  ThemePreviewComponent stamps every ng-template into a light and a dark region, and the region
+  paints the surface, padding and frame, so each demo sits directly in it.
+
+  Every copy keeps its own state: each pagination copy reads and writes the page of its own region
+  (pageFor), so a page change updates only that copy's live status, and each accordion keeps its
+  own expanded state.
+
+  Landmarks appear once per region, so each copy takes a name that says which region it is in: the
+  table's scroll region, the pagination nav, and each accordion panel's body region (Material names
+  it after its header, so the header carries a visually hidden region name). The div around those
+  demos paints nothing: it is the element previewScheme finds the region from.
+-->
+<div class="demo-group" data-demo="table">
+  <h3 class="demo-heading">Table</h3>
+  <app-theme-preview>
+    <ng-template>
+      <div #tableCopy>
+        <ui-table
+          [columns]="tableColumns"
+          [rows]="tableRows"
+          [label]="
+            previewScheme(tableCopy) === 'dark'
+              ? 'Team members, dark preview'
+              : 'Team members, light preview'
+          "
+        />
+      </div>
+    </ng-template>
+  </app-theme-preview>
+</div>
+
+<div class="demo-group" data-demo="list-avatar">
+  <h3 class="demo-heading">List and avatar</h3>
+  <app-theme-preview>
+    <ng-template>
+      <app-stack [gap]="6">
+        <!-- The name is visible beside each avatar, so the avatar is decorative. -->
+        <ui-list variant="divided">
+          @for (member of teamMembers; track member.name) {
+            <mat-list-item>
+              <app-avatar matListItemAvatar decorative [alt]="member.name" />
+              <span matListItemTitle>{{ member.name }}</span>
+              <span matListItemLine>{{ member.role }}</span>
+            </mat-list-item>
+          }
+        </ui-list>
+
+        <app-stack direction="row" align="center" [wrap]="true" [gap]="4">
+          <app-avatar alt="Alice Smith" size="sm" />
+          <app-avatar alt="Bob Jones" size="md" />
+          <app-avatar alt="Carol White" size="lg" />
+          <app-avatar alt="Dan Brown" size="xl" />
+        </app-stack>
+      </app-stack>
+    </ng-template>
+  </app-theme-preview>
+</div>
+
+<div class="demo-group" data-demo="stat-cards">
+  <h3 class="demo-heading">Stat cards</h3>
+  <app-theme-preview>
+    <ng-template>
+      <!--
+        Numbers go through locale pipes, never pre-formatted strings. The delta carries no sign:
+        deltaDirection draws the chevron and names the direction ("Up 12%", "Down 3%").
+      -->
+      <app-grid>
+        <app-stat-card
+          label="Active users"
+          [metric]="(1284 | number) ?? ''"
+          [delta]="0.12 | percent"
+          deltaDirection="up"
+        />
+        <app-stat-card
+          label="Sessions"
+          [metric]="(8932 | number) ?? ''"
+          [delta]="0.03 | percent"
+          deltaDirection="down"
+        />
+        <app-stat-card label="Conversations" [metric]="(342 | number) ?? ''" />
+      </app-grid>
+    </ng-template>
+  </app-theme-preview>
+</div>
+
+<div class="demo-group" data-demo="pagination">
+  <h3 class="demo-heading">Pagination</h3>
+  <app-theme-preview>
+    <ng-template>
+      <div #pagerCopy>
+        <ui-pagination
+          [page]="pageFor(pagerCopy)()"
+          [total]="pageCount"
+          [label]="
+            previewScheme(pagerCopy) === 'dark' ? 'Pagination, dark preview' : 'Pagination, light preview'
+          "
+          (pageChange)="pageFor(pagerCopy).set($event)"
+        />
+      </div>
+    </ng-template>
+  </app-theme-preview>
+</div>
+
+<div class="demo-group" data-demo="accordion">
+  <h3 class="demo-heading">Accordion</h3>
+  <app-theme-preview>
+    <ng-template>
+      <div #accordionCopy>
+        <ui-accordion>
+          <ui-accordion-item [index]="0">
+            <span slot="header">
+              What is Angular?
+              <span class="cdk-visually-hidden">
+                {{ previewScheme(accordionCopy) === 'dark' ? 'Dark preview' : 'Light preview' }}
+              </span>
+            </span>
+            A web framework for building fast, reliable apps
+          </ui-accordion-item>
+          <ui-accordion-item [index]="1">
+            <span slot="header">
+              What is Angular Material?
+              <span class="cdk-visually-hidden">
+                {{ previewScheme(accordionCopy) === 'dark' ? 'Dark preview' : 'Light preview' }}
+              </span>
+            </span>
+            A library of Material Design components built for Angular
+          </ui-accordion-item>
+        </ui-accordion>
+      </div>
+    </ng-template>
+  </app-theme-preview>
+</div>

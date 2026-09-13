@@ -1,0 +1,84 @@
+/*
+ * KPI tile on app-card (an outlined mat-card on --mat-sys-surface). Angular Material has no stat
+ * component, so the content uses --mat-sys-* type and color roles only. Contrast on surface for
+ * the violet/green theme (light scheme / dark scheme):
+ *
+ *   label    label-large, on-surface-variant                    8.93:1 / 14.33:1
+ *   metric   headline-medium, display-small from a 24rem card   on-surface 16.33:1 / 14.32:1
+ *   delta    label-large + 20px chevron + hidden direction word
+ *            up     --app-success                               6.20:1 / 10.84:1
+ *            down   --mat-sys-error                             6.17:1 / 10.88:1
+ *            neutral on-surface-variant                         8.93:1 / 14.33:1
+ */
+
+:host {
+  display: block;
+}
+
+/* Fill the host, so stat cards stretched in one grid row share a height. */
+app-card {
+  block-size: 100%;
+}
+
+.stat-card-layout {
+  /* The metric steps with the card's own width, not the window's: the same tile sits in wide rows and narrow panes. */
+  container: stat-card / inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-card-label {
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-label-large);
+  letter-spacing: var(--mat-sys-label-large-tracking);
+  /* Long or translated labels and 200% text wrap instead of being cut off. */
+  overflow-wrap: anywhere;
+}
+
+.stat-card-metric {
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-headline-medium);
+  letter-spacing: var(--mat-sys-headline-medium-tracking);
+  /* Set after the font shorthand, which resets it: digits keep one width as the value updates. */
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* In rem like the type tokens, so the step moves with the user's text size. */
+@container stat-card (min-width: 24rem) {
+  .stat-card-metric {
+    font: var(--mat-sys-display-small);
+    letter-spacing: var(--mat-sys-display-small-tracking);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.stat-card-delta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-label-large);
+  letter-spacing: var(--mat-sys-label-large-tracking);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-card-delta[data-direction='up'] {
+  color: var(--app-success);
+}
+
+.stat-card-delta[data-direction='down'] {
+  color: var(--mat-sys-error);
+}
+
+/* The chevron strokes in currentColor. As a block-level box it leaves no baseline gap under the svg on the 20px line. */
+.stat-card-delta-icon {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.stat-card-delta-value {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}

@@ -1,0 +1,16 @@
+@if (label()) {
+  <p class="preview-label">{{ label() }}</p>
+}
+
+<div class="preview-regions">
+  <!-- The light and dark classes set color-scheme on each region (styles.scss); keep them on these elements. -->
+  <div class="preview-region light" role="group" [attr.aria-labelledby]="lightCaptionId">
+    <p class="preview-caption" [id]="lightCaptionId">Light</p>
+    <ng-container [ngTemplateOutlet]="content()" />
+  </div>
+
+  <div class="preview-region dark" role="group" [attr.aria-labelledby]="darkCaptionId">
+    <p class="preview-caption" [id]="darkCaptionId">Dark</p>
+    <ng-container [ngTemplateOutlet]="content()" />
+  </div>
+</div>

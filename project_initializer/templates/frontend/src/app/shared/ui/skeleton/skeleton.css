@@ -1,0 +1,78 @@
+/*
+ * Loading placeholder. Neither M3 nor Angular Material has a skeleton, so the
+ * shape is built on --mat-sys-* tokens: a surface-container-high fill with a
+ * shimmer toward surface-container-highest.
+ *
+ * The placeholder is decorative (aria-hidden), so it is exempt from contrast
+ * minimums, and it takes no interaction states, focus ring or target size.
+ *
+ * Default sizes: line is 16px tall, block 96px tall, avatar a 40px circle. line
+ * and block fill the containing block's width (inline-size: 100%), so they need a
+ * definite-width container or an explicit width input. In a shrink-to-fit
+ * container (a flex item in a row, a column sized to its content) the percentage
+ * resolves to nothing and they collapse to zero width. The width / height inputs
+ * override the defaults with inline styles, which already outrank these rules.
+ */
+:host {
+  display: block;
+}
+
+:host([data-shape='avatar']) {
+  flex-shrink: 0;
+  inline-size: fit-content;
+}
+
+.skeleton {
+  box-sizing: border-box;
+  inline-size: 100%;
+  block-size: 16px;
+  border-radius: var(--mat-sys-corner-extra-small);
+  background-color: var(--mat-sys-surface-container-high);
+  background-image: linear-gradient(
+    90deg,
+    var(--mat-sys-surface-container-high) 25%,
+    var(--mat-sys-surface-container-highest) 50%,
+    var(--mat-sys-surface-container-high) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s linear infinite;
+  /* Invisible normally; forced-colors mode drops backgrounds and paints this edge instead. */
+  outline: 1px solid transparent;
+  outline-offset: -1px;
+}
+
+/* Media and card placeholders take the card corner. */
+:host([data-shape='block']) .skeleton {
+  block-size: 96px;
+  border-radius: var(--mat-sys-corner-medium);
+}
+
+/* One diameter: the component writes only an inline size on an avatar, so the aspect ratio keeps it a circle. */
+:host([data-shape='avatar']) .skeleton {
+  inline-size: 40px;
+  block-size: auto;
+  aspect-ratio: 1;
+  border-radius: var(--mat-sys-corner-full);
+}
+
+/* The highlight travels in the reading direction. */
+.skeleton:dir(rtl) {
+  animation-direction: reverse;
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* Motion is optional here: reduced motion leaves a still surface-container-high shape. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background-image: none;
+  }
+}

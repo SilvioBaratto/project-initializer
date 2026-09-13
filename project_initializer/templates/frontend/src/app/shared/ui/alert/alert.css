@@ -1,0 +1,89 @@
+/*
+ * M3 banner pattern on tokens (Angular Material has no banner component).
+ * Each variant paints a container role with its matching on-container role for
+ * the message; the leading icon takes the stronger status role.
+ */
+:host {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding-block: 12px;
+  padding-inline: 16px;
+  border-radius: var(--mat-sys-corner-medium);
+  font: var(--mat-sys-body-medium);
+  letter-spacing: var(--mat-sys-body-medium-tracking);
+
+  /* The dismiss button, its state layer, ripple and focus ring follow the variant's content color. */
+  --mat-icon-button-icon-color: currentColor;
+  --mat-icon-button-state-layer-color: currentColor;
+  --mat-icon-button-ripple-color: color-mix(
+    in srgb,
+    currentColor calc(var(--mat-sys-pressed-state-layer-opacity) * 100%),
+    transparent
+  );
+  --mat-focus-indicator-border-color: currentColor;
+}
+
+:host([hidden]) {
+  display: none;
+}
+
+:host(.alert-dismissible) {
+  padding-inline-end: 4px;
+}
+
+:host(.alert-info) {
+  background-color: var(--app-info-container);
+  color: var(--app-on-info-container);
+}
+
+:host(.alert-info) .alert-icon {
+  color: var(--app-info);
+}
+
+:host(.alert-success) {
+  background-color: var(--app-success-container);
+  color: var(--app-on-success-container);
+}
+
+:host(.alert-success) .alert-icon {
+  color: var(--app-success);
+}
+
+:host(.alert-warning) {
+  background-color: var(--app-warning-container);
+  color: var(--app-on-warning-container);
+}
+
+:host(.alert-warning) .alert-icon {
+  color: var(--app-warning);
+}
+
+:host(.alert-danger) {
+  background-color: var(--mat-sys-error-container);
+  color: var(--mat-sys-on-error-container);
+}
+
+:host(.alert-danger) .alert-icon {
+  color: var(--mat-sys-error);
+}
+
+.alert-icon {
+  display: flex;
+  flex-shrink: 0;
+  /* 24px icon centred on the 20px first line of body-medium. */
+  margin-block: -2px;
+}
+
+.alert-message {
+  position: relative;
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+.alert-dismiss {
+  flex-shrink: 0;
+  /* 40px state layer centred on the first line; Material keeps the 48px touch target. */
+  margin-block: -10px;
+}

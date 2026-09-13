@@ -1,0 +1,231 @@
+/*
+ * Contents of the M3 navigation rail, hosted by the shell's docked mat-sidenav (which paints the
+ * surface container), and of the compact actions bottom sheet.
+ * - Collapsed rail (96px, wider only when enlarged text needs it): custom icon-over-label
+ *   destinations built like the navigation bar items, plus icon buttons (matIconButton) for
+ *   Change theme (which opens the theme menu) and Sign out.
+ * - Expanded rail (280px) and compact sheet: mat-nav-list / mat-action-list items with labels
+ *   beside icons; Material supplies their state layers, ripple and the secondary-container indicator.
+ *   The sheet lists the theme choices in a single-selection list instead of opening the menu.
+ */
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-block-size: 0;
+}
+
+.sidebar {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 8px;
+  padding-block: 8px 16px;
+}
+
+.sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  margin-block-start: auto;
+}
+
+.sidebar-collapsed .sidebar-footer {
+  align-items: center;
+  /* 8px keeps the 48px touch targets of the stacked icon buttons apart. */
+  gap: 8px;
+}
+
+/* Grid hosts: the 24px svg leaves no inline baseline gap. */
+.sidebar-icon,
+.rail-icon,
+.sidebar-menu-icon {
+  display: grid;
+}
+
+/* LogOut's arrow leaves toward the inline end, so it mirrors with the layout in RTL (like the rail toggle's icon). */
+:host-context([dir='rtl']) .sidebar-icon-directional {
+  transform: scaleX(-1);
+}
+
+/* ── Collapsed rail destinations ─────────────────────────────────────────── */
+
+.rail-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rail-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-block-size: 56px;
+  padding-block: 6px;
+  padding-inline: 4px;
+  box-sizing: border-box;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-label-medium);
+  letter-spacing: var(--mat-sys-label-medium-tracking);
+  text-align: center;
+  text-decoration: none;
+  /* The focus ring is drawn on the indicator instead (see :focus-visible below). */
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.rail-indicator {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
+  inline-size: 56px;
+  block-size: 32px;
+  border-radius: var(--mat-sys-corner-full);
+  overflow: hidden;
+}
+
+.rail-indicator::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background-color: currentColor;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms linear;
+}
+
+@media (hover: hover) {
+  .rail-item:hover .rail-indicator::before {
+    opacity: var(--mat-sys-hover-state-layer-opacity);
+  }
+}
+
+.rail-item:focus-visible .rail-indicator::before {
+  opacity: var(--mat-sys-focus-state-layer-opacity);
+}
+
+.rail-item:focus-visible .rail-indicator {
+  outline: var(--mat-focus-indicator-border-width, 3px) solid
+    var(--mat-focus-indicator-border-color, var(--mat-sys-secondary));
+  outline-offset: 2px;
+}
+
+/*
+ * Labels never break inside a word: with enlarged text the collapsed rail widens to its longest
+ * label word (layout.css), and a label of several words wraps between them.
+ */
+.rail-label {
+  max-inline-size: 100%;
+  overflow-wrap: normal;
+  hyphens: manual;
+}
+
+/* Current destination: secondary label is 6.13:1 (light) and 10.88:1 (dark) on surface. */
+.rail-item-active {
+  color: var(--mat-sys-secondary);
+}
+
+.rail-item-active .rail-indicator {
+  background-color: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+}
+
+.rail-item-active .rail-label {
+  font-weight: var(--mat-sys-label-medium-weight-prominent, var(--mat-sys-label-large-weight));
+}
+
+/* ── Expanded rail and compact sheet lists ───────────────────────────────── */
+
+.sidebar-list {
+  padding-block: 0;
+  padding-inline: 12px;
+  /*
+   * M3 expanded rail items: at least 56px tall, fully rounded, label-large. The containers
+   * size to their text (min-block-size below), so enlarged text wraps instead of truncating.
+   */
+  --mat-list-list-item-one-line-container-height: auto;
+  --mat-list-list-item-container-shape: var(--mat-sys-corner-full);
+  --mat-list-list-item-leading-icon-start-space: 16px;
+  --mat-list-list-item-leading-icon-end-space: 12px;
+  --mat-list-list-item-label-text-font: var(--mat-sys-label-large-font);
+  --mat-list-list-item-label-text-size: var(--mat-sys-label-large-size);
+  --mat-list-list-item-label-text-line-height: var(--mat-sys-label-large-line-height);
+  --mat-list-list-item-label-text-weight: var(--mat-sys-label-large-weight);
+  --mat-list-list-item-label-text-tracking: var(--mat-sys-label-large-tracking);
+}
+
+.sidebar-list .mat-mdc-list-item {
+  min-block-size: 56px;
+  padding-block: 8px;
+}
+
+/*
+ * Material lists draw the focus state layer on any :focus, so a clicked item kept a 12% overlay
+ * until focus moved elsewhere. M3's focused state marks keyboard and voice focus only, so the
+ * overlay shows for :focus-visible alone.
+ */
+.sidebar-list .mat-mdc-list-item:not(:focus-visible) {
+  --mat-list-list-item-focus-state-layer-opacity: 0;
+}
+
+/* Material truncates list text to one line; the rail wraps it so no label is cut off. */
+.sidebar-list .mat-mdc-list-item-title {
+  white-space: normal;
+}
+
+/*
+ * The activated destination's content sits on the secondary-container indicator. That fill is only
+ * 1.23:1 (light) and 1.97:1 (dark) against the surface, so the label also turns bold, as in the
+ * collapsed rail and the navigation bar: the current destination doesn't rely on color alone.
+ */
+.sidebar-list .mdc-list-item--activated {
+  --mat-list-list-item-label-text-weight: var(--mat-sys-label-large-weight-prominent);
+  --mat-list-list-item-label-text-color: var(--mat-sys-on-secondary-container);
+  --mat-list-list-item-hover-label-text-color: var(--mat-sys-on-secondary-container);
+  --mat-list-list-item-leading-icon-color: var(--mat-sys-on-secondary-container);
+  --mat-list-list-item-hover-leading-icon-color: var(--mat-sys-on-secondary-container);
+}
+
+/*
+ * The account row and the compact sheet's Theme heading share one text style, aligned with the
+ * list's leading icons (12px list inset + 16px icon start).
+ */
+.sidebar-account,
+.sidebar-subheader {
+  padding-inline: 28px 24px;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-title-small);
+  letter-spacing: var(--mat-sys-title-small-tracking);
+}
+
+.sidebar-account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-block-size: 56px;
+}
+
+.sidebar-account-name {
+  min-inline-size: 0;
+  color: var(--mat-sys-on-surface);
+  overflow-wrap: anywhere;
+}
+
+.sidebar-subheader {
+  margin: 0;
+  padding-block: 16px 8px;
+}
+
+/*
+ * Theme menu items: the panel renders in the overlay container, but the items come from this
+ * template, so this rule still reaches them. Material spaces and colors only mat-icon beside a
+ * menu label, so the Lucide icon takes the same 12px gap and icon color.
+ */
+.sidebar-menu-icon {
+  flex-shrink: 0;
+  margin-inline-end: var(--mat-menu-item-spacing, 12px);
+  color: var(--mat-menu-item-icon-color, var(--mat-sys-on-surface-variant));
+}

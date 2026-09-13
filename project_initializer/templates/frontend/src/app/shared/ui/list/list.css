@@ -1,0 +1,112 @@
+/*
+ * Static list on <mat-list>. Type roles, leading/trailing slots and text colors come from
+ * Material's list tokens (--mat-list-*, resolved from --mat-sys-* roles); this sheet draws the
+ * outlined group and the divided / striped variants, and lets items grow to fit their text.
+ *
+ * Unencapsulated (items are projected): every selector is scoped under .app-list and uses
+ * child combinators, so a list nested inside an item keeps its own variant.
+ */
+
+.app-list {
+  display: block;
+}
+
+/* Explicit grouping: outline-variant boundary on surface (decorative, not an interactive edge). */
+.app-list > .app-list-surface {
+  /* Material's 40px leading avatar slot, grown with the root text size (the avatar's own 2.5rem). */
+  --mat-list-list-item-leading-avatar-size: max(40px, 2.5rem);
+
+  overflow: hidden;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: var(--mat-sys-corner-medium);
+  background-color: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+}
+
+/* ── Flexible items ───────────────────────────────────────────────────────── */
+
+/*
+ * Material fixes item heights (48/64/88px) and cuts every text slot to one line with an ellipsis,
+ * so 200% text or a longer translation loses content with no way to read it. Items here are
+ * flexible containers: those heights become minimums that grow with the root text size, and the
+ * title, supporting lines and plain item text wrap. Each selector outranks Material's own
+ * (including its three-line `nowrap` rule), whichever stylesheet loads first.
+ */
+.app-list > .app-list-surface > .mat-mdc-list-item.mdc-list-item {
+  block-size: auto;
+}
+
+.app-list > .app-list-surface > .mat-mdc-list-item.mdc-list-item--with-one-line {
+  min-block-size: max(48px, 3rem);
+}
+
+.app-list > .app-list-surface > .mat-mdc-list-item.mdc-list-item--with-two-lines {
+  min-block-size: max(64px, 4rem);
+}
+
+.app-list > .app-list-surface > .mat-mdc-list-item.mdc-list-item--with-three-lines {
+  min-block-size: max(88px, 5.5rem);
+}
+
+.app-list
+  > .app-list-surface
+  > .mat-mdc-list-item.mdc-list-item
+  > .mdc-list-item__content
+  > :is(.mat-mdc-list-item-title, .mat-mdc-list-item-line, .mat-mdc-list-item-unscoped-content) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * Material clamps plain supporting text in a three-line item to two lines, with a 20px line height
+ * that overlaps enlarged text. The supporting-text token (1.25rem, 20px at default size) scales.
+ */
+.app-list
+  > .app-list-surface
+  > .mat-mdc-list-item.mdc-list-item--with-three-lines
+  > .mdc-list-item__content
+  > .mat-mdc-list-item-unscoped-content {
+  display: block;
+  -webkit-line-clamp: none;
+  line-height: var(--mat-list-list-item-supporting-text-line-height, var(--mat-sys-body-medium-line-height));
+}
+
+/*
+ * Keeps wrapped text off the bottom edge. At the minimum heights above it adds no height: a
+ * one-line text column is 24px of 48, and a two-line column is 53-57px of 64 depending on the
+ * font's line gap, so two- and three-line items get 4px.
+ */
+.app-list > .app-list-surface > .mat-mdc-list-item.mdc-list-item--with-one-line > .mdc-list-item__content {
+  padding-block: 8px;
+}
+
+.app-list
+  > .app-list-surface
+  > .mat-mdc-list-item:is(.mdc-list-item--with-two-lines, .mdc-list-item--with-three-lines)
+  > .mdc-list-item__content {
+  padding-block-end: 4px;
+}
+
+/* ── Divided ──────────────────────────────────────────────────────────────── */
+
+/*
+ * A zero-height pseudo-element carries the divider, so it adds nothing to the item heights above
+ * and the line survives forced-colors mode (borders keep a system color, backgrounds do not).
+ * Color and width read mat-divider's own tokens (same fallbacks as <mat-divider>), so a theme's
+ * mat.divider-overrides restyles these dividers too.
+ */
+.app-list > .app-list-surface[data-variant='divided'] > .mat-mdc-list-item + .mat-mdc-list-item::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  border-block-start: var(--mat-divider-width, 1px) solid var(--mat-divider-color, var(--mat-sys-outline-variant));
+  pointer-events: none;
+}
+
+/* ── Striped ──────────────────────────────────────────────────────────────── */
+
+/* Parity counts list items only, so projected subheaders or dividers do not shift the stripes. */
+.app-list > .app-list-surface[data-variant='striped'] > .mat-mdc-list-item:nth-child(odd of .mat-mdc-list-item) {
+  --mat-list-list-item-container-color: var(--mat-sys-surface-container);
+}

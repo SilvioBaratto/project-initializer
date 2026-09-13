@@ -1,0 +1,133 @@
+<!--
+  The page owns the h1 and this section's h2, so each demo group is an h3.
+  ThemePreviewComponent stamps every ng-template into a light and a dark region, and the region
+  paints the surface, padding and frame, so each demo sits directly in it. The toggles share
+  their state, so both copies of a demo change together.
+
+  Every navigation toggle is a disclosure with a real target in its own copy: the navbar and
+  modal rail toggles show and hide a destination preview, and the docked rail toggle expands
+  and collapses one. aria-controls names that copy's preview, and is removed while @if has
+  removed it. The preview rows are plain text, not links, so trying a toggle never leaves the
+  catalog.
+
+  The tablist and the breadcrumb trail (a navigation landmark) appear once per region, so each
+  copy takes a name that says which region it is in. The div around each of them paints nothing:
+  it is the element previewScheme finds the region from.
+-->
+<ng-template #destinationPreview let-id="id" let-collapsed="collapsed">
+  <!-- role="list": list-style none makes WebKit drop the implicit list semantics. -->
+  <ul class="nav-preview" role="list" [id]="id" [class.nav-preview-collapsed]="collapsed">
+    @for (destination of destinations; track destination.label) {
+      <li class="nav-preview-item">
+        <lucide-icon class="nav-preview-icon" [name]="destination.icon" aria-hidden="true" />
+        <span>{{ destination.label }}</span>
+      </li>
+    }
+  </ul>
+</ng-template>
+
+<div class="demo-group" data-demo="navbar">
+  <h3 class="demo-heading">Navbar</h3>
+  <app-theme-preview>
+    <ng-template>
+      <div #navbarCopy class="nav-demo">
+        <app-navbar>
+          <app-hamburger
+            navbarBrand
+            [open]="navbarNavOpen()"
+            [controls]="navbarNavOpen() ? previewListId(navbarCopy) : ''"
+            (toggle)="navbarNavOpen.set(!navbarNavOpen())"
+          />
+          <span navbarBrand>My app</span>
+        </app-navbar>
+        @if (navbarNavOpen()) {
+          <ng-container
+            [ngTemplateOutlet]="destinationPreview"
+            [ngTemplateOutletContext]="{ id: previewListId(navbarCopy), collapsed: false }"
+          />
+        }
+      </div>
+    </ng-template>
+  </app-theme-preview>
+</div>
+
+<div class="demo-group" data-demo="hamburger">
+  <h3 class="demo-heading">Hamburger</h3>
+  <app-theme-preview>
+    <ng-template>
+      <app-stack direction="row" align="start" [wrap]="true" [gap]="6">
+        <div #modalCopy class="toggle-demo">
+          <div class="toggle-row">
+            <app-hamburger
+              [open]="modalNavOpen()"
+              [controls]="modalNavOpen() ? previewListId(modalCopy) : ''"
+              (toggle)="modalNavOpen.set(!modalNavOpen())"
+            />
+            <span class="demo-caption">Modal rail</span>
+          </div>
+          @if (modalNavOpen()) {
+            <ng-container
+              [ngTemplateOutlet]="destinationPreview"
+              [ngTemplateOutletContext]="{ id: previewListId(modalCopy), collapsed: false }"
+            />
+          }
+        </div>
+        <div #railCopy class="toggle-demo">
+          <div class="toggle-row">
+            <app-hamburger
+              variant="rail"
+              [open]="railExpanded()"
+              [controls]="previewListId(railCopy)"
+              (toggle)="railExpanded.set(!railExpanded())"
+            />
+            <span class="demo-caption">Docked rail</span>
+          </div>
+          <ng-container
+            [ngTemplateOutlet]="destinationPreview"
+            [ngTemplateOutletContext]="{ id: previewListId(railCopy), collapsed: !railExpanded() }"
+          />
+        </div>
+      </app-stack>
+    </ng-template>
+  </app-theme-preview>
+</div>
+
+<div class="demo-group" data-demo="tabs">
+  <h3 class="demo-heading">Tabs</h3>
+  <app-theme-preview>
+    <ng-template>
+      <div #tabsCopy>
+        <ui-tabs
+          [ariaLabel]="
+            previewScheme(tabsCopy) === 'dark'
+              ? 'Project views, dark preview'
+              : 'Project views, light preview'
+          "
+        >
+          <ui-tab [tabIndex]="0">Overview</ui-tab>
+          <ui-tab [tabIndex]="1">Details</ui-tab>
+          <ui-tab [tabIndex]="2">History</ui-tab>
+          <ui-tab-panel [panelIndex]="0">Status, owner, and next milestone for this project</ui-tab-panel>
+          <ui-tab-panel [panelIndex]="1">Budget, scope, and linked files</ui-tab-panel>
+          <ui-tab-panel [panelIndex]="2">Changes made in the last 30 days</ui-tab-panel>
+        </ui-tabs>
+      </div>
+    </ng-template>
+  </app-theme-preview>
+</div>
+
+<div class="demo-group" data-demo="breadcrumbs">
+  <h3 class="demo-heading">Breadcrumbs</h3>
+  <app-theme-preview>
+    <ng-template>
+      <div #trailCopy>
+        <ui-breadcrumbs
+          [items]="breadcrumbs"
+          [label]="
+            previewScheme(trailCopy) === 'dark' ? 'Breadcrumb, dark preview' : 'Breadcrumb, light preview'
+          "
+        />
+      </div>
+    </ng-template>
+  </app-theme-preview>
+</div>

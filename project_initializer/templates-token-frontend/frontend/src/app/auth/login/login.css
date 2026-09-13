@@ -1,0 +1,111 @@
+/*
+ * Sign-in view: a full routed view outside the app shell with one centered pane.
+ *   compact (< 600px): the card fills the width inside 16px margins.
+ *   medium and up (>= 600px): 24px margins; the card caps at 400px and centers.
+ * Colors, type and shape come from --mat-sys-* tokens, mostly through Material's outlined
+ * card, outlined form field and filled button. The text field (56px) and the button's 48px
+ * touch target at density 0 meet the target size, so nothing here shrinks them.
+ */
+:host {
+  display: block;
+}
+
+/*
+ * Grid items stretch to the inline size, so the card fills the width at compact. Vertical
+ * breathing room is margin on the first and last item rather than block padding, so the view
+ * stays exactly one viewport tall when the content fits.
+ */
+.login {
+  display: grid;
+  align-content: center;
+  row-gap: 16px;
+  min-block-size: 100vh;
+  min-block-size: 100dvh;
+  padding-inline: max(16px, env(safe-area-inset-left), env(safe-area-inset-right));
+  background-color: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+}
+
+/* The page title uses headline-small; the subtitle is body text in on-surface-variant. */
+.login-card {
+  margin-block-start: max(24px, env(safe-area-inset-top));
+  --mat-card-title-text-font: var(--mat-sys-headline-small-font);
+  --mat-card-title-text-line-height: var(--mat-sys-headline-small-line-height);
+  --mat-card-title-text-size: var(--mat-sys-headline-small-size);
+  --mat-card-title-text-tracking: var(--mat-sys-headline-small-tracking);
+  --mat-card-title-text-weight: var(--mat-sys-headline-small-weight);
+  --mat-card-subtitle-text-color: var(--mat-sys-on-surface-variant);
+  --mat-card-subtitle-text-font: var(--mat-sys-body-medium-font);
+  --mat-card-subtitle-text-line-height: var(--mat-sys-body-medium-line-height);
+  --mat-card-subtitle-text-size: var(--mat-sys-body-medium-size);
+  --mat-card-subtitle-text-tracking: var(--mat-sys-body-medium-tracking);
+  --mat-card-subtitle-text-weight: var(--mat-sys-body-medium-weight);
+}
+
+.login-card .login-header {
+  padding: 24px 24px 0;
+}
+
+.login-header [matCardSubtitle] {
+  margin-block-start: 4px;
+}
+
+.login-card .login-content {
+  padding: 24px;
+}
+
+/* Error summary: the error container role with its on-container text (7.24:1 in both schemes). */
+.login-error {
+  margin-block: 0 16px;
+  margin-inline: 0;
+  padding-block: 12px;
+  padding-inline: 16px;
+  border-radius: var(--mat-sys-corner-medium);
+  background-color: var(--mat-sys-error-container);
+  color: var(--mat-sys-on-error-container);
+  font: var(--mat-sys-body-medium);
+  letter-spacing: var(--mat-sys-body-medium-tracking);
+}
+
+.login-form {
+  display: grid;
+  row-gap: 8px;
+}
+
+.login-field,
+.login-submit {
+  inline-size: 100%;
+}
+
+/*
+ * Loading spinner in the button's leading icon slot. Material's icon offset and spacing target
+ * .mat-icon only, so repeat the filled-button values (-8px / 8px). The stroke follows the label
+ * color, which is the disabled label color while loading.
+ */
+.login-spinner {
+  --mat-progress-spinner-active-indicator-color: currentColor;
+  min-inline-size: 18px;
+  margin-inline: -8px 8px;
+}
+
+.login-footnote {
+  margin-block: 0 max(24px, env(safe-area-inset-bottom));
+  margin-inline: 0;
+  text-align: center;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-small);
+  letter-spacing: var(--mat-sys-body-small-tracking);
+}
+
+@media (min-width: 600px) {
+  .login {
+    padding-inline: max(24px, env(safe-area-inset-left), env(safe-area-inset-right));
+  }
+
+  /* Auto margins stop the grid stretch, so the width is set explicitly and capped. */
+  .login-card {
+    inline-size: 100%;
+    max-inline-size: 400px;
+    margin-inline: auto;
+  }
+}

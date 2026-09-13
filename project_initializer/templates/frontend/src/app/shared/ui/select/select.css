@@ -1,0 +1,16 @@
+/*
+ * Colors, type, shape and states come from Material's outlined form field and
+ * select, which read the --mat-sys-* theme tokens: outline and on-surface-variant
+ * supporting text and arrow, error role in the error state, 38% disabled content.
+ * The options panel paints surface-container with on-surface option text and a
+ * state layer per option. At density 0 the field container is 56px tall and each
+ * option 48px, at or above the 48px target, so nothing here shrinks them.
+ */
+:host {
+  display: block;
+}
+
+/* Fill the parent the way a block-level text field does; the default infix is a fixed 180px. */
+.field {
+  inline-size: 100%;
+}

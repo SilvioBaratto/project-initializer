@@ -1,18 +1,126 @@
-.skip-link {
-  position: absolute;
-  top: -9999px;
-  left: 0;
-  z-index: 9999;
-  padding: 0.5rem 1rem;
-  background: var(--color-surface-raised, #fff);
-  color: var(--color-primary, #000);
-  text-decoration: none;
-  font-weight: 600;
-  border-radius: 0 0 4px 0;
+/*
+ * App shell. mat-sidenav-container hosts the navigation rail (mat-sidenav) and the content
+ * (mat-sidenav-content). Angular Material has no navigation rail component, so the rail follows
+ * the M3 navigation rail component spec (m3.material.io). Media breakpoints are not needed
+ * here: the component tree differs per size class, so LayoutComponent switches on
+ * WindowSizeClassService (M3 600px / 840px / 1200px / 1600px).
+ *
+ * Viewport units: the shell uses dvh.
+ *   dvh (dynamic) follows the mobile browser toolbar as it shows and hides, so the shell
+ *       always matches the visible viewport. The navigation bar stays on screen.
+ *   svh (small) is the height with the toolbar shown: a stable floor that never jumps, but
+ *       leaves a gap below the shell once the toolbar hides.
+ *   lvh (large) is the height with the toolbar hidden: content, including the navigation
+ *       bar, can sit behind the toolbar on iOS. Avoid it for interactive shells.
+ * Verify sticky bottom bars with env(safe-area-inset-bottom) on a real iOS device.
+ */
+:host {
+  display: block;
 }
 
-.skip-link:focus {
-  top: 0;
-  outline: 2px solid currentColor;
-  outline-offset: 2px;
+.shell {
+  block-size: 100dvh;
+}
+
+/* mat-sidenav-content already has height: 100%; as a flex column it hands the rest to <main>. */
+.shell-content {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.shell-top-app-bar,
+.shell-nav-bar {
+  flex: none;
+}
+
+/* The only scroll container. overscroll-behavior keeps scroll chaining and pull-to-refresh inside it. */
+.shell-main {
+  flex: 1 1 auto;
+  min-block-size: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* <main> takes focus only programmatically (tabindex="-1", skip link and route changes); it is not a control. */
+.shell-main:focus {
+  outline: none;
+}
+
+/* Lucide icons inside matIconButton: a grid host leaves no inline baseline gap, so the 24px svg centres. */
+.shell-icon {
+  display: grid;
+}
+
+/* ── Navigation rail ─────────────────────────────────────────────────────── */
+
+/*
+ * Rail widths come from the M3 component specs: collapsed 96dp, expanded 220–360dp (280px here).
+ * The collapsed rail is 96px at least and otherwise sizes to its content (min-content): enlarged
+ * text widens it to the longest label word instead of breaking that word, and the container's
+ * autosize moves the content along.
+ * index.html sets viewport-fit=cover, so a notched phone in landscape (expanded size class) docks
+ * the rail under the sensor housing. The rail sits on the inline-start edge (left in LTR, right in
+ * RTL): it widens by that edge's safe-area inset and pads its content by the same amount, keeping
+ * the M3 width for the items. The insets are 0 everywhere else.
+ */
+.rail {
+  --mat-sidenav-container-width: min-content;
+  min-inline-size: calc(96px + env(safe-area-inset-left));
+}
+
+.rail.rail-wide {
+  --mat-sidenav-container-width: calc(280px + env(safe-area-inset-left));
+}
+
+:host-context([dir='rtl']) .rail {
+  min-inline-size: calc(96px + env(safe-area-inset-right));
+}
+
+:host-context([dir='rtl']) .rail.rail-wide {
+  --mat-sidenav-container-width: calc(280px + env(safe-area-inset-right));
+}
+
+/* The rail only ever docks (from 600px): square edges, flush with the content. */
+.rail {
+  --mat-sidenav-container-shape: 0;
+}
+
+/* Banner landmark from 600px: the brand, the expand toggle, the destinations and the rail's actions. */
+.rail-content {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-block-size: 100%;
+  padding-block: env(safe-area-inset-top) env(safe-area-inset-bottom);
+  padding-inline-start: env(safe-area-inset-left);
+}
+
+:host-context([dir='rtl']) .rail-content {
+  padding-inline-start: env(safe-area-inset-right);
+}
+
+.rail-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-block-size: 56px;
+  padding-block-start: 8px;
+  /* Lines the 24px toggle icon up with the list icons below (12px list inset + 16px). */
+  padding-inline: 20px 16px;
+}
+
+.rail:not(.rail-wide) .rail-header {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.rail-brand {
+  min-inline-size: 0;
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-title-medium);
+  letter-spacing: var(--mat-sys-title-medium-tracking);
+  overflow-wrap: anywhere;
 }

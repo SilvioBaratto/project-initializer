@@ -1,0 +1,42 @@
+<button
+  class="app-button"
+  [matButton]="appearance()"
+  [attr.type]="type()"
+  [class.app-button--ghost]="variant() === 'ghost'"
+  [class.app-button--danger]="variant() === 'danger'"
+  [class.app-button--sm]="size() === 'sm'"
+  [class.app-button--lg]="size() === 'lg'"
+  [disabled]="disabled() || loading()"
+  [disabledInteractive]="focusableWhileBusy()"
+  [attr.aria-busy]="loading() || null"
+  (click)="handleClick($event)"
+>
+  <!--
+    MatProgressSpinner sets a static tabindex="-1" on its host. A <button> may not contain a
+    descendant with a tabindex attribute, so the binding below removes it.
+  -->
+  @if (loading()) {
+    <mat-progress-spinner
+      matButtonIcon
+      class="app-button__spinner"
+      mode="indeterminate"
+      [diameter]="18"
+      [attr.tabindex]="null"
+      aria-hidden="true"
+    />
+  }
+  <!-- Projected content lands in Material's label slot (span.mdc-button__label), never an icon slot. -->
+  <ng-content />
+</button>
+@if (loadingText()) {
+  <!--
+    Outside the aria-busy button so the in-progress status is announced. It stays in the DOM while
+    loadingText is set, so the text added when loading starts is read out. .cdk-visually-hidden is
+    absolutely positioned, so the inline-grid host gains no track.
+  -->
+  <span class="cdk-visually-hidden" role="status">
+    @if (loading()) {
+      {{ loadingText() }}
+    }
+  </span>
+}

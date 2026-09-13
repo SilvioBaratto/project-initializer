@@ -6,8 +6,8 @@ Verifiable criteria (per oracle):
          → components.spec.ts must contain querySelectorAll + length-1 assertion,
            gated on an activeOverlay assignment and a detectChanges call
   [UNIT] Dual light/dark scoping continues to apply to the TRIGGER buttons
-         → components.html renders the overlay trigger section in BOTH regions
-           (exactly 2 occurrences of app-overlays-section, one per region)
+         → components.html mounts app-overlays-section once, and the section
+           stamps its triggers through app-theme-preview (a light and a dark region)
   [UNIT] At most one overlay is open at a time (no concurrent focus traps)
          → components.spec.ts must exercise the activeOverlay signal in an
            assertion that proves only one overlay panel exists in the DOM
@@ -118,16 +118,33 @@ def test_when_components_html_rendered_then_overlay_triggers_in_both_regions(
 ):
     """
     Criterion: 'dual light/dark scoping continues to apply to the TRIGGER buttons'.
-    The overlay trigger section (app-overlays-section) must appear in both the
-    light and dark regions — exactly 2 occurrences so neither region is missing.
-    Interpretation: 2 occurrences of app-overlays-section in components.html.
+    components.html mounts the overlay section (app-overlays-section) once, beside
+    the single instance of each dialog. Like every other catalog section, it stamps
+    each demo group through app-theme-preview, which renders the template once in a
+    light and once in a dark-classed region, so both regions show the triggers.
+    Interpretation: one app-overlays-section in components.html, and every dialog
+    trigger declared once, inside an app-theme-preview <ng-template>.
     """
-    count = html_content.count("app-overlays-section")
-    assert count == 2, (
-        f"app-overlays-section appears {count} time(s) in components.html; "
-        "it must appear exactly twice — once in the light region and once in "
-        "the dark-classed region — so both regions show the overlay trigger buttons"
+    count = html_content.count("<app-overlays-section")
+    assert count == 1, (
+        f"app-overlays-section is mounted {count} time(s) in components.html; "
+        "mount it once and let app-theme-preview stamp its triggers per region"
     )
+    section_html = (COMPONENTS_HTML.parent / "sections" / "overlays-section.html").read_text(
+        encoding="utf-8"
+    )
+    previews = [
+        chunk.split("</app-theme-preview>")[0]
+        for chunk in section_html.split("<app-theme-preview>")[1:]
+    ]
+    for name in ("modal", "slide-over", "drawer"):
+        emit = f"opened.emit('{name}')"
+        assert section_html.count(emit) == 1 and any(
+            "<ng-template>" in preview and emit in preview for preview in previews
+        ), (
+            f"the '{name}' trigger must be declared once, inside an app-theme-preview "
+            "<ng-template>, so it renders in both the light and the dark region"
+        )
 
 
 # ---------------------------------------------------------------------------

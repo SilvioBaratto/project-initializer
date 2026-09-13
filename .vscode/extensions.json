@@ -6,7 +6,6 @@
     "ms-python.debugpy",
     "charliermarsh.ruff",
     "angular.ng-template",
-    "bradlc.vscode-tailwindcss",
     "esbenp.prettier-vscode",
     "dbaeumer.vscode-eslint",
     "Prisma.prisma",

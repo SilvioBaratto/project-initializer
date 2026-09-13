@@ -1,18 +1,24 @@
 """
 Tests for issue #6: feat(ui): Button — variants, sizes, loading/disabled states.
 
-Source-blind: authored against acceptance criteria only, before any implementation.
+Originally authored against the acceptance criteria; updated for the Material 3
+migration (Angular Material `matButton`, no Tailwind).
 
 Criteria covered:
   - [UNIT] `variant` (primary|secondary|ghost|danger) and `size` signal inputs
-  - [UNIT] `loading` shows a spinner + sets `aria-busy`; `disabled` sets
-    `disabled` + `aria-disabled`
+  - [UNIT] `loading` shows a spinner (`mat-progress-spinner`) + sets `aria-busy`;
+    `disabled` sets `disabled` + `aria-disabled`
   - [UNIT] Emits click only when not disabled/loading
+  - [STRUCTURE] component split into button.ts + button.html + button.css,
+    wired with templateUrl/styleUrl
+  - [M3] 48px target: the template renders a Material `matButton`, which ships
+    a 48px touch target at density 0; the CSS never hides it
+  - [M3] styling through `--mat-sys-*` / `--mat-button-*` tokens only: no color
+    literals, no `!important`, no `::ng-deep`, no Tailwind utility classes
 
 Criteria skipped (not runtime-verifiable per oracle):
-  - Min height ≥44px (`min-h-11`); visible `focus-visible` ring; dark-mode via
-    tokens — NOT VERIFIABLE: browser-tier rendering concern; no static or
-    unit-level observable signal
+  - Visible focus ring (supplied globally by `mat.strong-focus-indicators()`)
+    and rendered contrast in both schemes — browser-tier rendering concern
   - All tests pass — boilerplate suite gate; no per-criterion assertion
   - SOLID, clean code (methods < 10 lines …) — subjective prose; no concrete
     runtime or unit assertion
@@ -54,20 +60,47 @@ BUTTON_DIR = UI_ROOT / "button"
 
 def _ts_file() -> pathlib.Path:
     """Return the primary (non-spec) TypeScript file for the button component."""
-    candidates = [f for f in BUTTON_DIR.glob("*.ts") if ".spec." not in f.name]
+    candidates = {f.name: f for f in BUTTON_DIR.glob("*.ts") if ".spec." not in f.name}
     if not candidates:
         raise FileNotFoundError(f"No non-spec .ts file found in {BUTTON_DIR}")
-    primary = [f for f in candidates if "button" in f.name]
-    return (primary or candidates)[0]
+    # Match the whole file name, not a substring, and never rely on glob order, which differs
+    # between filesystems.
+    for primary in ("button.ts", "button.component.ts"):
+        if primary in candidates:
+            return candidates[primary]
+    return candidates[sorted(candidates)[0]]
 
 
 def _full_source() -> str:
-    """Return concatenated source of .ts + any .html files in the button dir."""
-    ts_text = _ts_file().read_text(encoding="utf-8")
-    html_text = "".join(
-        f.read_text(encoding="utf-8") for f in BUTTON_DIR.glob("*.html")
+    """Return concatenated source of the non-spec .ts + .html + .css files."""
+    files = sorted(
+        f
+        for pattern in ("*.ts", "*.html", "*.css")
+        for f in BUTTON_DIR.glob(pattern)
+        if ".spec." not in f.name
     )
-    return ts_text + "\n" + html_text
+    return "\n".join(f.read_text(encoding="utf-8") for f in files)
+
+
+def _html_text() -> str:
+    """Return the button template (button.html)."""
+    return (BUTTON_DIR / "button.html").read_text(encoding="utf-8")
+
+
+def _css_text() -> str:
+    """Return the button component stylesheet (button.css)."""
+    return (BUTTON_DIR / "button.css").read_text(encoding="utf-8")
+
+
+# Tailwind utility residue: any of these in a class attribute or TS string means
+# the Material 3 migration left a utility class behind.
+TAILWIND_RESIDUE = re.compile(
+    r"\b(flex|inline-flex|grid-cols|items-|justify-|gap-[0-9]|p[xytblr]?-[0-9]"
+    r"|m[xytblr]?-[0-9]|w-[0-9]|h-[0-9]|min-h-|max-w-|text-(xs|sm|base|lg|xl|[0-9])"
+    r"|font-(medium|semibold|bold|display|sans|mono)|bg-|border-|rounded|shadow"
+    r"|ring-|dark:|md:|lg:|sm:|xl:|hover:|focus:|animate-|sr-only|truncate"
+    r"|space-[xy]-|divide-|opacity-[0-9]|transition-|duration-)"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -224,16 +257,25 @@ def test_when_button_source_read_then_aria_busy_attribute_is_present():
 
 
 def test_when_button_source_read_then_aria_disabled_attribute_is_present():
-    """Button template must include an aria-disabled attribute binding.
+    """Button must report its busy-disabled state through aria-disabled.
 
     Per criterion: '`disabled` sets `disabled` + `aria-disabled`'.
-    aria-disabled must be set alongside the native disabled attribute so that
-    assistive technology reflects the disabled state correctly.
+    Material 3 migration: `disabled` sets the native attribute, which assistive
+    technology already reports as disabled. While `loading`, the inner matButton
+    binds Material's `disabledInteractive`, which renders aria-disabled="true"
+    instead of the native attribute, so a focused button keeps keyboard focus
+    (a natively disabled focused button drops focus to <body>). The ARIA state
+    belongs on the inner <button>, not on the generic <app-button> host.
     """
-    combined = _full_source()
-    assert "aria-disabled" in combined, (
-        "Expected 'aria-disabled' in the Button component source (.ts or .html). "
+    html = _html_text()
+    assert re.search(r"\[disabledInteractive\]=", html), (
+        "Expected a '[disabledInteractive]' binding on the matButton in button.html, "
+        "so the busy button renders aria-disabled and stays focusable. "
         "Per criterion: '`disabled` sets `disabled` + `aria-disabled`'."
+    )
+    assert "'[attr.aria-disabled]'" not in _ts_file().read_text(encoding="utf-8"), (
+        "aria-disabled must not be bound on the <app-button> host (a generic element); "
+        "Material renders it on the inner <button>."
     )
 
 
@@ -260,23 +302,30 @@ def test_when_button_source_read_then_spinner_element_is_present():
     """Button template must contain a spinner element shown during loading.
 
     Per criterion: '`loading` shows a spinner'.
-    The spinner must be present in the template (shown conditionally with @if or
-    class binding). Accepted indicators: role='status', the animate-spin Tailwind
-    utility, an <app-spinner> element, SpinnerComponent import, or a literal
-    'spinner' reference in the source.
+    The spinner must be present in the template (shown conditionally with @if).
+    Accepted indicators: a Material <mat-progress-spinner> / <mat-spinner>
+    element, role='status', an <app-spinner> element, a SpinnerComponent
+    import, or a CSS @keyframes animation. The Tailwind animate-spin utility is
+    no longer accepted (Material 3 migration).
     """
     combined = _full_source()
     has_spinner = (
-        'role="status"' in combined
-        or "animate-spin" in combined
+        "<mat-progress-spinner" in combined
+        or "<mat-spinner" in combined
+        or 'role="status"' in combined
         or "app-spinner" in combined.lower()
         or "SpinnerComponent" in combined
-        or bool(re.search(r"\bspinner\b", combined, re.IGNORECASE))
+        or "@keyframes" in combined
     )
     assert has_spinner, (
         "Expected a spinner element in the Button component source. Indicators: "
-        "role='status', animate-spin, <app-spinner>, SpinnerComponent, or "
-        "a 'spinner' reference. Per criterion: '`loading` shows a spinner'."
+        "<mat-progress-spinner>, <mat-spinner>, role='status', <app-spinner>, "
+        "SpinnerComponent, or a CSS @keyframes animation. "
+        "Per criterion: '`loading` shows a spinner'."
+    )
+    assert "animate-spin" not in combined, (
+        "The Tailwind 'animate-spin' utility must not remain after the Material 3 "
+        "migration; use mat-progress-spinner or a CSS animation."
     )
 
 
@@ -339,4 +388,134 @@ def test_when_button_source_read_then_click_is_guarded_against_disabled_or_loadi
         "suppresses clicks) or an explicit conditional in the click handler such as "
         "`if (this.disabled() || this.loading()) return;`. "
         "Per criterion: 'Emits click only when not disabled/loading'."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Material 3 migration: file separation, Material button, tokens only
+# ---------------------------------------------------------------------------
+
+
+def test_when_button_folder_inspected_then_component_is_split_into_ts_html_css():
+    """button.ts must wire button.html and button.css via templateUrl/styleUrl.
+
+    Requirement: every component has exactly <name>.ts + <name>.html +
+    <name>.css, with no inline template or inline styles.
+    """
+    for name in ("button.ts", "button.html", "button.css"):
+        assert (BUTTON_DIR / name).is_file(), (
+            f"Expected shared/ui/button/{name} to exist"
+        )
+    ts = (BUTTON_DIR / "button.ts").read_text(encoding="utf-8")
+    assert re.search(r"templateUrl:\s*'\./button\.html'", ts), (
+        "Expected templateUrl: './button.html' in shared/ui/button/button.ts"
+    )
+    assert re.search(r"styleUrl:\s*'\./button\.css'", ts), (
+        "Expected styleUrl: './button.css' in shared/ui/button/button.ts"
+    )
+    assert not re.search(r"\btemplate:\s*`", ts), (
+        "button.ts must not declare an inline template"
+    )
+    assert not re.search(r"\bstyles:\s*[\[`']", ts), (
+        "button.ts must not declare inline styles"
+    )
+
+
+def test_when_button_template_read_then_material_button_provides_the_touch_target():
+    """The template must render a native <button matButton> from MatButtonModule.
+
+    Replaces the Tailwind `min-h-11` check: Angular Material's M3 button ships a
+    48px touch target at density 0 (M3 target size: 48 x 48dp). The component
+    CSS must not hide that target or override the container height.
+    """
+    html = _html_text()
+    ts = _ts_file().read_text(encoding="utf-8")
+    assert re.search(r"<button\b[^>]*\[?matButton\]?", html), (
+        "Expected a native <button> carrying matButton in shared/ui/button/button.html"
+    )
+    assert "MatButtonModule" in ts or re.search(r"\bMatButton\b", ts), (
+        "Expected MatButtonModule (or MatButton) in the button component imports"
+    )
+    css = _css_text()
+    assert "touch-target-display" not in css, (
+        "button.css must not hide Material's 48px touch target"
+    )
+    assert "container-height" not in css, (
+        "button.css must not override the M3 button container height"
+    )
+
+
+def test_when_button_ts_read_then_variants_map_to_m3_appearances():
+    """Variants map to M3 appearances: primary=filled, secondary=outlined, ghost=text, danger=filled."""
+    ts = _ts_file().read_text(encoding="utf-8")
+    for variant, appearance in (
+        ("primary", "filled"),
+        ("secondary", "outlined"),
+        ("ghost", "text"),
+        ("danger", "filled"),
+    ):
+        assert re.search(rf"\b{variant}:\s*'{appearance}'", ts), (
+            f"Expected variant '{variant}' to map to the '{appearance}' matButton "
+            "appearance in shared/ui/button/button.ts"
+        )
+
+
+def test_when_button_css_read_then_danger_uses_error_roles():
+    """The danger variant sets the filled button tokens to the M3 error roles."""
+    css = _css_text()
+    assert re.search(
+        r"--mat-button-filled-container-color:\s*var\(--mat-sys-error\)", css
+    ), "Expected danger to set --mat-button-filled-container-color to var(--mat-sys-error)"
+    assert re.search(
+        r"--mat-button-filled-label-text-color:\s*var\(--mat-sys-on-error\)", css
+    ), "Expected danger to set --mat-button-filled-label-text-color to var(--mat-sys-on-error)"
+
+
+def test_when_button_css_read_then_only_tokens_style_it():
+    """button.css styles through --mat-sys-* tokens only.
+
+    Replaces the Tailwind `dark:` check: colors come from --mat-sys-* roles, which
+    mat.theme resolves for both color schemes, so no scheme-specific rules or
+    color literals are needed.
+    """
+    css = _css_text()
+    assert "var(--mat-sys-" in css, "Expected button.css to use --mat-sys-* tokens"
+    assert not re.search(r"#[0-9a-fA-F]{3,8}\b", css), "button.css must not contain hex colors"
+    assert not re.search(r"\b(?:rgba?|hsla?)\(", css), (
+        "button.css must not contain rgb()/hsl() color literals"
+    )
+    assert "!important" not in css, "button.css must not use !important"
+    assert "::ng-deep" not in css, "button.css must not use ::ng-deep"
+
+
+def test_when_button_template_and_ts_read_then_no_tailwind_utility_classes_remain():
+    """No Tailwind utility classes in the template's class attributes or TS strings."""
+    html = _html_text()
+    class_names = re.findall(r'\bclass="([^"]*)"', html) + re.findall(
+        r"\[class\.([\w-]+)\]", html
+    )
+    for value in class_names:
+        assert not TAILWIND_RESIDUE.search(value), (
+            f"Tailwind utility residue in button.html class: {value!r}"
+        )
+    ts = _ts_file().read_text(encoding="utf-8")
+    for literal in re.findall(r"'([^'\n]*)'", ts):
+        assert not TAILWIND_RESIDUE.search(literal), (
+            f"Tailwind utility residue in a button.ts string: {literal!r}"
+        )
+
+
+def test_when_button_template_read_then_spinner_tabindex_is_removed():
+    """The loading spinner must not carry a tabindex inside the native <button>.
+
+    MatProgressSpinner sets a static tabindex="-1" on its host, and the HTML
+    content model forbids a <button> descendant with a tabindex attribute, so the
+    template binds [attr.tabindex]="null" on <mat-progress-spinner>.
+    """
+    html = _html_text()
+    spinner = re.search(r"<mat-progress-spinner\b[^>]*>", html)
+    assert spinner, "Expected <mat-progress-spinner> in shared/ui/button/button.html"
+    assert re.search(r'\[attr\.tabindex\]="null"', spinner.group(0)), (
+        "Expected [attr.tabindex]=\"null\" on <mat-progress-spinner> so the button "
+        "has no descendant with a tabindex attribute"
     )

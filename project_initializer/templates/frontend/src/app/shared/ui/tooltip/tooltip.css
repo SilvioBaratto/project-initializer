@@ -1,0 +1,10 @@
+/*
+ * The wrapper is the origin MatTooltip positions its panel against, so it
+ * needs a box that hugs the projected trigger (display: contents has none).
+ * An inline grid blockifies the trigger, so no baseline gap pads the box.
+ * The panel itself is Material's plain tooltip, painted from M3 tokens:
+ * inverse-surface / inverse-on-surface, body-small, corner-extra-small.
+ */
+:host {
+  display: inline-grid;
+}

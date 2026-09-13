@@ -1,0 +1,89 @@
+/*
+ * Avatar: no Angular Material equivalent, so it is built on --mat-sys-* tokens.
+ * Diameter per size on the 4px grid (sm 32, md 40, lg 48, xl 64). The avatar is
+ * not interactive, so it carries no state layer or focus ring; wrap it in a
+ * control that supplies the 48px target when it needs one.
+ */
+:host {
+  --avatar-size: 40px;
+  /* Same diameter in rem, so the initials circle grows with browser text resizing. */
+  --avatar-size-text: 2.5rem;
+
+  /* Containing block for the photo, which NgOptimizedImage renders in fill mode. */
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  inline-size: var(--avatar-size);
+  block-size: var(--avatar-size);
+  /* Keeps the circle from shrinking inside rows of other items. */
+  min-inline-size: var(--avatar-size);
+  min-block-size: var(--avatar-size);
+  overflow: hidden;
+  vertical-align: middle;
+  border-radius: var(--mat-sys-corner-full);
+  /* Placeholder behind a photo while it loads. */
+  background: var(--mat-sys-surface-container-highest);
+  color: var(--mat-sys-on-surface-variant);
+  /* Plain family and weight at every size: lg and xl only step the font size up. */
+  font: var(--mat-sys-title-medium);
+  letter-spacing: var(--mat-sys-title-medium-tracking);
+}
+
+:host([data-size='sm']) {
+  --avatar-size: 32px;
+  --avatar-size-text: 2rem;
+
+  font: var(--mat-sys-label-large);
+  letter-spacing: var(--mat-sys-label-large-tracking);
+}
+
+:host([data-size='lg']) {
+  --avatar-size: 48px;
+  --avatar-size-text: 3rem;
+
+  font-size: var(--mat-sys-title-large-size);
+}
+
+:host([data-size='xl']) {
+  --avatar-size: 64px;
+  --avatar-size-text: 4rem;
+
+  font-size: var(--mat-sys-headline-small-size);
+}
+
+/* Initials carry text: never smaller than the px grid size, larger when text is resized. */
+:host(.app-avatar--initials) {
+  inline-size: max(var(--avatar-size), var(--avatar-size-text));
+  block-size: max(var(--avatar-size), var(--avatar-size-text));
+  min-inline-size: max(var(--avatar-size), var(--avatar-size-text));
+  min-block-size: max(var(--avatar-size), var(--avatar-size-text));
+  background: var(--mat-sys-primary-container);
+  color: var(--mat-sys-on-primary-container);
+}
+
+/* Fill mode positions the photo over the whole circle; cover crops non-square photos. */
+.image {
+  object-fit: cover;
+}
+
+/* data: and blob: photos skip NgOptimizedImage, so they fill the circle the way fill mode does. */
+.image-inline {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+}
+
+.initials {
+  line-height: 1;
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* Forced colors drop backgrounds: keep the circle's edge visible. */
+@media (forced-colors: active) {
+  :host {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+}

@@ -1,0 +1,38 @@
+/*
+ * Indeterminate circular progress plus its label, on --mat-sys-* tokens only.
+ *
+ * mat-progress-spinner strokes the indicator with --mat-sys-primary: 5.00:1 or more against
+ * surface through surface-container-highest in both schemes (graphics need 3:1). The label
+ * uses on-surface-variant: 7.25:1 or more on the same surfaces (small text needs 4.5:1).
+ * The indicator keeps a direction: ltr of its own, so it turns clockwise in RTL too.
+ *
+ * Reduced motion needs no rule here: Material keeps the indeterminate animation running at
+ * 1.25x its duration, and the global reduced-motion rule in styles.scss exempts it.
+ */
+:host {
+  display: inline-flex;
+  max-inline-size: 100%;
+  vertical-align: middle;
+}
+
+/* position: relative keeps the visually hidden label anchored inside the component. */
+.status {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-inline-size: 0;
+}
+
+/* Fixed diameter: a narrow parent never squeezes it, and text resizing leaves it alone. */
+.indicator {
+  flex-shrink: 0;
+}
+
+.label {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+  font: var(--mat-sys-body-medium);
+  letter-spacing: var(--mat-sys-body-medium-tracking);
+  color: var(--mat-sys-on-surface-variant);
+}

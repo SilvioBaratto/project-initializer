@@ -1,0 +1,14 @@
+/*
+ * Colors, type, shape and states come from Material's outlined form field, which
+ * reads the --mat-sys-* theme tokens: outline and on-surface-variant supporting
+ * text, error role in the error state, 38% disabled content. At density 0 its
+ * container is 56px tall, above the 48px target, so nothing here shrinks it.
+ */
+:host {
+  display: block;
+}
+
+/* Fill the parent the way a block-level text field does; the default infix is a fixed 180px. */
+.field {
+  inline-size: 100%;
+}

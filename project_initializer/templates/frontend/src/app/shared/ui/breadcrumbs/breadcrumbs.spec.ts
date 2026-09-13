@@ -1,6 +1,5 @@
-import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { LucideIconConfig } from 'lucide-angular';
 
 import { ICON_PROVIDER } from '../../../icons';
@@ -14,14 +13,18 @@ async function setup(items: CrumbItem[] = []): Promise<ComponentFixture<Breadcru
   await TestBed.configureTestingModule({
     imports: [BreadcrumbsComponent],
     providers: [
-      provideRouter([]),
+      // Component-less routes: enough for RouterLink to resolve and navigate.
+      provideRouter([
+        { path: 'settings', children: [] },
+        { path: '', children: [] },
+      ]),
       ICON_PROVIDER,
       {
         provide: LucideIconConfig,
         useFactory: () => {
           const cfg = new LucideIconConfig();
-          cfg.size = 16;
-          cfg.strokeWidth = 1.5;
+          cfg.size = 24;
+          cfg.strokeWidth = 2;
           return cfg;
         },
       },
@@ -31,6 +34,7 @@ async function setup(items: CrumbItem[] = []): Promise<ComponentFixture<Breadcru
   const f = TestBed.createComponent(BreadcrumbsComponent);
   f.componentRef.setInput('items', items);
   f.detectChanges();
+  await f.whenStable();
   return f;
 }
 
@@ -40,6 +44,20 @@ function nav(f: ComponentFixture<unknown>): HTMLElement {
 
 function ol(f: ComponentFixture<unknown>): HTMLElement {
   return f.nativeElement.querySelector('ol')!;
+}
+
+function links(f: ComponentFixture<unknown>): HTMLAnchorElement[] {
+  return Array.from(f.nativeElement.querySelectorAll('a'));
+}
+
+function crumbs(f: ComponentFixture<unknown>): HTMLLIElement[] {
+  return Array.from(f.nativeElement.querySelectorAll('li'));
+}
+
+/** The emulated-encapsulation stylesheet Angular injected for this component. */
+function componentStylesheet(): string {
+  const sheets = Array.from(document.head.querySelectorAll('style')).map((s) => s.textContent ?? '');
+  return sheets.find((css) => css.includes('.crumb-link')) ?? '';
 }
 
 const THREE_CRUMBS: CrumbItem[] = [
@@ -63,16 +81,32 @@ describe('BreadcrumbsComponent — nav landmark', () => {
     expect(nav(f).getAttribute('aria-label')).toBe('Breadcrumb');
   });
 
+  it('when a label is given, the nav uses it as its distinct accessible name', async () => {
+    const f = await setup(THREE_CRUMBS);
+    f.componentRef.setInput('label', 'Dark preview breadcrumb');
+    f.detectChanges();
+    expect(nav(f).getAttribute('aria-label')).toBe('Dark preview breadcrumb');
+  });
+
+  it('when breadcrumbs render, the landmark label sits on the nav, not the host', async () => {
+    const f = await setup(THREE_CRUMBS);
+    expect((f.nativeElement as HTMLElement).hasAttribute('aria-label')).toBe(false);
+  });
+
   it('when breadcrumbs render, the list is an ordered list (<ol>)', async () => {
     const f = await setup(THREE_CRUMBS);
     expect(ol(f)).not.toBeNull();
     expect(ol(f).tagName.toLowerCase()).toBe('ol');
   });
 
+  it('when breadcrumbs render, the unstyled list keeps list semantics with role="list"', async () => {
+    const f = await setup(THREE_CRUMBS);
+    expect(ol(f).getAttribute('role')).toBe('list');
+  });
+
   it('when three crumbs are provided, three <li> elements are rendered', async () => {
     const f = await setup(THREE_CRUMBS);
-    const items = f.nativeElement.querySelectorAll('li');
-    expect(items.length).toBe(3);
+    expect(crumbs(f).length).toBe(3);
   });
 });
 
@@ -98,6 +132,12 @@ describe('BreadcrumbsComponent — aria-current="page" on last crumb', () => {
     const current = f.nativeElement.querySelector('[aria-current="page"]')!;
     expect(current.textContent?.trim()).toBe('Profile');
   });
+
+  it('when breadcrumbs render, the aria-current element is inside the last <li>', async () => {
+    const f = await setup(THREE_CRUMBS);
+    const lis = crumbs(f);
+    expect(lis[lis.length - 1].querySelector('[aria-current="page"]')).not.toBeNull();
+  });
 });
 
 describe('BreadcrumbsComponent — last crumb is not a link', () => {
@@ -107,11 +147,111 @@ describe('BreadcrumbsComponent — last crumb is not a link', () => {
     expect(current.tagName.toLowerCase()).not.toBe('a');
   });
 
+  it('when breadcrumbs render, the current crumb is not focusable', async () => {
+    const f = await setup(THREE_CRUMBS);
+    const current = f.nativeElement.querySelector('[aria-current="page"]') as HTMLElement;
+    expect(current.hasAttribute('tabindex')).toBe(false);
+    expect(current.hasAttribute('href')).toBe(false);
+  });
+
   it('when breadcrumbs render, non-last crumbs are anchor elements', async () => {
     const f = await setup(THREE_CRUMBS);
-    const anchors: NodeListOf<HTMLAnchorElement> = f.nativeElement.querySelectorAll('a');
     // Three crumbs → first two are links (2 anchors)
-    expect(anchors.length).toBe(2);
+    expect(links(f).length).toBe(2);
+  });
+});
+
+describe('BreadcrumbsComponent — ancestor links', () => {
+  it('when breadcrumbs render, each link carries an href to its route (native keyboard activation)', async () => {
+    const f = await setup(THREE_CRUMBS);
+    expect(links(f).map((a) => a.getAttribute('href'))).toEqual(['/', '/settings']);
+  });
+
+  it('when breadcrumbs render, each link is named by its visible label only', async () => {
+    const f = await setup(THREE_CRUMBS);
+    const [home, settings] = links(f);
+    expect(home.textContent?.trim()).toBe('Home');
+    expect(settings.textContent?.trim()).toBe('Settings');
+    expect(home.hasAttribute('aria-label')).toBe(false);
+  });
+
+  it('when an ancestor link is clicked, the router navigates to its route', async () => {
+    const f = await setup(THREE_CRUMBS);
+    const router = TestBed.inject(Router);
+
+    links(f)[1].click();
+    await f.whenStable();
+
+    expect(router.url).toBe('/settings');
+  });
+
+  it('when two crumbs share a label, every crumb still renders', async () => {
+    const f = await setup([
+      { label: 'Docs', routerLink: '/' },
+      { label: 'Docs', routerLink: '/settings' },
+      { label: 'Docs' },
+    ]);
+    expect(crumbs(f).length).toBe(3);
+  });
+});
+
+describe('BreadcrumbsComponent — ancestor without a route', () => {
+  const NO_ROUTE: CrumbItem[] = [
+    { label: 'Home', routerLink: '/' },
+    { label: 'Archive' },
+    { label: 'Profile' },
+  ];
+
+  it('when a middle crumb has no routerLink, it renders as text, not a link to the current page', async () => {
+    const f = await setup(NO_ROUTE);
+    const middle = crumbs(f)[1];
+    expect(middle.querySelector('a')).toBeNull();
+    expect(middle.querySelector('[href]')).toBeNull();
+    expect(middle.textContent?.trim()).toBe('Archive');
+    expect(links(f).map((a) => a.getAttribute('href'))).toEqual(['/']);
+  });
+
+  it('when a middle crumb has no routerLink, it is not marked as the current page', async () => {
+    const f = await setup(NO_ROUTE);
+    expect(crumbs(f)[1].querySelector('[aria-current]')).toBeNull();
+    expect(f.nativeElement.querySelectorAll('[aria-current="page"]').length).toBe(1);
+  });
+
+  it('when a middle crumb has no routerLink, a separator still follows it', async () => {
+    const f = await setup(NO_ROUTE);
+    expect(crumbs(f)[1].querySelector('lucide-icon[aria-hidden="true"]')).not.toBeNull();
+    expect(f.nativeElement.querySelectorAll('lucide-icon[aria-hidden="true"]').length).toBe(2);
+  });
+});
+
+describe('BreadcrumbsComponent — pressed ripple', () => {
+  it('when breadcrumbs render, each link hosts a ripple layer and the current crumb has none', async () => {
+    const f = await setup(THREE_CRUMBS);
+    for (const a of links(f)) {
+      expect(a.querySelector('.crumb-ripple.mat-ripple')).not.toBeNull();
+    }
+    expect(f.nativeElement.querySelector('[aria-current="page"] .mat-ripple')).toBeNull();
+  });
+
+  it('when a link is pressed with a pointer, a ripple fades in inside the link', async () => {
+    const f = await setup(THREE_CRUMBS);
+    const [home] = links(f);
+    home.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, buttons: 1, detail: 1 }));
+    expect(home.querySelectorAll('.crumb-ripple .mat-ripple-element').length).toBe(1);
+  });
+
+  it('when a screen reader sends a fake mousedown, no ripple appears', async () => {
+    const f = await setup(THREE_CRUMBS);
+    const [home] = links(f);
+    home.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, buttons: 0, detail: 0 }));
+    expect(home.querySelectorAll('.mat-ripple-element').length).toBe(0);
+  });
+
+  it('when rendered, the ripple uses the content color at the pressed state-layer opacity', async () => {
+    await setup(THREE_CRUMBS);
+    expect(componentStylesheet()).toMatch(
+      /--mat-ripple-color:[^;]*var\(--mat-sys-on-surface-variant\)[^;]*var\(--mat-sys-pressed-state-layer-opacity\)/,
+    );
   });
 });
 
@@ -134,10 +274,25 @@ describe('BreadcrumbsComponent — separators are aria-hidden', () => {
     const separators = f.nativeElement.querySelectorAll('lucide-icon[aria-hidden="true"]');
     expect(separators.length).toBe(0);
   });
+
+  it('when breadcrumbs render, separators follow their link inside the same <li>', async () => {
+    const f = await setup(THREE_CRUMBS);
+    const firstLi: HTMLElement = f.nativeElement.querySelector('li');
+    const anchor = firstLi.querySelector('a')!;
+    expect(anchor.nextElementSibling?.tagName.toLowerCase()).toBe('lucide-icon');
+  });
+
+  it('when breadcrumbs render, separator chevrons render at 18px', async () => {
+    const f = await setup(THREE_CRUMBS);
+    const svg = f.nativeElement.querySelector('lucide-icon svg') as SVGElement | null;
+    expect(svg).not.toBeNull();
+    expect(svg!.getAttribute('width')).toBe('18');
+    expect(svg!.getAttribute('height')).toBe('18');
+  });
 });
 
 // ===========================================================================
-// Criterion 3 — Signal input; dark-mode tokens
+// Criterion 3 — Signal input; Material 3 tokens
 // ===========================================================================
 
 describe('BreadcrumbsComponent — signal input', () => {
@@ -156,12 +311,11 @@ describe('BreadcrumbsComponent — signal input', () => {
 
   it('when items is empty, no list items are rendered', async () => {
     const f = await setup([]);
-    const lis = f.nativeElement.querySelectorAll('li');
-    expect(lis.length).toBe(0);
+    expect(crumbs(f).length).toBe(0);
   });
 });
 
-describe('BreadcrumbsComponent — dark-mode tokens', () => {
+describe('BreadcrumbsComponent — Material 3 tokens', () => {
   it('when rendered, no hardcoded hex colours appear in inline element styles', async () => {
     const f = await setup(THREE_CRUMBS);
     const hexPattern = /#[0-9a-fA-F]{3,8}\b/;
@@ -172,14 +326,32 @@ describe('BreadcrumbsComponent — dark-mode tokens', () => {
     }
   });
 
-  it('when rendered, the ordered list carries a text-text-secondary token class', async () => {
-    const f = await setup(THREE_CRUMBS);
-    expect(ol(f).className).toContain('text-text-secondary');
+  it('when rendered, the stylesheet paints from --mat-sys-* roles with no color literals', async () => {
+    await setup(THREE_CRUMBS);
+    const css = componentStylesheet();
+    expect(css).not.toBe('');
+    expect(css).toContain('var(--mat-sys-on-surface-variant)');
+    expect(css).toContain('var(--mat-sys-on-surface)');
+    expect(css).toContain('var(--mat-sys-body-medium)');
+    expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(/);
   });
 
-  it('when rendered, the current crumb carries a text-text token class', async () => {
-    const f = await setup(THREE_CRUMBS);
-    const current = f.nativeElement.querySelector('[aria-current="page"]')!;
-    expect(current.className).toContain('text-text');
+  it('when rendered, the link state layer uses the Material state-layer opacity tokens', async () => {
+    await setup(THREE_CRUMBS);
+    const css = componentStylesheet();
+    expect(css).toContain('var(--mat-sys-hover-state-layer-opacity)');
+    expect(css).toContain('var(--mat-sys-focus-state-layer-opacity)');
+    expect(css).toContain('var(--mat-sys-pressed-state-layer-opacity)');
+    expect(css).toMatch(/outline-offset:\s*2px/);
+  });
+
+  it('when rendered, crumb rows reserve a 48px target', async () => {
+    await setup(THREE_CRUMBS);
+    expect(componentStylesheet()).toMatch(/min-block-size:\s*48px/);
+  });
+
+  it('when rendered, the separator chevron mirrors in right-to-left layouts', async () => {
+    await setup(THREE_CRUMBS);
+    expect(componentStylesheet()).toMatch(/:dir\(rtl\)[^{]*\{[^}]*scaleX\(-1\)/);
   });
 });

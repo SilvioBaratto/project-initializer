@@ -1,0 +1,5 @@
+/*
+ * Nothing to style here: the host is never attached to the page. `ui-tabs` renders the label
+ * template inside Material's tab header, which owns the label typography (title-small), the
+ * on-surface label color, state layers and the primary active indicator through its tokens.
+ */

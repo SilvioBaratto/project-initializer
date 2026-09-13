@@ -1,0 +1,132 @@
+:host {
+  display: block;
+}
+
+/* Trail: crumbs wrap onto new rows instead of truncating, so every label stays readable. */
+.trail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-medium);
+  letter-spacing: var(--mat-sys-body-medium-tracking);
+}
+
+/* Each row is 48px so the enlarged link targets of wrapped rows never overlap. */
+.crumb {
+  display: flex;
+  align-items: center;
+  min-block-size: 48px;
+  min-inline-size: 0;
+}
+
+/* Ancestor crumb with a route: a text-button-sized link (40px visual, 48px target). */
+.crumb-link {
+  /* Ripple in the content color at the pressed opacity, the way Material tints its text-button ripple. */
+  --mat-ripple-color: color-mix(
+    in srgb,
+    var(--mat-sys-on-surface-variant) calc(var(--mat-sys-pressed-state-layer-opacity) * 100%),
+    transparent
+  );
+
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-block-size: 40px;
+  min-inline-size: 48px;
+  padding-inline: 12px;
+  border-radius: var(--mat-sys-corner-full);
+  color: var(--mat-sys-on-surface-variant);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+/* State layer in the content color; opacity comes from Material's state tokens. */
+.crumb-link::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms linear;
+}
+
+/*
+ * Ripple container: an inner layer clipped to the link shape (like .mat-mdc-button-ripple), so the
+ * ripple's overflow clipping never cuts the ::after touch target. It sits under the label text.
+ */
+.crumb-ripple {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* Touch target: extends the 40px link to 48px tall, like Material's button touch target. */
+.crumb-link::after {
+  content: '';
+  position: absolute;
+  inset-block: -4px;
+  inset-inline: 0;
+}
+
+@media (hover: hover) {
+  .crumb-link:hover::before {
+    opacity: var(--mat-sys-hover-state-layer-opacity);
+  }
+}
+
+.crumb-link:focus-visible::before {
+  opacity: var(--mat-sys-focus-state-layer-opacity);
+}
+
+/* Pressed: state layer plus the ripple, as Material buttons combine them. */
+.crumb-link:active::before {
+  opacity: var(--mat-sys-pressed-state-layer-opacity);
+}
+
+/* Keyboard focus ring outside the link with a gap, matching mat.strong-focus-indicators(). */
+.crumb-link:focus-visible {
+  outline: var(--mat-focus-indicator-border-width, 3px) solid var(--mat-sys-secondary);
+  outline-offset: 2px;
+}
+
+/* Non-link crumb text, aligned with the link labels by the same inline padding. */
+.crumb-text {
+  display: inline-flex;
+  align-items: center;
+  padding-inline: 12px;
+  color: var(--mat-sys-on-surface-variant);
+  overflow-wrap: anywhere;
+}
+
+/* Current page: not interactive, so no state layer; stronger color and weight. */
+.crumb-current {
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-label-large);
+  letter-spacing: var(--mat-sys-label-large-tracking);
+}
+
+/* Decorative chevron; `display: flex` lets the transform apply and drops the svg baseline gap. */
+.separator {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+/* Directional icon: the chevron points toward the next crumb in right-to-left layouts too. */
+.separator:dir(rtl) {
+  transform: scaleX(-1);
+}

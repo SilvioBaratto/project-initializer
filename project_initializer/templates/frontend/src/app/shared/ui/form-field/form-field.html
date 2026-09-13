@@ -1,0 +1,18 @@
+<!--
+  A projected <app-input> or <app-select> claims FORM_FIELD_CONTEXT and renders the
+  label, hint and error inside its own mat-form-field, so only the control shows.
+  A projected native control (also one swapped in for such a control) gets the label
+  and supporting text below; the component class sets its id, aria-invalid and
+  aria-describedby after each check.
+-->
+@if (!contextClaimed() && label()) {
+  <label class="label" [for]="labelFor()">{{ label() }}</label>
+}
+<ng-content />
+@if (!contextClaimed()) {
+  @if (errorText()) {
+    <span class="supporting-text error-text" [id]="errorId" role="alert">{{ errorText() }}</span>
+  } @else if (helpText()) {
+    <span class="supporting-text" [id]="helpId">{{ helpText() }}</span>
+  }
+}

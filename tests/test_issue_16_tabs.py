@@ -6,18 +6,24 @@ Criteria covered (per oracle report):
          aria-labelledby
   [UNIT] Roving tabindex; ArrowLeft/ArrowRight + Home/End move focus;
          Enter/Space activate
+  [UNIT] 48px tab targets and theme tokens only (Material 3)
 
 Skipped (not runtime-verifiable):
-  Dark-mode tokens, visible focus, ≥44px tabs
+  Visible focus rendering
   All tests pass (boilerplate suite gate)
   SOLID / code-quality prose
 
 Design note: tests scaffold a frontend-only project and inspect the generated
-Tabs component files. Tests FAIL today (Red) because the Tabs component does
-not yet exist in the template tree; they will PASS once the implementation is
-added to project_initializer/templates/frontend/src/app/shared/ui/tabs/.
+Tabs component files. The component is built on Angular Material's
+``mat-tab-group``, which renders the tablist/tab/tabpanel roles, the ARIA
+attributes, the roving tabindex and the arrow/Home/End/Enter/Space keyboard
+handling itself. The template therefore no longer spells those out; each
+criterion is checked as "the component delegates to ``mat-tab-group``" plus
+"the co-located spec (tabs.spec.ts) asserts the rendered behavior", which the
+Angular test run verifies at runtime.
 """
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -31,21 +37,41 @@ from hypothesis import given, strategies as st
 
 TABS_RELATIVE_DIR = Path("frontend/src/app/shared/ui/tabs")
 
+# Each component in the folder: exactly <name>.ts + <name>.html + <name>.css.
+TABS_COMPONENTS = ("tabs", "tab", "tab-panel")
+
+
+def _read_tabs_component(root: Path) -> str:
+    """
+    Return the combined source of the generated Tabs components: every
+    non-spec ``.ts`` plus every ``.html`` and ``.css`` in the tabs folder.
+    """
+    tabs_dir = root / TABS_RELATIVE_DIR
+    files = sorted(
+        f
+        for pattern in ("*.ts", "*.html", "*.css")
+        for f in tabs_dir.glob(pattern)
+        if ".spec." not in f.name
+    )
+    return "\n".join(f.read_text(encoding="utf-8") for f in files)
+
 
 def _read_tabs_template(root: Path) -> str:
-    """
-    Return the HTML/template content of the generated Tabs component.
-    Handles both inline-template (.ts only) and separate .html variants.
-    """
-    html_path = root / TABS_RELATIVE_DIR / "tabs.html"
-    if html_path.exists():
-        return html_path.read_text(encoding="utf-8")
-    ts_path = root / TABS_RELATIVE_DIR / "tabs.ts"
-    return ts_path.read_text(encoding="utf-8")
+    """Return the ``ui-tabs`` template (tabs.html)."""
+    return (root / TABS_RELATIVE_DIR / "tabs.html").read_text(encoding="utf-8")
 
 
-def _read_tabs_ts(root: Path) -> str:
-    return (root / TABS_RELATIVE_DIR / "tabs.ts").read_text(encoding="utf-8")
+def _read_tabs_css(root: Path) -> str:
+    """Return the combined stylesheets of the Tabs components."""
+    tabs_dir = root / TABS_RELATIVE_DIR
+    return "\n".join(
+        f.read_text(encoding="utf-8") for f in sorted(tabs_dir.glob("*.css"))
+    )
+
+
+def _read_tabs_spec(root: Path) -> str:
+    """Return the co-located Angular spec that exercises the rendered tabs."""
+    return (root / TABS_RELATIVE_DIR / "tabs.spec.ts").read_text(encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -87,41 +113,56 @@ def scaffolded(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 
 class TestARIARolesPresent:
-    """role="tablist"/"tab"/"tabpanel" must appear in the generated template."""
+    """role="tablist"/"tab"/"tabpanel" come from Material's tab group.
+
+    The template delegates to ``mat-tab-group`` (which renders the roles) and
+    the co-located spec asserts each role on the rendered DOM.
+    """
 
     def test_when_tabs_template_is_generated_then_tablist_role_is_present(
         self, scaffolded: Path
     ) -> None:
-        assert 'role="tablist"' in _read_tabs_template(scaffolded)
+        assert "<mat-tab-group" in _read_tabs_template(scaffolded)
+        assert '[role="tablist"]' in _read_tabs_spec(scaffolded)
 
     def test_when_tabs_template_is_generated_then_tab_role_is_present(
         self, scaffolded: Path
     ) -> None:
-        assert 'role="tab"' in _read_tabs_template(scaffolded)
+        assert "<mat-tab>" in _read_tabs_template(scaffolded)
+        assert '[role="tab"]' in _read_tabs_spec(scaffolded)
 
     def test_when_tabs_template_is_generated_then_tabpanel_role_is_present(
         self, scaffolded: Path
     ) -> None:
-        assert 'role="tabpanel"' in _read_tabs_template(scaffolded)
+        assert "matTabContent" in _read_tabs_template(scaffolded)
+        assert '[role="tabpanel"]' in _read_tabs_spec(scaffolded)
 
 
 class TestARIAAttributesPresent:
-    """aria-selected, aria-controls, and aria-labelledby must be present."""
+    """aria-selected, aria-controls, and aria-labelledby must be present.
+
+    Material sets them on the rendered tabs and panels; the spec asserts them.
+    ``ui-tabs`` also forwards its own ``ariaLabel``/``ariaLabelledby`` inputs
+    to the tablist.
+    """
 
     def test_when_tabs_template_is_generated_then_aria_selected_is_present(
         self, scaffolded: Path
     ) -> None:
-        assert "aria-selected" in _read_tabs_template(scaffolded)
+        assert "<mat-tab-group" in _read_tabs_template(scaffolded)
+        assert "aria-selected" in _read_tabs_spec(scaffolded)
 
     def test_when_tabs_template_is_generated_then_aria_controls_is_present(
         self, scaffolded: Path
     ) -> None:
-        assert "aria-controls" in _read_tabs_template(scaffolded)
+        assert "<mat-tab-group" in _read_tabs_template(scaffolded)
+        assert "aria-controls" in _read_tabs_spec(scaffolded)
 
     def test_when_tabs_template_is_generated_then_aria_labelledby_is_present(
         self, scaffolded: Path
     ) -> None:
-        assert "aria-labelledby" in _read_tabs_template(scaffolded)
+        assert "[aria-labelledby]" in _read_tabs_template(scaffolded)
+        assert "aria-labelledby" in _read_tabs_spec(scaffolded)
 
 
 # ===========================================================================
@@ -135,48 +176,107 @@ class TestRovingTabindex:
     def test_when_tabs_template_is_generated_then_tabindex_binding_is_present(
         self, scaffolded: Path
     ) -> None:
-        assert "tabindex" in _read_tabs_template(scaffolded)
+        assert "<mat-tab-group" in _read_tabs_template(scaffolded)
+        assert "tabindex" in _read_tabs_spec(scaffolded)
 
 
 class TestKeyboardNavigation:
-    """All required key identifiers must appear in the component's TypeScript."""
+    """Material's tab header handles every required key.
+
+    The component must not add a second keydown handler, which would move
+    focus twice. The spec drives each key through the rendered tabs.
+    """
 
     def test_when_tabs_ts_is_generated_then_ArrowLeft_key_is_handled(
         self, scaffolded: Path
     ) -> None:
-        assert "ArrowLeft" in _read_tabs_ts(scaffolded)
+        assert "MatTabsModule" in _read_tabs_component(scaffolded)
+        assert "TestKey.LEFT_ARROW" in _read_tabs_spec(scaffolded)
 
     def test_when_tabs_ts_is_generated_then_ArrowRight_key_is_handled(
         self, scaffolded: Path
     ) -> None:
-        assert "ArrowRight" in _read_tabs_ts(scaffolded)
+        assert "MatTabsModule" in _read_tabs_component(scaffolded)
+        assert "TestKey.RIGHT_ARROW" in _read_tabs_spec(scaffolded)
 
     def test_when_tabs_ts_is_generated_then_Home_key_is_handled(
         self, scaffolded: Path
     ) -> None:
-        assert "Home" in _read_tabs_ts(scaffolded)
+        assert "MatTabsModule" in _read_tabs_component(scaffolded)
+        assert "TestKey.HOME" in _read_tabs_spec(scaffolded)
 
     def test_when_tabs_ts_is_generated_then_End_key_is_handled(
         self, scaffolded: Path
     ) -> None:
-        assert "End" in _read_tabs_ts(scaffolded)
+        assert "MatTabsModule" in _read_tabs_component(scaffolded)
+        assert "TestKey.END" in _read_tabs_spec(scaffolded)
 
     def test_when_tabs_ts_is_generated_then_Enter_key_is_handled(
         self, scaffolded: Path
     ) -> None:
-        assert "Enter" in _read_tabs_ts(scaffolded)
+        assert "MatTabsModule" in _read_tabs_component(scaffolded)
+        assert "TestKey.ENTER" in _read_tabs_spec(scaffolded)
 
     def test_when_tabs_ts_is_generated_then_Space_key_is_handled(
         self, scaffolded: Path
     ) -> None:
-        content = _read_tabs_ts(scaffolded)
-        assert " " in content or "Space" in content
+        assert "MatTabsModule" in _read_tabs_component(scaffolded)
+        # The harness sends the Space key as the literal ' ' character.
+        assert ", ' ')" in _read_tabs_spec(scaffolded)
 
     def test_when_tabs_template_is_generated_then_keydown_handler_is_wired(
         self, scaffolded: Path
     ) -> None:
-        """The tablist element must wire up a keydown listener."""
-        assert "keydown" in _read_tabs_template(scaffolded)
+        """Keydown reaches Material's tab header; the component adds no handler of its own."""
+        component = _read_tabs_component(scaffolded)
+        assert "<mat-tab-group" in component
+        assert "keydown" not in component
+        assert "sendKeys(" in _read_tabs_spec(scaffolded)
+
+
+# ===========================================================================
+# Criterion 3 — Material 3 structure, 48px targets, theme tokens
+# ===========================================================================
+
+
+class TestMaterialStructure:
+    """Each component is <name>.ts + .html + .css, OnPush, styled only with tokens."""
+
+    @pytest.mark.parametrize("name", TABS_COMPONENTS)
+    def test_when_tabs_are_generated_then_each_component_has_ts_html_and_css(
+        self, scaffolded: Path, name: str
+    ) -> None:
+        tabs_dir = scaffolded / TABS_RELATIVE_DIR
+        for ext in ("ts", "html", "css"):
+            assert (tabs_dir / f"{name}.{ext}").exists(), f"missing {name}.{ext}"
+        ts = (tabs_dir / f"{name}.ts").read_text(encoding="utf-8")
+        assert f"templateUrl: './{name}.html'" in ts
+        assert f"styleUrl: './{name}.css'" in ts
+        assert "ChangeDetectionStrategy.OnPush" in ts
+        assert "template:" not in ts and "styles:" not in ts
+
+    def test_when_tabs_are_generated_then_public_selectors_are_kept(
+        self, scaffolded: Path
+    ) -> None:
+        component = _read_tabs_component(scaffolded)
+        for selector in ("ui-tabs", "ui-tab", "ui-tab-panel"):
+            assert f"selector: '{selector}'" in component
+
+    def test_when_tabs_are_generated_then_tab_targets_keep_materials_48px_height(
+        self, scaffolded: Path
+    ) -> None:
+        """Material's tab container is 48px at density 0; no stylesheet shrinks it."""
+        assert "<mat-tab-group" in _read_tabs_template(scaffolded)
+        assert "--mat-tab-container-height" not in _read_tabs_css(scaffolded)
+
+    def test_when_tabs_css_is_generated_then_it_uses_tokens_without_color_literals(
+        self, scaffolded: Path
+    ) -> None:
+        css = _read_tabs_css(scaffolded)
+        assert "var(--mat-sys-" in css
+        assert not re.search(r"#[0-9a-fA-F]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\(", css)
+        assert "!important" not in css
+        assert "::ng-deep" not in css
 
 
 # ===========================================================================

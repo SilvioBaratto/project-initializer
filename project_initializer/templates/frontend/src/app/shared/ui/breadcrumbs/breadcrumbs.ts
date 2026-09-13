@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { MatRipple } from '@angular/material/core';
 import { RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
@@ -7,35 +8,27 @@ export interface CrumbItem {
   routerLink?: string | string[];
 }
 
+/**
+ * Breadcrumb trail. Material 3 and Angular Material ship no breadcrumbs, so the
+ * trail is built on `--mat-sys-*` tokens. Ancestor crumbs with a route are links
+ * with a state layer, a pressed ripple, a focus ring outside the link and a 48px
+ * target; an ancestor without a route is plain text. The last crumb is the
+ * current page (marked with aria-current, not a link). Chevron separators are
+ * decorative and mirror in right-to-left layouts.
+ */
 @Component({
   selector: 'ui-breadcrumbs',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideAngularModule],
-  template: `
-    <nav aria-label="Breadcrumb">
-      <ol class="flex flex-wrap items-center gap-1 text-sm
-                 text-text-secondary dark:text-text-secondary">
-        @for (crumb of items(); track crumb.label; let last = $last) {
-          <li class="flex items-center gap-1">
-            @if (last) {
-              <span aria-current="page"
-                    class="font-medium text-text dark:text-text">
-                {{ crumb.label }}
-              </span>
-            } @else {
-              <a [routerLink]="crumb.routerLink ?? []"
-                 class="transition-colors hover:text-text dark:hover:text-text">
-                {{ crumb.label }}
-              </a>
-              <lucide-icon name="ChevronRight" class="h-3.5 w-3.5 shrink-0"
-                           aria-hidden="true" />
-            }
-          </li>
-        }
-      </ol>
-    </nav>
-  `,
+  imports: [RouterLink, MatRipple, LucideAngularModule],
+  templateUrl: './breadcrumbs.html',
+  styleUrl: './breadcrumbs.css',
 })
 export class BreadcrumbsComponent {
   readonly items = input([] as CrumbItem[]);
+
+  /**
+   * Accessible name of the navigation landmark. When a page shows more than one
+   * trail, give each a distinct label (without the word "navigation").
+   */
+  readonly label = input('Breadcrumb');
 }

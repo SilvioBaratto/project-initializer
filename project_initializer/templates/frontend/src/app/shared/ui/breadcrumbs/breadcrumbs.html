@@ -1,0 +1,23 @@
+<nav class="breadcrumbs" [attr.aria-label]="label()">
+  <!-- role="list": list-style: none drops list semantics in WebKit/VoiceOver -->
+  <ol class="trail" role="list">
+    @for (crumb of items(); track $index; let last = $last) {
+      <li class="crumb">
+        @if (last) {
+          <span class="crumb-text crumb-current" aria-current="page">{{ crumb.label }}</span>
+        } @else if (crumb.routerLink) {
+          <a #link class="crumb-link" [routerLink]="crumb.routerLink">
+            <span class="crumb-ripple" matRipple [matRippleTrigger]="link" aria-hidden="true"></span>
+            {{ crumb.label }}
+          </a>
+        } @else {
+          <!-- No route: plain text, since a link here would point at the current page -->
+          <span class="crumb-text">{{ crumb.label }}</span>
+        }
+        @if (!last) {
+          <lucide-icon class="separator" name="ChevronRight" [size]="18" aria-hidden="true" />
+        }
+      </li>
+    }
+  </ol>
+</nav>

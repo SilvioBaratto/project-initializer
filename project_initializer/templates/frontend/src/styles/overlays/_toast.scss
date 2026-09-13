@@ -1,0 +1,26 @@
+// Global overlay-panel styles owned by shared/ui/toast.
+// Material renders the snackbar in the body-level .cdk-overlay-container, so toast.css
+// cannot reach its container (Angular Material gotcha: overlay panels). ToastService passes
+// `app-toast` as `panelClass`, and MatSnackBar puts it on the container itself.
+// Tokens and px only, no color literals.
+
+// Bottom center (MatSnackBar's position) keeps Material's 8px gap and clears the iOS home
+// indicator.
+.mat-mdc-snack-bar-container.app-toast {
+  margin-block-end: calc(8px + env(safe-area-inset-bottom));
+}
+
+// While the shell's navigation bar is on screen, the snackbar sits 8px above it. LayoutComponent
+// renders the bar (class shell-nav-bar) only at the compact window size, so keying the rule to
+// the bar's presence covers pages routed outside the shell (login has no bar) and a snackbar that
+// stays open while the window crosses 600px, which a panel class chosen at open time cannot.
+// The bar is at least 64px + env(safe-area-inset-bottom) tall and grows with larger text or a
+// wrapped label, so the offset reads --app-nav-bar-block-size, the bar's rendered block size.
+// BottomTabBarComponent measures itself with a ResizeObserver and publishes it on <html>: this
+// container sits in the body-level overlay container, outside the bar, so it only inherits from
+// the root. Before the first measurement (or without ResizeObserver) the fallback is that minimum.
+// The fallback keeps its own calc(): Sass evaluates var() arguments, and a bare
+// `64px + env(...)` there compiles to the invalid `64pxenv(...)`.
+body:has(.shell-nav-bar) .mat-mdc-snack-bar-container.app-toast {
+  margin-block-end: calc(8px + var(--app-nav-bar-block-size, calc(64px + env(safe-area-inset-bottom))));
+}

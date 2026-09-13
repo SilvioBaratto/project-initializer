@@ -5,34 +5,58 @@ import {
   input,
   output,
 } from '@angular/core';
+import { MatIconButton } from '@angular/material/button';
 import { LucideAngularModule } from 'lucide-angular';
 
+import type { IconName } from '../../../icons';
+
+/**
+ * Which navigation surface the toggle drives.
+ * - `modal`: opens and closes the modal expanded rail (compact window size class).
+ * - `rail`: expands and collapses a docked navigation rail (medium and up).
+ */
+export type HamburgerVariant = 'modal' | 'rail';
+
+/**
+ * Navigation toggle built on the M3 standard icon button (`matIconButton`).
+ * The accessible name names the action and flips with `open`; `aria-expanded`
+ * and `aria-controls` tie the button to the surface it drives.
+ */
 @Component({
   selector: 'app-hamburger',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule],
-  template: `
-    <button
-      type="button"
-      class="inline-flex items-center justify-center min-h-11 min-w-11
-             rounded-md p-1.5 text-text-secondary
-             hover:text-text hover:bg-surface-inset
-             transition-colors focus-visible:outline-none
-             focus-visible:ring-2 focus-visible:ring-primary"
-      [attr.aria-expanded]="open()"
-      [attr.aria-controls]="controls()"
-      [attr.aria-label]="label()"
-      (click)="toggle.emit()"
-    >
-      <lucide-icon [name]="open() ? 'X' : 'Menu'" class="w-5 h-5" aria-hidden="true" />
-    </button>
-  `,
+  imports: [MatIconButton, LucideAngularModule],
+  templateUrl: './hamburger.html',
+  styleUrl: './hamburger.css',
 })
 export class HamburgerComponent {
-  readonly open     = input(false);
+  /** Whether the controlled navigation surface is open (modal) or expanded (rail). */
+  readonly open = input(false);
+  /** Id of the element the button controls; omitted from the DOM when empty. */
   readonly controls = input('');
+  /** Navigation surface the toggle drives; picks the icon pair and label wording. */
+  readonly variant = input<HamburgerVariant>('modal');
 
   readonly toggle = output<void>();
 
-  readonly label = computed(() => this.open() ? 'Close menu' : 'Open menu');
+  readonly label = computed(() => {
+    if (this.variant() === 'rail') {
+      return this.open() ? 'Collapse navigation' : 'Expand navigation';
+    }
+    return this.open() ? 'Close navigation' : 'Open navigation';
+  });
+
+  /**
+   * Closed or collapsed: the menu icon at the top of every M3 side rail.
+   * Open: X closes the modal rail; PanelLeftClose collapses the docked rail.
+   */
+  readonly icon = computed<IconName>(() => {
+    if (!this.open()) {
+      return 'Menu';
+    }
+    return this.variant() === 'rail' ? 'PanelLeftClose' : 'X';
+  });
+
+  /** Only PanelLeftClose points at an edge, so only it mirrors in RTL; Menu and X are symmetric. */
+  readonly directional = computed(() => this.icon() === 'PanelLeftClose');
 }

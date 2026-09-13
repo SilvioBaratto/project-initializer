@@ -1,0 +1,96 @@
+/*
+ * Responsive data table. Header row (56px, title-small), data rows (52px, body-medium), start-aligned
+ * cells and the last-row divider come from Angular Material's table tokens (--mat-table-*); this sheet
+ * draws the outlined scroll region, the M3 compact stacked cards and the layout switch at 600px
+ * (M3 compact / medium boundary, the same literal as WindowSizeClassService).
+ */
+
+:host {
+  display: block;
+}
+
+/* ── Scroll region ───────────────────────────────────────────────────────── */
+
+/* Outlined container on surface; scrolls on its own and never chains the scroll to the page. */
+.table-region {
+  overflow-x: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: var(--mat-sys-corner-medium);
+  background-color: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-body-medium);
+  letter-spacing: var(--mat-sys-body-medium-tracking);
+}
+
+/* Keyboard focus ring outside the region with a gap, matching mat.strong-focus-indicators(). */
+.table-region:focus-visible {
+  outline: 3px solid var(--mat-sys-secondary);
+  outline-offset: 2px;
+}
+
+/* ── Medium and wider: Material data table ───────────────────────────────── */
+
+/* Hidden at compact; the stacked cards take over. Row dividers are decorative, so outline-variant. */
+.table-data {
+  display: none;
+  --mat-table-row-item-outline-color: var(--mat-sys-outline-variant);
+}
+
+/* ── Compact: stacked cards ──────────────────────────────────────────────── */
+
+/* Markers removed, so the list keeps role="list" in the template for WebKit / VoiceOver. */
+.table-cards {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.table-card {
+  padding-block: 12px;
+  padding-inline: 16px;
+}
+
+.table-card + .table-card {
+  border-block-start: 1px solid var(--mat-sys-outline-variant);
+}
+
+/* Labels share one column sized to the longest header (no fixed width, so translations wrap). */
+.table-card-fields {
+  display: grid;
+  grid-template-columns: fit-content(40%) minmax(0, 1fr);
+  column-gap: 16px;
+  row-gap: 4px;
+  margin: 0;
+}
+
+.table-card-field {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: baseline;
+}
+
+.table-card-label {
+  font: var(--mat-sys-label-large);
+  letter-spacing: var(--mat-sys-label-large-tracking);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.table-card-value {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--mat-sys-on-surface);
+}
+
+/* ── Layout switch at the M3 medium breakpoint ───────────────────────────── */
+
+@media (min-width: 600px) {
+  .table-data {
+    display: table;
+  }
+
+  .table-cards {
+    display: none;
+  }
+}

@@ -1,0 +1,18 @@
+<lucide-icon class="alert-icon" [name]="icon()" />
+
+<div class="alert-message" [attr.role]="role()">
+  <span class="cdk-visually-hidden">{{ statusLabel() }}:&ngsp;</span>
+  <ng-content />
+</div>
+
+@if (dismissible()) {
+  <button
+    matIconButton
+    type="button"
+    class="alert-dismiss"
+    [attr.aria-label]="dismissLabel()"
+    (click)="dismiss()"
+  >
+    <lucide-icon name="X" />
+  </button>
+}

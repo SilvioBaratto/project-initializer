@@ -1,0 +1,28 @@
+/*
+ * Stacks the label, the projected control and the supporting text.
+ * minmax(0, 1fr) lets a wide control shrink instead of overflowing the column.
+ * A projected Material control renders its own label and subscript, so it is the only row.
+ */
+:host {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 4px;
+}
+
+/* Visible label above a projected native control. */
+.label {
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-label-large);
+  letter-spacing: var(--mat-sys-label-large-tracking);
+}
+
+/* Help text: the M3 text field supporting-text role. */
+.supporting-text {
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-small);
+  letter-spacing: var(--mat-sys-body-small-tracking);
+}
+
+.error-text {
+  color: var(--mat-sys-error);
+}

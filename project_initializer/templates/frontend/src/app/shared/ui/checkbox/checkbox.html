@@ -1,0 +1,14 @@
+<mat-checkbox
+  class="checkbox"
+  [class.checkbox-invalid]="hasError()"
+  [id]="checkboxId()"
+  [checked]="isChecked()"
+  [disabled]="isDisabled()"
+  [indeterminate]="indeterminate()"
+  (change)="onChange($event)"
+  (indeterminateChange)="indeterminate.set($event)"
+  (focusout)="onTouched()"
+>{{ label() }}</mat-checkbox>
+@if (hasError()) {
+  <span class="error-text" [id]="errorId()" role="alert">{{ errorText() }}</span>
+}

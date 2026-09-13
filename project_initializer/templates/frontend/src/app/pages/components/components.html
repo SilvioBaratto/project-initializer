@@ -1,80 +1,70 @@
-<div class="mx-auto max-w-5xl space-y-12">
-  <div>
-    <h1 class="text-2xl font-semibold text-text">Component Catalog</h1>
-    <p class="mt-1 text-sm text-text-secondary">
-      Every shared UI component rendered in light and dark for cross-platform QA (issue #24).
+<div class="catalog">
+  <header class="catalog-header">
+    <h1 class="catalog-title">Component catalog</h1>
+    <p class="catalog-intro">
+      Every shared UI component, shown in a light and a dark region so you can check both color schemes side by side
     </p>
-  </div>
+  </header>
 
-  <!-- Core -->
-  <section data-section="Core">
-    <h2 class="mb-6 text-lg font-semibold text-text border-b border-border pb-2">Core</h2>
+  <section class="catalog-section" data-section="Core" aria-labelledby="catalog-core-heading">
+    <h2 id="catalog-core-heading" class="section-heading">Core</h2>
     <app-core-section />
   </section>
 
-  <!-- Forms -->
-  <section data-section="Forms">
-    <h2 class="mb-6 text-lg font-semibold text-text border-b border-border pb-2">Forms</h2>
+  <section class="catalog-section" data-section="Forms" aria-labelledby="catalog-forms-heading">
+    <h2 id="catalog-forms-heading" class="section-heading">Forms</h2>
     <app-forms-section />
   </section>
 
-  <!-- Navigation -->
-  <section data-section="Navigation">
-    <h2 class="mb-6 text-lg font-semibold text-text border-b border-border pb-2">Navigation</h2>
+  <section class="catalog-section" data-section="Navigation" aria-labelledby="catalog-navigation-heading">
+    <h2 id="catalog-navigation-heading" class="section-heading">Navigation</h2>
     <app-navigation-section />
   </section>
 
-  <!-- Overlays -->
-  <section data-section="Overlays">
-    <h2 class="mb-6 text-lg font-semibold text-text border-b border-border pb-2">Overlays</h2>
-    <p class="mb-4 text-xs text-text-secondary">
-      Overlays use fixed positioning and escape any local dark container.
-      Triggers shown in both light and dark; at most one overlay opens at a time.
+  <section class="catalog-section" data-section="Overlays" aria-labelledby="catalog-overlays-heading">
+    <h2 id="catalog-overlays-heading" class="section-heading">Overlays</h2>
+    <p class="section-intro">
+      Modals, slide-overs, drawers, snackbars, and tooltips open in an overlay container at the end of the page,
+      outside these regions, so they follow the app's theme rather than the region you open them from. Only one modal,
+      slide-over, or drawer is open at a time.
     </p>
-    <!-- Dual-region trigger row: light (left) and dark-scoped (right) -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-      <div class="light rounded-lg border border-border bg-surface p-4">
-        <p class="mb-2 text-xs text-text-tertiary">Light — Overlay Triggers</p>
-        <app-overlays-section (opened)="openOverlay($event)" />
-      </div>
-      <div class="dark rounded-lg border border-border bg-surface p-4">
-        <p class="mb-2 text-xs text-text-tertiary">Dark — Overlay Triggers</p>
-        <app-overlays-section (opened)="openOverlay($event)" />
-      </div>
-    </div>
+
+    <!-- The section previews each trigger group in a light and a dark region; the dialogs are mounted once, below. -->
+    <app-overlays-section (opened)="openOverlay($event)" />
   </section>
 
-  <!-- Data Display -->
-  <section data-section="Data Display">
-    <h2 class="mb-6 text-lg font-semibold text-text border-b border-border pb-2">Data Display</h2>
+  <section class="catalog-section" data-section="Data Display" aria-labelledby="catalog-data-display-heading">
+    <h2 id="catalog-data-display-heading" class="section-heading">Data display</h2>
     <app-data-display-section />
   </section>
-
-  <!-- Overlays rendered once at page root — outside any .dark container so they
-       follow the global theme (CSS variables inherit through the DOM tree, not
-       the visual box). At most one open at a time. -->
-  @if (activeOverlay() === 'modal') {
-    <app-modal [open]="true" label="Demo Modal" (closed)="closeOverlay()">
-      <p class="text-sm text-text">This is a demo modal dialog.</p>
-      <div class="mt-4">
-        <app-button variant="secondary" (clicked)="closeOverlay()">Close</app-button>
-      </div>
-    </app-modal>
-  }
-  @if (activeOverlay() === 'slide-over') {
-    <app-slide-over [open]="true" label="Demo Slide-over" (closed)="closeOverlay()">
-      <p class="p-4 text-sm text-text">Demo slide-over panel content.</p>
-      <div class="p-4">
-        <app-button variant="secondary" (clicked)="closeOverlay()">Close</app-button>
-      </div>
-    </app-slide-over>
-  }
-  @if (activeOverlay() === 'drawer') {
-    <app-drawer [open]="true" side="right" (close)="closeOverlay()">
-      <p class="p-4 text-sm text-text">Demo drawer panel content.</p>
-      <div class="p-4">
-        <app-button variant="secondary" (clicked)="closeOverlay()">Close</app-button>
-      </div>
-    </app-drawer>
-  }
 </div>
+
+<!--
+  One instance of each overlay. Each open state is derived from activeOverlay, so at most one is open.
+  MatDialog renders them in the overlay container under the body element, where they follow the
+  global theme, and returns focus to the trigger when they close. A user dismissal clears
+  activeOverlay through (closed) / (close), scoped to its own overlay so a late dismissal never
+  clears one opened after it.
+
+  Modal actions: dismissive Cancel first as a text button, then the one confirming action, Publish,
+  as the filled button, so it is the most prominent action in the dialog.
+-->
+<app-modal #modal label="Publish changes?" [open]="activeOverlay() === 'modal'" (closed)="closeOverlay('modal')">
+  <p class="overlay-text">Everyone with access to this project will see your changes</p>
+  <app-modal-actions>
+    <button matButton type="button" (click)="modal.close()">Cancel</button>
+    <button matButton="filled" type="button" (click)="modal.close()">Publish</button>
+  </app-modal-actions>
+</app-modal>
+
+<app-slide-over
+  label="Project details"
+  [open]="activeOverlay() === 'slide-over'"
+  (closed)="closeOverlay('slide-over')"
+>
+  <p class="overlay-text">Created by Alice Smith. Last updated 5 minutes ago.</p>
+</app-slide-over>
+
+<app-drawer label="Notifications" side="right" [open]="activeOverlay() === 'drawer'" (close)="closeOverlay('drawer')">
+  <p class="overlay-text">You're all caught up</p>
+</app-drawer>

@@ -1,0 +1,67 @@
+<!--
+  The page owns the h1 and this section's h2, so each demo group is an h3. The heading sits outside
+  the ng-template, so it appears once in the outline while ThemePreviewComponent stamps the demo into
+  a light and a dark region.
+-->
+<div class="demo-group" data-demo="overlay-triggers">
+  <h3 class="demo-heading">Modal, slide-over, and drawer</h3>
+  <app-theme-preview>
+    <ng-template>
+      <!--
+        Each surface is a modal MatDialog, so its trigger takes aria-haspopup="dialog" and no aria-expanded:
+        that state belongs to disclosures, and the dialog makes the trigger inert while it is open.
+      -->
+      <app-stack direction="row" align="center" [wrap]="true" [gap]="2">
+        <button matButton="outlined" type="button" aria-haspopup="dialog" (click)="opened.emit('modal')">
+          Open modal
+        </button>
+        <button matButton="outlined" type="button" aria-haspopup="dialog" (click)="opened.emit('slide-over')">
+          Open slide-over
+        </button>
+        <button matButton="outlined" type="button" aria-haspopup="dialog" (click)="opened.emit('drawer')">
+          Open drawer
+        </button>
+      </app-stack>
+    </ng-template>
+  </app-theme-preview>
+</div>
+
+<div class="demo-group" data-demo="snackbars">
+  <h3 class="demo-heading">Snackbar</h3>
+  <app-theme-preview>
+    <ng-template>
+      <app-stack direction="row" align="center" [wrap]="true" [gap]="2">
+        <button matButton="outlined" type="button" (click)="showSnackbar()">Show snackbar</button>
+        <button matButton="outlined" type="button" (click)="showErrorSnackbar()">Show error snackbar</button>
+      </app-stack>
+    </ng-template>
+  </app-theme-preview>
+</div>
+
+<div class="demo-group" data-demo="tooltips">
+  <h3 class="demo-heading">Tooltip</h3>
+  <app-theme-preview>
+    <ng-template>
+      <app-stack direction="row" align="center" [wrap]="true" [gap]="2">
+        <!-- Wrapper API: describes the first focusable element projected inside it. -->
+        <ui-tooltip text="Keeps your changes without publishing them" position="above">
+          <app-button variant="ghost" size="sm">Save draft</app-button>
+        </ui-tooltip>
+
+        <!--
+          Directive API, on the focusable trigger itself. The tooltip repeats the icon button's name for
+          pointer users; AriaDescriber skips a description that matches aria-label, so it isn't read twice.
+        -->
+        <button
+          matIconButton
+          type="button"
+          aria-label="Copy link"
+          uiTooltip="Copy link"
+          uiTooltipPosition="above"
+        >
+          <lucide-icon name="Copy" />
+        </button>
+      </app-stack>
+    </ng-template>
+  </app-theme-preview>
+</div>

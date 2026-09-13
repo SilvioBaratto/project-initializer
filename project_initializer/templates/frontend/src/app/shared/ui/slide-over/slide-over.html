@@ -1,22 +1,10 @@
-@if (open()) {
-  <!-- Backdrop -->
-  <div
-    class="fixed inset-0 z-50 bg-black/40 dark:bg-black/60"
-    data-testid="slide-over-backdrop"
-    (click)="handleClose()"
-    aria-hidden="true"
-  ></div>
-
-  <!-- Dialog panel — slides in from the configured edge -->
-  <div
-    role="dialog"
-    aria-modal="true"
-    [attr.aria-label]="label()"
-    [class]="allPanelClasses()"
-    appFocusTrap
-    [active]="open()"
-    (close)="handleClose()"
-  >
-    <ng-content />
-  </div>
-}
+<!-- Nothing renders in place: app-drawer opens the content in the overlay container while `open` is true. -->
+<app-drawer
+  [(open)]="open"
+  [side]="side()"
+  [label]="label()"
+  closeLabel="Close panel"
+  (close)="closed.emit()"
+>
+  <ng-content />
+</app-drawer>

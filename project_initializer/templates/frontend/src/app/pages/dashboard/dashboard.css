@@ -1,0 +1,132 @@
+/*
+ * Dashboard: M3 feed canonical layout, a grid of peer cards that reflows with the
+ * window size class and gains columns at expanded (M3 canonical layouts, feed,
+ * "Across breakpoints").
+ *
+ *   compact   (< 600px)    16px margins, cards stacked in one column
+ *   medium    (600-839px)  24px margins, two card columns
+ *   expanded+ (>= 840px)   24px margins, four card columns, while the page's own
+ *                          content box is at least 672px wide. A docked sidebar
+ *                          that leaves less keeps two columns: the page-width
+ *                          guard sits inside the window query, so it can only
+ *                          narrow the result.
+ *
+ * The four peer cards step 2 -> 4, not 2 -> 3, so no row is left with a lone card.
+ * The shell's <main> adds no padding, so the page owns its pane margins. Content is
+ * capped at 64rem and centered, like the sibling home and settings pages. Colors,
+ * type and shape come from --mat-sys-* tokens only.
+ */
+:host {
+  display: block;
+  box-sizing: border-box;
+  /* Card columns react to the width left beside the navigation, not only the window. */
+  container: dashboard / inline-size;
+  padding-block: 16px;
+  padding-inline: 16px;
+}
+
+@media (min-width: 600px) {
+  :host {
+    padding-block: 24px;
+    padding-inline: 24px;
+  }
+}
+
+.dashboard {
+  max-inline-size: 64rem;
+  margin-inline: auto;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.dashboard-header {
+  margin-block-end: 16px;
+}
+
+.dashboard-title {
+  margin: 0;
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-headline-small);
+  letter-spacing: var(--mat-sys-headline-small-tracking);
+}
+
+.dashboard-supporting-text {
+  margin: 4px 0 0;
+  /* Body text stays within about 60 characters per line. */
+  max-inline-size: 60ch;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-medium);
+  letter-spacing: var(--mat-sys-body-medium-tracking);
+}
+
+@media (min-width: 600px) {
+  .dashboard-header {
+    margin-block-end: 24px;
+  }
+}
+
+/* ── Metric feed ────────────────────────────────────────────────────────── */
+
+.metric-feed {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 600px) {
+  .metric-feed {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+  }
+}
+
+@media (min-width: 840px) {
+  /* 4 x 150px card floor + 3 x 24px gaps. The floor is this page's, not an M3 value:
+     it lets the four cards fit beside a 96px collapsed rail at an 840px window. */
+  @container dashboard (min-width: 672px) {
+    .metric-feed {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+}
+
+/* Cards in the same row share a height. */
+.metric-card {
+  block-size: 100%;
+}
+
+.metric-label {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-title-small);
+  letter-spacing: var(--mat-sys-title-small-tracking);
+}
+
+.metric-value {
+  margin: 8px 0 0;
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-headline-large);
+  letter-spacing: var(--mat-sys-headline-large-tracking);
+  font-variant-numeric: tabular-nums;
+  /* Large text resizing wraps the figure instead of clipping it. */
+  overflow-wrap: anywhere;
+}
+
+.metric-hint {
+  margin: 4px 0 0;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-small);
+  letter-spacing: var(--mat-sys-body-small-tracking);
+}
+
+/* ── Loading placeholders ───────────────────────────────────────────────── */
+
+/* Label, value and hint lines of a placeholder tile, in the order the card shows them. */
+.skeleton-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

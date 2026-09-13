@@ -1,1 +1,181 @@
+/*
+ * Routed view outside the app shell: a single pane centered in the window.
+ *   compact  (< 600px): the pane fills the width inside 16px margins
+ *   medium+ (>= 600px): 24px margins, the pane caps at 400px
+ * Colors, type and shape come from --mat-sys-* tokens and the --app-* status roles.
+ * Buttons keep Material's 48px touch targets (density 0); text fields are 56px tall.
+ */
+:host {
+  display: block;
+}
 
+.page {
+  box-sizing: border-box;
+  min-block-size: 100vh;
+  min-block-size: 100dvh;
+  display: grid;
+  place-items: center;
+  padding-block: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-bottom));
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+}
+
+.pane {
+  inline-size: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/*
+ * Card title (the view's h1) in headline-small, subtitle in body-medium on-surface-variant
+ * (8.93:1 light, 14.33:1 dark), set through Material's card tokens like the sibling auth views.
+ */
+.card {
+  --mat-card-title-text-font: var(--mat-sys-headline-small-font);
+  --mat-card-title-text-line-height: var(--mat-sys-headline-small-line-height);
+  --mat-card-title-text-size: var(--mat-sys-headline-small-size);
+  --mat-card-title-text-tracking: var(--mat-sys-headline-small-tracking);
+  --mat-card-title-text-weight: var(--mat-sys-headline-small-weight);
+  --mat-card-subtitle-text-color: var(--mat-sys-on-surface-variant);
+  --mat-card-subtitle-text-font: var(--mat-sys-body-medium-font);
+  --mat-card-subtitle-text-line-height: var(--mat-sys-body-medium-line-height);
+  --mat-card-subtitle-text-size: var(--mat-sys-body-medium-size);
+  --mat-card-subtitle-text-tracking: var(--mat-sys-body-medium-tracking);
+  --mat-card-subtitle-text-weight: var(--mat-sys-body-medium-weight);
+}
+
+/* The card keeps 24px insets at every width, like the token, Entra and password reset cards. */
+.card > .header {
+  padding: 24px 24px 0;
+}
+
+.header .subtitle {
+  margin-block-start: 4px;
+}
+
+.card > .content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 24px 24px;
+}
+
+@media (min-width: 600px) {
+  .page {
+    padding-left: max(24px, env(safe-area-inset-left));
+    padding-right: max(24px, env(safe-area-inset-right));
+  }
+
+  .pane {
+    max-inline-size: 400px;
+  }
+}
+
+/* ── Actions ────────────────────────────────────────────────────────────── */
+
+.full-width {
+  inline-size: 100%;
+}
+
+/* Non-mat-icon content in a Material button's icon slot (18px, Material's icon offsets). */
+.brand-mark,
+.button-spinner {
+  display: flex;
+  flex-shrink: 0;
+  margin-inline: -8px 8px;
+}
+
+/* The spinner follows the button label color, including the disabled 38% state. */
+.button-spinner {
+  --mat-progress-spinner-active-indicator-color: currentColor;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-label-medium);
+  letter-spacing: var(--mat-sys-label-medium-tracking);
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  border-block-start: 1px solid var(--mat-sys-outline-variant);
+}
+
+/* ── Form ───────────────────────────────────────────────────────────────── */
+
+/* No gap: the always-present live regions stay empty (0px) until they get content. */
+.form {
+  display: flex;
+  flex-direction: column;
+}
+
+.field {
+  inline-size: 100%;
+}
+
+.field + .field {
+  margin-block-start: 4px;
+}
+
+.message {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-block: 4px 16px;
+  padding: 12px 16px;
+  border-radius: var(--mat-sys-corner-medium);
+  font: var(--mat-sys-body-medium);
+  letter-spacing: var(--mat-sys-body-medium-tracking);
+}
+
+.message-error {
+  background: var(--mat-sys-error-container);
+  color: var(--mat-sys-on-error-container);
+}
+
+.message-success {
+  background: var(--app-success-container);
+  color: var(--app-on-success-container);
+}
+
+.message-icon {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.message-text {
+  margin: 0;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+.reset-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-block-end: 8px;
+}
+
+.submit {
+  margin-block-start: 8px;
+}
+
+/* ── Mode switch ────────────────────────────────────────────────────────── */
+
+.switch {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-medium);
+  letter-spacing: var(--mat-sys-body-medium-tracking);
+  text-align: center;
+}

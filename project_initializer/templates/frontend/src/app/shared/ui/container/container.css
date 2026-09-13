@@ -1,0 +1,47 @@
+/*
+ * Page-width container. The host is the box: a block that fills its parent, centers itself once
+ * the size cap is reached, and pads its content by the M3 window margin plus the device
+ * safe-area inset. The cap measures the content (padding sits outside it), so a size keeps the
+ * same line length at every window size.
+ *
+ * Margins follow the M3 window size classes: 16px at compact (below 600px), 24px from medium
+ * (600px) up. Safe-area insets are physical (left/right), so the sides are set with physical
+ * properties: in RTL the left inset must still pad the left edge.
+ */
+
+:host {
+  --app-container-margin: 16px;
+
+  display: block;
+  max-inline-size: 56rem;
+  margin-inline: auto;
+  padding-left: calc(var(--app-container-margin) + env(safe-area-inset-left, 0px));
+  padding-right: calc(var(--app-container-margin) + env(safe-area-inset-right, 0px));
+}
+
+@media (min-width: 600px) {
+  :host {
+    --app-container-margin: 24px;
+  }
+}
+
+/* Size caps in rem so they scale with the user's text size. */
+:host([data-size='sm']) {
+  max-inline-size: 24rem;
+}
+
+:host([data-size='md']) {
+  max-inline-size: 42rem;
+}
+
+:host([data-size='lg']) {
+  max-inline-size: 56rem;
+}
+
+:host([data-size='xl']) {
+  max-inline-size: 72rem;
+}
+
+:host([data-size='full']) {
+  max-inline-size: none;
+}

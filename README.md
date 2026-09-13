@@ -131,7 +131,7 @@ my-project/
 │   ├── Dockerfile
 │   ├── README.md           # generated backend quick-start
 │   └── .claude/CLAUDE.md   # generated deep architecture guide
-├── frontend/               # Angular + Tailwind CSS
+├── frontend/               # Angular + Angular Material 3
 │   ├── Dockerfile
 │   ├── nginx.conf
 │   ├── src/

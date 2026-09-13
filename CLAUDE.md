@@ -307,13 +307,24 @@ Which overlay owns a lock follows its `package.json`: `templates-api-nestjs` (ba
 
 ## Frontend Template (`frontend/`)
 
-Angular 21 with Tailwind CSS. Key conventions:
+Angular 21 with Angular Material 3 (`@angular/material` + `@angular/cdk` 21.2) and `lucide-angular` icons. There is no utility-class CSS framework and no PostCSS config. Key conventions:
 
 - **Standalone components only** (no NgModules, don't set `standalone: true` — it's default)
 - **Signals for state**: Use `signal()`, `computed()`, `input()`, `output()`
 - **Native control flow**: Use `@if`, `@for`, `@switch` instead of `*ngIf`, `*ngFor`
 - **OnPush change detection**: Set `changeDetection: ChangeDetectionStrategy.OnPush`
 - **Inject function**: Use `inject()` instead of constructor injection
+- **Three files per component**: `<name>.ts` + `<name>.html` + `<name>.css`, wired with `templateUrl` / `styleUrl`; no inline templates or styles
+- **Theme and tokens**: `src/styles.scss` applies `mat.theme()` on `html` with `color-scheme: light dark` (violet primary, green tertiary, density 0). Component CSS uses only `--mat-sys-*` tokens plus the `--app-{success,warning,info}*` status roles defined there: no color literals, no `!important`, no `::ng-deep`. Tune a Material component through its token custom properties (`--mat-button-*`, `--mat-list-*`, …)
+- **Light and dark**: `ThemeService` puts exactly one of `.light` / `.dark` on `<html>`; those classes only set `color-scheme`. Before Angular boots, a script in `src/index.html` pins a stored choice (`app-theme`) as an inline `color-scheme`, which `ThemeService` removes when it applies the class
+- **CSP nonce**: `src/index.html` renders `<app-root ngCspNonce="CSP_NONCE">`; `frontend/nginx.conf` swaps the placeholder for `$request_id` with `sub_filter` and allows that nonce in its `Content-Security-Policy` `script-src` and `style-src`. The base and both api layers ship the same file; the supabase and entra frontend overlays ship their own, which also allows their provider in `connect-src` (and `frame-src` for Entra). `tests/test_frontend_nginx_csp.py` keeps the copies identical apart from that policy
+- **Overlay panels**: dialogs, snackbars and menus render in the body-level `.cdk-overlay-container`, so their panel styles live in `src/styles/overlays/_<component>.scss` (`@use`d by `styles.scss`), selected by the `panelClass` passed to `MatDialog`, `MatBottomSheet` or `MatSnackBar`; `mat-menu` takes a static `class` instead (its `panelClass` input aliases `class`)
+- **Window size classes**: `WindowSizeClassService` (`src/app/services/window-size-class.ts`) on the M3 breakpoints 600 / 840 / 1200 / 1600px, with the same literals in CSS media queries. Never the CDK `Breakpoints` presets or 768px
+- **Navigation shell**: below 600px a top app bar plus a navigation bar, with a top app bar button that opens the theme and account actions (never destinations); from 600px a collapsed rail docked in `mat-sidenav`, which a toggle expands from 840px and which starts expanded from 1600px, unless the user has toggled the rail: that choice is stored in localStorage (`app-rail-expanded`, `RAIL_EXPANDED_STORAGE_KEY` in `layout.ts`) and wins at every width from 840px; never a navigation drawer
+- **Icons**: registered by name in `src/app/icons.ts` (an unregistered name throws when the icon renders); inside Material text, filled, outlined or tonal buttons add `matButtonIcon` (plus `iconPositionEnd` when trailing) and `[size]="18"`. Material's icon margins target `.mat-icon` only, so give the `lucide-icon` host `display: flex; flex-shrink: 0; margin-inline: -8px 8px` when leading (`8px -8px` when trailing, -4px instead of -8px on text buttons)
+- **Specs**: Vitest through `ng test` (zoneless, `src/test-providers.ts`); prefer Angular Material test harnesses
+
+The generated `frontend/.claude/CLAUDE.md` (`generate_frontend_claude()` in `docs_generator.py`) carries the full list; change both together. `tests/test_docs_frontend_material.py` cross-checks each convention it names against the template.
 
 Key commands:
 ```bash

@@ -1,91 +1,85 @@
-<div class="flex flex-col h-full">
-  <!-- Messages area -->
-  <!-- overscroll-contain: prevents the page/shell from scrolling when the message list
-       reaches its boundary (rubber-band escape on iOS Safari and over-scroll on Chrome). -->
-  <div class="flex-1 overflow-y-auto overscroll-contain px-4 py-6 md:px-8" #scrollContainer role="log" aria-label="Chat messages" aria-live="polite">
-    @if (messages().length === 0) {
-      <div class="flex items-center justify-center h-full">
-        <div class="text-center max-w-sm">
-          <div class="w-12 h-12 mx-auto mb-4 rounded-2xl bg-accent/10 flex items-center justify-center">
-            <svg class="w-6 h-6 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
-            </svg>
+<!-- The route title names the view; the chat keeps its full height for the conversation. -->
+<h1 class="cdk-visually-hidden">Chat</h1>
+
+<!-- Message history. Scrolls on its own (overscroll contained) and is focusable so
+     keyboard users can scroll it: its messages hold no focusable content. -->
+<div
+  #scrollContainer
+  class="messages"
+  role="log"
+  aria-label="Chat messages"
+  aria-live="polite"
+  tabindex="0"
+>
+  @if (messages().length === 0) {
+    <div class="empty-state">
+      <span class="empty-icon">
+        <lucide-icon name="message-square" />
+      </span>
+      <h2 class="empty-title">Start a conversation</h2>
+      <p class="empty-text">Ask anything to get started</p>
+    </div>
+  } @else {
+    <div class="thread">
+      @for (msg of messages(); track msg.id) {
+        @if (msg.role === 'user') {
+          <div class="message message-user">
+            <span class="cdk-visually-hidden">You</span>
+            <p class="message-text">{{ msg.content }}</p>
           </div>
-          <h2 class="text-base font-semibold text-text mb-1">Start a conversation</h2>
-          <p class="text-sm text-text-secondary">Ask anything to get started.</p>
+        } @else if (msg.isError) {
+          <div class="message message-error">
+            <lucide-icon class="message-icon" name="circle-alert" [size]="20" />
+            <p class="message-text">{{ msg.content }}</p>
+          </div>
+        } @else {
+          <div class="message message-assistant">
+            <span class="cdk-visually-hidden">Assistant</span>
+            <p class="message-text">{{ msg.content }}</p>
+          </div>
+        }
+      }
+
+      @if (isLoading()) {
+        <div class="message message-assistant typing" role="status">
+          <span class="cdk-visually-hidden">Assistant is typing…</span>
+          <span class="typing-dots" aria-hidden="true">
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+          </span>
         </div>
-      </div>
-    } @else {
-      <div class="max-w-3xl mx-auto space-y-4">
-        @for (msg of messages(); track msg.id) {
-          @if (msg.role === 'user') {
-            <div class="flex justify-end">
-              <div class="max-w-[80%] rounded-2xl rounded-br-md px-4 py-2.5 bg-accent text-white text-sm leading-relaxed whitespace-pre-wrap">
-                {{ msg.content }}
-              </div>
-            </div>
-          } @else if (msg.isError) {
-            <div class="flex justify-start">
-              <div class="max-w-[80%] rounded-2xl rounded-bl-md px-4 py-2.5 bg-red-50 border border-red-200 text-red-800 text-sm leading-relaxed">
-                <div class="flex items-center gap-2">
-                  <svg class="w-4 h-4 flex-shrink-0 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
-                  </svg>
-                  <span>{{ msg.content }}</span>
-                </div>
-              </div>
-            </div>
-          } @else {
-            <div class="flex justify-start">
-              <div class="max-w-[80%] rounded-2xl rounded-bl-md px-4 py-2.5 bg-zinc-100 text-text text-sm leading-relaxed whitespace-pre-wrap">
-                {{ msg.content }}
-              </div>
-            </div>
-          }
-        }
+      }
+    </div>
+  }
+</div>
 
-        @if (isLoading()) {
-          <div class="flex justify-start" role="status" aria-label="Assistant is typing">
-            <div class="rounded-2xl rounded-bl-md px-4 py-2.5 bg-zinc-100">
-              <div class="flex items-center gap-1.5" aria-hidden="true">
-                <div class="w-1.5 h-1.5 rounded-full bg-text-secondary/50 animate-bounce motion-reduce:animate-none [animation-delay:0ms]"></div>
-                <div class="w-1.5 h-1.5 rounded-full bg-text-secondary/50 animate-bounce motion-reduce:animate-none [animation-delay:150ms]"></div>
-                <div class="w-1.5 h-1.5 rounded-full bg-text-secondary/50 animate-bounce motion-reduce:animate-none [animation-delay:300ms]"></div>
-              </div>
-            </div>
-          </div>
-        }
-      </div>
-    }
-  </div>
-
-  <!-- Input bar — Gemini-style pill, identical on mobile and desktop.
-       The textarea and send button sit inline (items-end), so the send stays
-       pinned bottom-right as the text grows. The textarea auto-grows up to a
-       ~168px cap (matching Gemini's 7-line max), then scrolls internally. -->
-  <div class="px-4 py-3 md:px-8 md:py-4">
-    <form
-      (ngSubmit)="onSend()"
-      class="max-w-3xl mx-auto flex items-end gap-2 rounded-[26px] border border-border bg-surface-inset px-2 py-1.5 shadow-sm transition-colors focus-within:border-accent/40 focus-within:shadow">
+<!-- Composer. Enter sends, Shift+Enter inserts a newline; the textarea grows to
+     7 rows, then scrolls. The send button stays pinned to the bottom edge. -->
+<div class="composer-region">
+  <form class="composer" (submit)="$event.preventDefault(); onSend()">
+    <mat-form-field class="composer-field" appearance="outline" subscriptSizing="dynamic">
       <textarea
+        #inputEl
+        matInput
+        cdkTextareaAutosize
+        [cdkAutosizeMinRows]="1"
+        [cdkAutosizeMaxRows]="7"
         aria-label="Chat message"
-        class="flex-1 resize-none border-0 bg-transparent px-3 py-1.5 text-[15px]/6 text-text placeholder:text-text-secondary/60
-               [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
-               focus:outline-none focus:ring-0"
-        rows="1"
-        placeholder="Type a message..."
+        placeholder="Type a message"
         [value]="userInput()"
         (input)="onInputChange($event)"
         (keydown.enter)="onKeydown($event)"
-        [disabled]="isLoading()"
-        #inputEl></textarea>
-      <button
-        type="submit"
-        aria-label="Send message"
-        [disabled]="isLoading() || !userInput().trim()"
-        class="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-full bg-accent hover:bg-accent/90 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors">
-        <lucide-icon name="arrow-up" class="w-5 h-5" aria-hidden="true" />
-      </button>
-    </form>
-  </div>
+      ></textarea>
+    </mat-form-field>
+    <button
+      matIconButton
+      class="send-button"
+      type="submit"
+      aria-label="Send message"
+      [disabled]="isLoading() || !userInput().trim()"
+    >
+      <lucide-icon name="arrow-up" />
+    </button>
+  </form>
 </div>

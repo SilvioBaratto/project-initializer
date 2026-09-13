@@ -1,0 +1,26 @@
+<mat-form-field class="field" appearance="outline" subscriptSizing="dynamic">
+  @if (label()) {
+    <mat-label>{{ label() }}</mat-label>
+  }
+  <mat-select
+    #select
+    [id]="selectId()"
+    [value]="value()"
+    [disabled]="isDisabled()"
+    [aria-label]="ariaLabel()"
+    [aria-labelledby]="ariaLabelledby()"
+    (selectionChange)="onSelectionChange($event)"
+    (openedChange)="onOpenedChange($event)"
+    (blur)="onBlur(select.panelOpen)"
+  >
+    @for (opt of options(); track opt.value) {
+      <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
+    }
+  </mat-select>
+  @if (helpText()) {
+    <mat-hint [id]="hintId">{{ helpText() }}</mat-hint>
+  }
+  @if (hasError()) {
+    <mat-error [id]="errorId">{{ resolvedErrorText() }}</mat-error>
+  }
+</mat-form-field>

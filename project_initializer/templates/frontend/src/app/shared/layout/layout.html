@@ -1,37 +1,71 @@
-<div class="h-dvh overflow-hidden flex flex-col md:block bg-surface">
-  <!-- Skip link (target: #main-content) -->
-  <a href="#main-content" class="skip-link">Skip to content</a>
+<a class="skip-link" href="#main-content" (click)="skipToMain($event)">Skip to content</a>
 
-  <!-- Mobile header -->
-  <app-navbar class="md:hidden shrink-0">
-    <app-hamburger navbarBrand
-      [open]="isSidebarOpen()"
-      controls="sidebar-drawer"
-      (toggle)="toggleSidebar()"
-    />
-    <span navbarBrand class="text-base font-display font-semibold tracking-tight text-text">Acme</span>
-    <div navbarActions class="w-8"></div>
-  </app-navbar>
+<mat-sidenav-container class="shell" autosize>
+  @if (!isMobile()) {
+    <!--
+      Navigation rail, docked from 600px (below 600px the navigation bar holds the destinations
+      and a bottom sheet the actions). disableClose keeps Esc from hiding it.
+    -->
+    <mat-sidenav
+      id="app-rail"
+      class="rail"
+      [class.rail-wide]="sidebarMode() === 'expanded'"
+      mode="side"
+      [opened]="true"
+      [disableClose]="true"
+    >
+      <!-- The banner at these widths: the top app bar, the compact header, doesn't render here. -->
+      <div class="rail-content" role="banner">
+        @if (canExpandRail()) {
+          <div class="rail-header">
+            <app-hamburger
+              variant="rail"
+              [open]="railExpanded()"
+              controls="app-rail"
+              (toggle)="toggleRail()"
+            />
+            @if (sidebarMode() === 'expanded') {
+              <span class="rail-brand">Acme</span>
+            }
+          </div>
+        }
+        <app-sidebar [mode]="sidebarMode()" />
+      </div>
+    </mat-sidenav>
+  }
 
-  <!-- Sidebar (drawer overlay is owned by DrawerComponent) -->
-  <app-sidebar [isOpen]="isSidebarOpen()" [isMobile]="isMobile()" (closeSidebar)="closeSidebar()"></app-sidebar>
+  <mat-sidenav-content class="shell-content">
+    @if (isMobile()) {
+      <app-navbar class="shell-top-app-bar">
+        <span navbarBrand>Acme</span>
+        <!-- Opens the bottom sheet with the rail's actions (the navigation bar below holds the destinations). -->
+        <button
+          matIconButton
+          type="button"
+          navbarActions
+          class="shell-actions-toggle"
+          aria-haspopup="dialog"
+          [attr.aria-label]="actionsSheet.triggerLabel"
+          (click)="openActionsSheet()"
+        >
+          <lucide-icon class="shell-icon" [name]="actionsSheet.triggerIcon" aria-hidden="true" />
+        </button>
+      </app-navbar>
+    }
 
-  <!-- Main content -->
-  <!-- overscroll-contain: keeps scroll chains within this region; prevents the OS
-       rubber-band / pull-to-refresh from leaking out when the content hits its boundary. -->
-  <main id="main-content" tabindex="-1" aria-label="Main content"
-        class="md:pl-64 flex-1 min-h-0 overflow-y-auto overscroll-contain md:h-dvh flex flex-col">
-    <router-outlet></router-outlet>
-  </main>
+    <!--
+      The only scroll container; see layout.css for the viewport-unit trade-offs.
+      No aria-label: there is one main landmark, and a label would only repeat its role.
+    -->
+    <main #main id="main-content" class="shell-main" tabindex="-1">
+      <router-outlet />
+    </main>
 
-  <!-- Mobile bottom navigation -->
-  <app-bottom-tab-bar class="md:hidden shrink-0" />
+    @if (isMobile()) {
+      <app-bottom-tab-bar class="shell-nav-bar" />
+    }
+  </mat-sidenav-content>
+</mat-sidenav-container>
 
-  <!-- aria-live route announcer (screen-reader only) -->
-  <div aria-live="polite" aria-atomic="true" class="sr-only">{{ announced() }}</div>
-
-  <!-- Toast outlet -->
-  <div id="toast-outlet">
-    <app-toast />
-  </div>
-</div>
+<!-- Route announcer: reads the new page title to screen readers. -->
+<div class="cdk-visually-hidden" aria-live="polite" aria-atomic="true">{{ announced() }}</div>

@@ -3,8 +3,9 @@ Tests for issue #4: feat(frontend): add scroll primitives and touch-action to th
 
 Source-blind: authored against acceptance criteria only, before any implementation.
 Criteria covered (UNIT-verifiable):
-  - touch-action: manipulation is applied to interactive elements (and/or globally
-    in @layer base) so double-tap zoom and the ~300ms delay are removed
+  - touch-action: manipulation is applied to interactive elements in the global
+    stylesheet (src/styles.scss since the Material 3 migration) so double-tap
+    zoom and the ~300ms delay are removed
   - Pinch-to-zoom is preserved: the index.html viewport meta stays scalable with
     no user-scalable=no / maximum-scale=1
   - overscroll-contain, touch-action, and scroll-snap primitives are
@@ -32,13 +33,29 @@ FRONTEND = (
     / "frontend"
 )
 
-STYLES_CSS = FRONTEND / "src" / "styles.css"
+# The global stylesheet is src/styles.scss since the Material 3 migration. The
+# Tailwind src/styles.css is gone and no reader here falls back to it.
+STYLES_SCSS = FRONTEND / "src" / "styles.scss"
 LAYOUT_HTML = FRONTEND / "src" / "app" / "shared" / "layout" / "layout.html"
 INDEX_HTML = FRONTEND / "src" / "index.html"
 
 
 def _read_styles() -> str:
-    return STYLES_CSS.read_text(encoding="utf-8")
+    """Text of the global stylesheet, src/styles.scss."""
+    return STYLES_SCSS.read_text(encoding="utf-8")
+
+
+def _strip_comments(css: str) -> str:
+    """Remove /* block */ and // line comments (SCSS) from *css*."""
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
+    return re.sub(r"(?<!:)//[^\n]*", "", css)
+
+
+def _selector_of_rule_at(css: str, pos: int) -> str:
+    """Return the selector of the rule whose body contains offset *pos*."""
+    open_brace = css.rfind("{", 0, pos)
+    prelude_start = max(css.rfind("}", 0, open_brace), css.rfind(";", 0, open_brace)) + 1
+    return _strip_comments(css[prelude_start:open_brace]).strip()
 
 
 def _read_layout() -> str:
@@ -50,54 +67,42 @@ def _read_index() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Criterion: touch-action: manipulation applied to interactive elements /
-#            globally in @layer base
+# Criterion: touch-action: manipulation applied to interactive elements in the
+#            global stylesheet
 # ---------------------------------------------------------------------------
 
 
 def test_when_styles_css_read_then_touch_action_manipulation_is_declared():
-    """styles.css must declare touch-action: manipulation.
+    """src/styles.scss must declare touch-action: manipulation.
 
     Per criterion: 'touch-action: manipulation is applied to interactive elements
-    (and/or globally in @layer base) so double-tap zoom and the ~300ms delay are
-    removed.'  The presence of the declaration is the minimum verifiable check.
+    so double-tap zoom and the ~300ms delay are removed.'  The presence of the
+    declaration is the minimum verifiable check.
     """
     css = _read_styles()
-    assert "touch-action: manipulation" in css, (
-        "Expected 'touch-action: manipulation' to be declared in src/styles.css"
+    assert re.search(r"touch-action\s*:\s*manipulation", css), (
+        "Expected 'touch-action: manipulation' to be declared in src/styles.scss"
     )
 
 
 def test_when_touch_action_manipulation_found_then_it_targets_interactive_or_base_layer_context():
-    """touch-action: manipulation must target interactive elements or @layer base.
+    """touch-action: manipulation must sit on a rule that targets interactive elements.
 
-    Per criterion: applied 'to interactive elements (and/or globally in @layer base)'.
-    We inspect a 500-character window before the declaration for at least one
-    interactive-element indicator or the @layer base keyword, ruling out it being
-    applied exclusively to generic layout containers.
-
-    Interpretation: the window must contain one of:
-      @layer base, button, "a,", [role, input, select, textarea, summary.
+    Per criterion: applied 'to interactive elements'. The Tailwind-era check also
+    accepted `@layer base` and scanned a 500-character window; the global
+    stylesheet is plain SCSS now, so the check reads the selector list of the rule
+    that holds the declaration, which must name at least one of:
+      a, button, [role=...], input, select, textarea, summary, label.
     """
     css = _read_styles()
-    pos = css.find("touch-action: manipulation")
-    assert pos != -1, "touch-action: manipulation not found — checked by prior test"
-    window = css[max(0, pos - 500) : pos + 50]
-    interactive_indicators = [
-        "@layer base",
-        "button",
-        "a,",
-        "[role",
-        "input",
-        "select",
-        "textarea",
-        "summary",
-    ]
-    assert any(ind in window for ind in interactive_indicators), (
-        "touch-action: manipulation must be inside @layer base or within a selector "
-        "that targets interactive elements (button, a, input, select, textarea, "
-        "[role], summary). "
-        f"Context window: {window!r}"
+    match = re.search(r"touch-action\s*:\s*manipulation", css)
+    assert match is not None, "touch-action: manipulation not found — checked by prior test"
+    selector = _selector_of_rule_at(css, match.start())
+    interactive = re.compile(r"^(a|button|input|select|textarea|summary|label)\b|^\[role\b")
+    assert any(interactive.match(part.strip()) for part in selector.split(",")), (
+        "touch-action: manipulation must sit in a rule whose selector targets "
+        "interactive elements (a, button, [role], input, select, textarea, summary, "
+        f"label). Selector found: {selector!r}"
     )
 
 
@@ -157,20 +162,41 @@ def test_when_index_html_read_then_viewport_meta_does_not_contain_maximum_scale_
 # ---------------------------------------------------------------------------
 
 
+# Since the Material 3 migration the shell carries no utility classes: these
+# primitives are CSS properties in the global stylesheet (src/styles.scss, which
+# replaced styles.css) or in the layout component's own sources
+# (layout.ts + layout.html + layout.css).
+
+LAYOUT_DIR = LAYOUT_HTML.parent
+
+
+def _read_global_styles() -> str:
+    """Text of the global stylesheet, src/styles.scss (a missing file fails loudly)."""
+    return _read_styles()
+
+
+def _read_layout_sources() -> dict[str, str]:
+    """The shell component's own sources, keyed by extension (.ts, .html, .css)."""
+    return {
+        ext: (LAYOUT_DIR / f"layout{ext}").read_text(encoding="utf-8")
+        for ext in (".ts", ".html", ".css")
+        if (LAYOUT_DIR / f"layout{ext}").exists()
+    }
+
+
 def test_when_styles_css_or_layout_html_read_then_overscroll_contain_is_present():
-    """overscroll-contain (overscroll-behavior: contain) must be available or applied.
+    """overscroll-behavior: contain must be available or applied.
 
     Per criterion: 'overscroll-contain ... primitives are available/applied for
-    scrollable/carousel regions.'  Satisfied if styles.css declares the CSS property
-    or layout.html applies the Tailwind utility class 'overscroll-contain'.
+    scrollable/carousel regions.'  The Tailwind 'overscroll-contain' utility is
+    gone, so the property itself must be declared: in layout.css on the shell's
+    <main> scroll container, or in the global stylesheet.
     """
-    css = _read_styles()
-    html = _read_layout()
-    has_in_css = "overscroll-behavior" in css or "overscroll-contain" in css
-    has_in_html = "overscroll-contain" in html
-    assert has_in_css or has_in_html, (
-        "Expected 'overscroll-behavior' (CSS property) or 'overscroll-contain' "
-        "(Tailwind utility) to appear in src/styles.css or layout.html"
+    layout_css = _read_layout_sources().get(".css", "")
+    declaration = re.compile(r"overscroll-behavior(?:-[a-z]+)?\s*:\s*contain")
+    assert declaration.search(layout_css) or declaration.search(_read_global_styles()), (
+        "Expected an 'overscroll-behavior: contain' declaration in layout.css "
+        "(the shell's scroll container) or in src/styles.scss"
     )
 
 
@@ -178,16 +204,14 @@ def test_when_styles_css_or_layout_html_read_then_scroll_snap_primitive_is_prese
     """scroll-snap primitives must be available/applied for carousel/scroll regions.
 
     Per criterion: 'scroll-snap primitives are available/applied for
-    scrollable/carousel regions.'  Satisfied if styles.css defines any
-    scroll-snap-* CSS property, or layout.html applies snap-* Tailwind utilities.
+    scrollable/carousel regions.'  Satisfied if the global stylesheet or the
+    layout sources (.ts/.html/.css) mention a scroll-snap-* CSS property; the
+    Tailwind snap-* utilities no longer exist.
     """
-    css = _read_styles()
-    html = _read_layout()
-    has_in_css = "scroll-snap" in css
-    has_in_html = bool(re.search(r"\bsnap-[a-z]", html))
-    assert has_in_css or has_in_html, (
+    sources = _read_global_styles() + "\n".join(_read_layout_sources().values())
+    assert "scroll-snap" in sources, (
         "Expected 'scroll-snap' (scroll-snap-type / scroll-snap-align) in "
-        "src/styles.css, or a 'snap-*' utility class in layout.html"
+        "src/styles.scss or the layout component sources"
     )
 
 
@@ -195,16 +219,13 @@ def test_when_styles_css_or_layout_html_read_then_touch_action_primitive_is_pres
     """A touch-action declaration must be present for scrollable regions.
 
     Per criterion: 'touch-action ... primitives are available/applied for
-    scrollable/carousel regions.'  Any touch-action declaration in styles.css or
-    any touch-action-* class in layout.html satisfies this requirement.
+    scrollable/carousel regions.'  Any touch-action declaration in the global
+    stylesheet or the layout component's CSS satisfies this requirement.
     """
-    css = _read_styles()
-    html = _read_layout()
-    has_in_css = "touch-action" in css
-    has_in_html = bool(re.search(r"\btouch-action-[a-z]|touch-action:", html))
-    assert has_in_css or has_in_html, (
-        "Expected a 'touch-action' declaration in src/styles.css or a "
-        "touch-action-* utility in layout.html for scrollable/carousel regions"
+    sources = _read_global_styles() + _read_layout_sources().get(".css", "")
+    assert re.search(r"touch-action\s*:", sources), (
+        "Expected a 'touch-action' declaration in src/styles.scss or layout.css "
+        "for scrollable/carousel regions"
     )
 
 
@@ -218,13 +239,14 @@ def test_when_styles_css_or_layout_html_read_then_a_comment_documents_dvh_svh_lv
 
     Per criterion: 'An inline comment documents the h-dvh/h-svh/h-lvh trade-offs
     against layout.html usage.'  We require that at least one CSS block comment
-    (/* ... */), CSS line comment (// ...), or HTML comment (<!-- ... -->) in
-    styles.css or layout.html contains all three viewport-height unit names —
-    establishing that the trade-offs are explicitly documented, not merely that
-    one unit happens to be used as a class.
+    (/* ... */), CSS/SCSS line comment (// ...), or HTML comment (<!-- ... -->) in
+    the global stylesheet or the layout component sources (.ts/.html/.css)
+    contains all three viewport-height unit names — establishing that the
+    trade-offs are explicitly documented, not merely that one unit is used.
     """
-    css = _read_styles()
-    html = _read_layout()
+    layout = _read_layout_sources()
+    css = _read_global_styles() + layout.get(".css", "") + layout.get(".ts", "")
+    html = layout.get(".html", "")
 
     css_block_comments = re.findall(r"/\*.*?\*/", css, re.DOTALL)
     css_line_comments = re.findall(r"//[^\n]*", css)
@@ -236,7 +258,7 @@ def test_when_styles_css_or_layout_html_read_then_a_comment_documents_dvh_svh_lv
         return "dvh" in text and "svh" in text and "lvh" in text
 
     assert any(mentions_all_three(c) for c in all_comments), (
-        "Expected at least one comment in src/styles.css or layout.html that "
+        "Expected at least one comment in src/styles.scss or the layout sources that "
         "mentions all three viewport height units (dvh, svh, lvh) — "
         "documenting the h-dvh/h-svh/h-lvh trade-offs per requirements §4."
     )

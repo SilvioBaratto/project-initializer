@@ -1,20 +1,24 @@
-@if (open()) {
-  <!-- Overlay backdrop -->
-  <div
-    class="fixed inset-0 z-40 bg-black/20 dark:bg-black/50 md:hidden"
-    data-testid="drawer-overlay"
-    aria-hidden="true"
-    (click)="handleClose()"
-  ></div>
-}
+<!-- Rendered by MatDialog into the overlay container while `open` is true. -->
+<ng-template #sheet>
+  <div class="drawer-sheet">
+    <div class="drawer-header">
+      @if (label()) {
+        <!-- matDialogTitle adds and removes this id in the dialog's aria-labelledby. -->
+        <h2 matDialogTitle class="drawer-headline">{{ label() }}</h2>
+      }
+      <button
+        matIconButton
+        type="button"
+        class="drawer-close"
+        [attr.aria-label]="closeLabel()"
+        (click)="handleClose()"
+      >
+        <lucide-icon name="X" />
+      </button>
+    </div>
 
-<!-- Panel — always in DOM so translate-x transition plays -->
-<aside
-  [class]="panelClasses()"
-  [id]="drawerId() || null"
-  appFocusTrap
-  [active]="isTrapActive()"
-  (close)="handleClose()"
->
-  <ng-content />
-</aside>
+    <div class="drawer-body">
+      <ng-content />
+    </div>
+  </div>
+</ng-template>

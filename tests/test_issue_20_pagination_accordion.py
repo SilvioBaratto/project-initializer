@@ -3,9 +3,14 @@ Source-blind tests for issue #20: Pagination + Accordion.
 
 Criteria covered (per oracle report):
   [UNIT] Pagination: nav[aria-label], aria-current="page" on the active page,
-         accessible prev/next, ≥44px touch target, bounds-aware disabled state
+         accessible prev/next, 48px touch target, bounds-aware disabled state
+         (built on Angular Material icon and text buttons, which render the 48px
+         touch target; split into .ts/.html/.css styled with --mat-sys-* tokens,
+         adapting at the M3 600px compact breakpoint)
   [UNIT] Accordion: button[aria-expanded][aria-controls] headers,
          panels role="region" + aria-labelledby, keyboard operable
+         (built on Angular Material's expansion panel, which renders those
+         attributes; split into .ts/.html/.css styled with --mat-sys-* tokens)
 
 Skipped (not runtime-verifiable):
   Dark-mode tokens; visible focus
@@ -55,6 +60,23 @@ def _read_template(component_dir: Path, root: Path, name: str) -> str:
 
 def _read_ts(component_dir: Path, root: Path, name: str) -> str:
     return (root / component_dir / f"{name}.ts").read_text(encoding="utf-8")
+
+
+def _read_pagination_sources(root: Path, *patterns: str) -> str:
+    """Concatenate the pagination unit's sources (specs excluded).
+
+    Defaults to every .ts, .html and .css file in the unit folder.
+    """
+    unit_dir = root / PAGINATION_DIR
+    files = sorted(
+        {
+            path
+            for pattern in (patterns or ("*.ts", "*.html", "*.css"))
+            for path in unit_dir.glob(pattern)
+            if not path.name.endswith(".spec.ts")
+        }
+    )
+    return "\n".join(path.read_text(encoding="utf-8") for path in files)
 
 
 # ---------------------------------------------------------------------------
@@ -114,6 +136,16 @@ class TestPaginationNavLandmark:
         content = _read_template(PAGINATION_DIR, scaffolded, "pagination")
         assert "aria-label" in content
 
+    def test_when_pagination_ts_is_generated_then_nav_label_is_an_input_defaulting_to_pagination(
+        self, scaffolded: Path
+    ) -> None:
+        """Each navigation landmark needs a unique label, so a view with two
+        paginators must be able to name them apart; the default stays 'Pagination'."""
+        ts = _read_ts(PAGINATION_DIR, scaffolded, "pagination")
+        assert "label = input('Pagination')" in ts
+        html = _read_template(PAGINATION_DIR, scaffolded, "pagination")
+        assert '[attr.aria-label]="label()"' in html
+
 
 class TestPaginationCurrentPage:
     """aria-current="page" must mark the active page button."""
@@ -169,28 +201,100 @@ class TestPaginationPrevNext:
 
 
 class TestPaginationTouchTarget:
-    """Each page control must meet the ≥44px minimum touch target requirement."""
+    """Each page control must meet the 48px M3 touch-target requirement."""
 
     def test_when_pagination_template_is_generated_then_min_size_class_is_applied(
         self, scaffolded: Path
     ) -> None:
         """
-        Criterion: '≥44px'.
-        Requirements specify min-h-11 (44px) for touch targets.
-        The template must use a min-height/min-width class resolving to ≥44px
-        (e.g. min-h-11, min-w-11, size-11, h-11, w-11, or equivalent).
-        Assumption: the Tailwind utility 'min-h-11' (= 2.75rem = 44px) is used,
-        matching the Button component pattern documented in requirements §5.
+        Criterion: '≥44px' (M3: 48×48px).
+        The controls are Material buttons (matIconButton / matButton), which render
+        a 48px touch target at density 0, and the unit's CSS keeps every control
+        cell and page button at least 48px.
         """
-        content = _read_template(PAGINATION_DIR, scaffolded, "pagination")
-        # Any of these classes satisfies ≥44px in a Tailwind v4 context
-        has_target = any(
-            cls in content
-            for cls in ("min-h-11", "min-w-11", "size-11", "h-11", "w-11")
+        content = _read_pagination_sources(scaffolded)
+        assert "matIconButton" in content and "matButton" in content, (
+            "Pagination controls must be Material buttons, which provide the 48px touch target."
         )
-        assert has_target, (
-            "No ≥44px touch-target class found in pagination template. "
-            "Expected one of: min-h-11, min-w-11, size-11, h-11, w-11."
+        css = _read_pagination_sources(scaffolded, "*.css")
+        assert "min-block-size: 48px" in css
+        assert "min-inline-size: 48px" in css
+
+
+class TestPaginationComponentFiles:
+    """Pagination is split into .ts + .html + .css and styled with M3 tokens."""
+
+    def test_when_pagination_is_generated_then_it_has_ts_html_and_css(
+        self, scaffolded: Path
+    ) -> None:
+        for ext in ("ts", "html", "css"):
+            assert (scaffolded / PAGINATION_DIR / f"pagination.{ext}").is_file(), (
+                f"missing pagination.{ext}"
+            )
+        ts = _read_ts(PAGINATION_DIR, scaffolded, "pagination")
+        assert "templateUrl: './pagination.html'" in ts
+        assert "styleUrl: './pagination.css'" in ts
+        assert "ChangeDetectionStrategy.OnPush" in ts
+        assert "template:" not in ts and "styles:" not in ts
+
+    def test_when_pagination_css_is_generated_then_it_uses_tokens_without_color_literals(
+        self, scaffolded: Path
+    ) -> None:
+        """Replaces the Tailwind dark: token check: colors come from --mat-sys-* roles."""
+        import re
+
+        css = _read_pagination_sources(scaffolded, "*.css")
+        assert "var(--mat-sys-" in css
+        assert not re.search(r"#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(", css)
+        assert "!important" not in css
+        assert "::ng-deep" not in css
+
+    def test_when_pagination_css_is_generated_then_current_page_has_a_non_color_cue(
+        self, scaffolded: Path
+    ) -> None:
+        """The current page must not be marked by its fill color alone (WCAG 1.4.1):
+        next to the tonal fill, its label gets the prominent weight via the button token."""
+        import re
+
+        css = _read_pagination_sources(scaffolded, "*.css")
+        rule = re.search(r"\.page\[aria-current=['\"]page['\"]\]\s*\{([^}]*)\}", css)
+        assert rule, "missing a .page[aria-current='page'] rule"
+        assert (
+            "--mat-button-tonal-label-text-weight: var(--mat-sys-label-large-weight-prominent)"
+            in rule.group(1)
+        )
+
+    def test_when_pagination_css_is_generated_then_it_adapts_to_its_own_width(
+        self, scaffolded: Path
+    ) -> None:
+        """A paginator narrower than its widest row (11 slots of 48px = 528px) swaps page
+        numbers for a status. The host is the query container, so a docked rail and page
+        margins count, not the window width; never a 768px breakpoint."""
+        import re
+
+        css = _read_pagination_sources(scaffolded, "*.css")
+        assert re.search(r"container:\s*pagination\s*/\s*inline-size", css)
+        assert re.search(r"@container pagination \(max-width: 527\.98px\)", css)
+        assert re.search(r"@container pagination \(min-width: 528px\)", css)
+        assert not re.search(r"@media[^{]*width", css)
+        assert "768px" not in css
+
+    def test_when_pagination_css_is_generated_then_directional_icons_mirror_in_rtl(
+        self, scaffolded: Path
+    ) -> None:
+        css = _read_pagination_sources(scaffolded, "*.css")
+        assert ":dir(rtl)" in css and "scaleX(-1)" in css
+
+    def test_when_pagination_sources_are_generated_then_no_tailwind_utilities_remain(
+        self, scaffolded: Path
+    ) -> None:
+        import re
+
+        content = _read_pagination_sources(scaffolded)
+        assert not re.search(
+            r"\b(min-h-11|min-w-11|inline-flex|items-center|rounded-md|text-sm|"
+            r"focus-visible:|dark:|hover:|disabled:opacity)",
+            content,
         )
 
 
@@ -252,34 +356,175 @@ class TestPaginationDisabledState:
 # ===========================================================================
 
 
+#
+# The accordion is built on Angular Material's expansion panel. Material's
+# <mat-expansion-panel-header> host renders role="button" with aria-expanded and
+# aria-controls bindings and handles Enter/Space itself; the panel body renders
+# role="region" with aria-labelledby pointing back at the header. Those
+# attributes live in Material's template rather than ours, so each assert accepts
+# either the literal attribute in the unit's sources or the Material element that
+# provides it. The unit is split into accordion.{ts,html,css} and
+# accordion-item.{ts,html,css}, so the readers below glob the whole folder.
+
+_MATERIAL_HEADER = "<mat-expansion-panel-header"
+
+
+def _read_accordion_sources(root: Path, *patterns: str) -> str:
+    """Concatenate the accordion unit's sources (specs excluded).
+
+    Defaults to every .ts, .html and .css file in the unit folder.
+    """
+    unit_dir = root / ACCORDION_DIR
+    files = sorted(
+        {
+            path
+            for pattern in (patterns or ("*.ts", "*.html", "*.css"))
+            for path in unit_dir.glob(pattern)
+            if not path.name.endswith(".spec.ts")
+        }
+    )
+    return "\n".join(path.read_text(encoding="utf-8") for path in files)
+
+
+def _css_block(css: str, selector: str) -> str:
+    """Declarations of the first rule whose selector list ends with exactly `selector`."""
+    import re
+
+    match = re.search(r"(?:^|[,}\s])" + re.escape(selector) + r"\s*\{([^{}]*)\}", css, re.MULTILINE)
+    assert match, f"no CSS rule for {selector!r}"
+    return match.group(1)
+
+
+def _uses_material_panel(content: str) -> bool:
+    """True when a template renders <mat-expansion-panel> (not only its header)."""
+    return "<mat-expansion-panel>" in content or "<mat-expansion-panel " in content
+
+
+class TestAccordionComponentFiles:
+    """Each accordion component is split into .ts + .html + .css and styled with M3 tokens."""
+
+    def test_when_accordion_is_generated_then_each_component_has_ts_html_and_css(
+        self, scaffolded: Path
+    ) -> None:
+        for name in ("accordion", "accordion-item"):
+            for ext in ("ts", "html", "css"):
+                assert (scaffolded / ACCORDION_DIR / f"{name}.{ext}").is_file(), (
+                    f"missing {name}.{ext}"
+                )
+            ts = (scaffolded / ACCORDION_DIR / f"{name}.ts").read_text(encoding="utf-8")
+            assert f"templateUrl: './{name}.html'" in ts
+            assert f"styleUrl: './{name}.css'" in ts
+            assert "ChangeDetectionStrategy.OnPush" in ts
+
+    def test_when_accordion_css_is_generated_then_it_uses_tokens_without_color_literals(
+        self, scaffolded: Path
+    ) -> None:
+        """Replaces the Tailwind dark: token check: colors come from --mat-sys-* roles."""
+        import re
+
+        css = _read_accordion_sources(scaffolded, "*.css")
+        assert "var(--mat-sys-" in css
+        assert not re.search(r"#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(", css)
+        assert "!important" not in css
+        assert "::ng-deep" not in css
+
+    def test_when_accordion_css_is_generated_then_headers_keep_a_48px_target(
+        self, scaffolded: Path
+    ) -> None:
+        """Material's header is 48px collapsed; the unit's CSS keeps that as its minimum."""
+        css = _read_accordion_sources(scaffolded, "*.css")
+        assert "min-block-size: 48px" in css
+
+    def test_when_accordion_css_is_generated_then_expanded_headers_get_a_hover_state_layer(
+        self, scaffolded: Path
+    ) -> None:
+        """
+        M3 hover is inherited by list-like rows (interaction/states.md:172-176). Material
+        21.2 paints hover only on collapsed headers, so the unit draws a token-only
+        ::after layer on every header (::before is the focus ring), expanded included.
+        """
+        css = _read_accordion_sources(scaffolded, "accordion-item.css")
+        block = _css_block(css, ".mat-expansion-panel-header:not([aria-disabled='true']):hover::after")
+        assert "@media (hover: hover)" in css
+        assert "var(--mat-sys-on-surface)" in block
+        assert "opacity: var(--mat-sys-hover-state-layer-opacity)" in block
+        assert "pointer-events: none" in block
+        header = _css_block(css, ".mat-expansion-panel-header")
+        assert "--mat-expansion-header-hover-state-layer-color: transparent" in header
+        assert "position: relative" in header
+
+    def test_when_accordion_css_is_generated_then_ring_corners_follow_the_row_position(
+        self, scaffolded: Path
+    ) -> None:
+        """
+        The focus ring follows the component's shape (interaction/states.md:212-218):
+        square middle rows, the container's inner corner on the outer edges of the first
+        and last rows. Header radius and ring token are set together so both of
+        Material's ring radius sources agree.
+        """
+        item_css = _read_accordion_sources(scaffolded, "accordion-item.css")
+        container_css = _read_accordion_sources(scaffolded, "accordion.css")
+        assert "--ui-accordion-inner-corner: calc(var(--mat-sys-corner-medium) - 1px)" in container_css
+        assert "--mat-focus-indicator-border-radius: 0;" in _css_block(
+            item_css, ".mat-expansion-panel-header"
+        )
+        first = _css_block(item_css, ":host(:first-child) .mat-expansion-panel-header")
+        last = _css_block(item_css, ":host(:last-child) .mat-expansion-panel-header:not(.mat-expanded)")
+        only = _css_block(
+            item_css, ":host(:first-child:last-child) .mat-expansion-panel-header:not(.mat-expanded)"
+        )
+        for block, corners in ((first, ("start-start", "start-end")), (last, ("end-start", "end-end"))):
+            assert "--mat-focus-indicator-border-radius:" in block
+            for corner in corners:
+                assert f"border-{corner}-radius: var(--ui-accordion-inner-corner)" in block
+        assert "--mat-focus-indicator-border-radius: var(--ui-accordion-inner-corner)" in only
+
+    def test_when_accordion_css_is_generated_then_header_height_change_is_animated(
+        self, scaffolded: Path
+    ) -> None:
+        """
+        With `auto` header heights Material's `height` transition has nothing to animate,
+        so the 48px to 64px minimum transitions on Material's 225ms expansion timing,
+        gated on the class the panel adds only when animations are enabled.
+        """
+        css = _read_accordion_sources(scaffolded, "accordion-item.css")
+        block = _css_block(
+            css, ".mat-expansion-panel-animations-enabled .mat-expansion-panel-header"
+        )
+        assert "transition: min-block-size 225ms" in block
+
+
 class TestAccordionHeaderButton:
     """Each accordion header must be a button with aria-expanded and aria-controls."""
 
     def test_when_accordion_template_is_generated_then_button_element_is_present(
         self, scaffolded: Path
     ) -> None:
-        content = _read_template(ACCORDION_DIR, scaffolded, "accordion")
-        assert "<button" in content or "button" in content
+        """Material's expansion panel header carries role="button"."""
+        content = _read_accordion_sources(scaffolded)
+        assert "<button" in content or _MATERIAL_HEADER in content
 
     def test_when_accordion_template_is_generated_then_aria_expanded_is_present(
         self, scaffolded: Path
     ) -> None:
         """
         Criterion: 'button[aria-expanded][aria-controls]'.
-        aria-expanded communicates whether the associated panel is open.
+        aria-expanded communicates whether the associated panel is open; Material's
+        header binds it.
         """
-        content = _read_template(ACCORDION_DIR, scaffolded, "accordion")
-        assert "aria-expanded" in content
+        content = _read_accordion_sources(scaffolded)
+        assert "aria-expanded" in content or _MATERIAL_HEADER in content
 
     def test_when_accordion_template_is_generated_then_aria_controls_is_present(
         self, scaffolded: Path
     ) -> None:
         """
         Criterion: 'button[aria-expanded][aria-controls]'.
-        aria-controls links the button to its panel via the panel's id.
+        aria-controls links the button to its panel via the panel's id; Material's
+        header binds it.
         """
-        content = _read_template(ACCORDION_DIR, scaffolded, "accordion")
-        assert "aria-controls" in content
+        content = _read_accordion_sources(scaffolded)
+        assert "aria-controls" in content or _MATERIAL_HEADER in content
 
 
 class TestAccordionPanel:
@@ -292,9 +537,10 @@ class TestAccordionPanel:
         Criterion: 'panels role="region"'.
         W3C APG disclosure pattern requires the panel to have role="region" so
         it is exposed as a landmark when the accordion has a meaningful label.
+        Material's expansion panel renders its body with role="region".
         """
-        content = _read_template(ACCORDION_DIR, scaffolded, "accordion")
-        assert 'role="region"' in content
+        content = _read_accordion_sources(scaffolded)
+        assert 'role="region"' in content or _uses_material_panel(content)
 
     def test_when_accordion_template_is_generated_then_aria_labelledby_is_present(
         self, scaffolded: Path
@@ -302,10 +548,11 @@ class TestAccordionPanel:
         """
         Criterion: 'panels … aria-labelledby'.
         aria-labelledby on the panel region must point back to the header button
-        so the landmark is announced by its header text.
+        so the landmark is announced by its header text. Material's expansion
+        panel binds it to its header's id.
         """
-        content = _read_template(ACCORDION_DIR, scaffolded, "accordion")
-        assert "aria-labelledby" in content
+        content = _read_accordion_sources(scaffolded)
+        assert "aria-labelledby" in content or _uses_material_panel(content)
 
 
 class TestAccordionKeyboardOperable:
@@ -316,22 +563,14 @@ class TestAccordionKeyboardOperable:
     ) -> None:
         """
         Criterion: 'keyboard operable'.
-        W3C APG disclosure: Enter activates the button (native button already
-        does this, but explicit handling or reliance on native button semantics
-        must be verifiable — the component must use a <button> which natively
-        fires click on Enter).
-        Assumption: the TypeScript contains 'Enter' key string for explicit
-        handling, OR the template uses a <button> (already asserted above).
-        We check the TS for any explicit key guard; absence is acceptable only
-        if the template test above confirmed a native <button>.
+        W3C APG disclosure: Enter activates the header. Verifiable as explicit
+        handling in the sources, a native <button>, or Material's expansion panel
+        header (which toggles its panel on Enter).
         """
-        ts_content = _read_ts(ACCORDION_DIR, scaffolded, "accordion")
-        template_content = _read_template(ACCORDION_DIR, scaffolded, "accordion")
-        has_enter_in_ts = "Enter" in ts_content
-        uses_native_button = "<button" in template_content
-        assert has_enter_in_ts or uses_native_button, (
-            "Accordion is not keyboard-operable: no Enter key handler in TS "
-            "and no native <button> found in template."
+        content = _read_accordion_sources(scaffolded)
+        assert "Enter" in content or "<button" in content or _MATERIAL_HEADER in content, (
+            "Accordion is not keyboard-operable: no Enter key handler, no native "
+            "<button> and no Material expansion panel header found."
         )
 
     def test_when_accordion_ts_is_generated_then_Space_key_is_handled(
@@ -339,17 +578,24 @@ class TestAccordionKeyboardOperable:
     ) -> None:
         """
         Criterion: 'keyboard operable'.
-        Space activates a button natively; explicit handling or native button
-        usage must be verifiable.
+        Space activates the header: explicit handling, a native <button>, or
+        Material's expansion panel header (which toggles on Space and prevents
+        the page scroll).
         """
-        ts_content = _read_ts(ACCORDION_DIR, scaffolded, "accordion")
-        template_content = _read_template(ACCORDION_DIR, scaffolded, "accordion")
-        has_space_in_ts = " " in ts_content or "Space" in ts_content
-        uses_native_button = "<button" in template_content
-        assert has_space_in_ts or uses_native_button, (
-            "Accordion is not keyboard-operable via Space: no Space handler "
-            "in TS and no native <button> in template."
+        content = _read_accordion_sources(scaffolded)
+        assert "Space" in content or "<button" in content or _MATERIAL_HEADER in content, (
+            "Accordion is not keyboard-operable via Space: no Space handler, no "
+            "native <button> and no Material expansion panel header found."
         )
+
+    def test_when_accordion_ts_is_generated_then_single_mode_drives_material_multi(
+        self, scaffolded: Path
+    ) -> None:
+        """The `single` input keeps its meaning by mapping onto MatAccordion's `multi`."""
+        ts = _read_accordion_sources(scaffolded, "accordion.ts")
+        assert "single = input(" in ts
+        assert "MatAccordion" in ts
+        assert ".multi = !this.single()" in ts
 
     def test_when_accordion_ts_is_generated_then_toggle_method_exists(
         self, scaffolded: Path

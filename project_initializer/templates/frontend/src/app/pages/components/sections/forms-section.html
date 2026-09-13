@@ -1,0 +1,84 @@
+<!--
+  The page owns the h1 and this section's h2, so each demo group is an h3.
+  ThemePreviewComponent stamps every ng-template twice (light and dark region), and each copy keeps
+  its own state: the size radios, the status select and the country select take a set name or a
+  form control keyed by their copy's root element (see forms-section.ts).
+-->
+<div class="demo-group" data-demo="buttons">
+  <h3 class="demo-heading">Button</h3>
+  <app-theme-preview>
+    <ng-template>
+      <!--
+        Each label names an action; the caption under it names the variant or state.
+        A 16px gap keeps each button's 48px touch target, 4px past its 40px container, well over
+        the 8px target spacing.
+      -->
+      <app-stack direction="row" align="start" [wrap]="true" [gap]="4">
+        <div class="button-demo">
+          <app-button variant="primary">Save changes</app-button>
+          <span class="demo-caption">Primary</span>
+        </div>
+        <div class="button-demo">
+          <app-button variant="secondary">Preview</app-button>
+          <span class="demo-caption">Secondary</span>
+        </div>
+        <div class="button-demo">
+          <app-button variant="ghost">Cancel</app-button>
+          <span class="demo-caption">Ghost</span>
+        </div>
+        <div class="button-demo">
+          <app-button variant="danger">Delete project</app-button>
+          <span class="demo-caption">Danger</span>
+        </div>
+        <div class="button-demo">
+          <app-button [loading]="true">Upload file</app-button>
+          <span class="demo-caption">Loading</span>
+        </div>
+        <div class="button-demo">
+          <app-button [disabled]="true">Publish</app-button>
+          <span class="demo-caption">Disabled</span>
+        </div>
+      </app-stack>
+    </ng-template>
+  </app-theme-preview>
+</div>
+
+<div class="demo-group" data-demo="fields">
+  <h3 class="demo-heading">Input, select, and form field</h3>
+  <app-theme-preview>
+    <ng-template>
+      <div #fieldsCopy class="field-demos">
+        <app-form-field label="Name" helpText="Enter your full name">
+          <app-input />
+        </app-form-field>
+        <!-- Required: the error shows only once the field is touched and still has no status. -->
+        <app-form-field label="Status" [errorText]="statusErrorText(fieldsCopy)">
+          <app-select [options]="statusOptions" [formControl]="statusControl(fieldsCopy)" />
+        </app-form-field>
+        <app-form-field label="Country">
+          <app-select [options]="countryOptions" [formControl]="countryControl(fieldsCopy)" />
+        </app-form-field>
+      </div>
+    </ng-template>
+  </app-theme-preview>
+</div>
+
+<div class="demo-group" data-demo="choices">
+  <h3 class="demo-heading">Checkbox and radio</h3>
+  <app-theme-preview>
+    <ng-template>
+      <div class="choice-demos">
+        <div class="choice-set">
+          <app-checkbox label="Accept terms" />
+          <app-checkbox label="Subscribe to newsletter" [checked]="true" />
+        </div>
+        <!-- The legend names the radio set, so screen readers announce it with each radio. -->
+        <fieldset #sizeSet class="choice-set">
+          <legend class="choice-legend">Size</legend>
+          <app-radio [name]="sizeSetName(sizeSet)" value="sm" label="Small" />
+          <app-radio [name]="sizeSetName(sizeSet)" value="lg" label="Large" [checked]="true" />
+        </fieldset>
+      </div>
+    </ng-template>
+  </app-theme-preview>
+</div>

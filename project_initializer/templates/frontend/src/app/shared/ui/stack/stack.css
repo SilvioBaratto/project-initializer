@@ -1,0 +1,90 @@
+/*
+ * Stack layout primitive. The host is the flex container, so projected items are its flex items with
+ * no wrapper in between. StackComponent reflects its inputs on the host as data attributes
+ * (direction, wrap, align, justify) and the --app-stack-gap custom property; this file maps them.
+ *
+ *   input       host reflection                        default
+ *   direction   data-direction="row | col"             col     (column)
+ *   wrap        data-wrap="wrap | nowrap"              nowrap
+ *   align       data-align="start | center | ..."      stretch
+ *   justify     data-justify="start | center | ..."    start
+ *   gap         --app-stack-gap: <whole 4px steps>     16px
+ *
+ * Rows follow the writing direction, so start and end flip in RTL with no extra rules.
+ * Purely structural: no color, type, shape or elevation, so no --mat-sys-* tokens are needed.
+ */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  justify-content: start;
+  gap: var(--app-stack-gap, 16px);
+}
+
+/* ── Direction and wrapping ───────────────────────────────────────────────── */
+
+:host([data-direction='row']) {
+  flex-direction: row;
+}
+
+:host([data-direction='col']) {
+  flex-direction: column;
+}
+
+:host([data-wrap='wrap']) {
+  flex-wrap: wrap;
+}
+
+:host([data-wrap='nowrap']) {
+  flex-wrap: nowrap;
+}
+
+/* ── Cross-axis alignment ─────────────────────────────────────────────────── */
+
+:host([data-align='start']) {
+  align-items: start;
+}
+
+:host([data-align='center']) {
+  align-items: center;
+}
+
+:host([data-align='end']) {
+  align-items: end;
+}
+
+:host([data-align='stretch']) {
+  align-items: stretch;
+}
+
+:host([data-align='baseline']) {
+  align-items: baseline;
+}
+
+/* ── Main-axis distribution ───────────────────────────────────────────────── */
+
+:host([data-justify='start']) {
+  justify-content: start;
+}
+
+:host([data-justify='center']) {
+  justify-content: center;
+}
+
+:host([data-justify='end']) {
+  justify-content: end;
+}
+
+:host([data-justify='space-between']) {
+  justify-content: space-between;
+}
+
+:host([data-justify='space-around']) {
+  justify-content: space-around;
+}
+
+:host([data-justify='space-evenly']) {
+  justify-content: space-evenly;
+}
