@@ -36,8 +36,13 @@ export class AuthService {
     return this.acquireSilentOrInteractive(account);
   }
 
-  login(): void {
-    this.msalService.instance.loginRedirect({ scopes: [environment.scope] });
+  /**
+   * Starts the MSAL redirect. The promise is returned, not dropped: MSAL reports a failure to
+   * start (interaction_in_progress, an uninitialized client) as a rejection, and the login page
+   * awaits it to show that failure and leave its busy state.
+   */
+  login(): Promise<void> {
+    return this.msalService.instance.loginRedirect({ scopes: [environment.scope] });
   }
 
   logout(): void {

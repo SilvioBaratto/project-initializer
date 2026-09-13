@@ -1,6 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { MsalService } from '@azure/msal-angular';
 import { InteractionRequiredAuthError } from '@azure/msal-browser';
+import { vi } from 'vitest';
+import { environment } from '../../../environments/environment';
 import { AuthService } from './auth.service';
 
 // Minimal stub for IPublicClientApplication used across tests.
@@ -9,7 +11,7 @@ function makeMsalInstanceStub(overrides: Partial<{
   getAllAccounts: () => unknown[];
   acquireTokenSilent: (req: unknown) => Promise<{ accessToken: string }>;
   acquireTokenRedirect: (req: unknown) => Promise<void>;
-  loginRedirect: (req: unknown) => void;
+  loginRedirect: (req: unknown) => Promise<void>;
   logoutRedirect: () => void;
   setActiveAccount: (a: unknown) => void;
   initialize: () => Promise<void>;
@@ -20,7 +22,7 @@ function makeMsalInstanceStub(overrides: Partial<{
     getAllAccounts: () => [{ username: 'user@example.com' }],
     acquireTokenSilent: async () => ({ accessToken: 'fake-token' }),
     acquireTokenRedirect: async () => undefined,
-    loginRedirect: () => undefined,
+    loginRedirect: async () => undefined,
     logoutRedirect: () => undefined,
     setActiveAccount: () => undefined,
     initialize: async () => undefined,
@@ -124,7 +126,7 @@ describe('AuthService', () => {
   // ── Criterion: InteractionRequiredAuthError fallback path ─────────────────
 
   it('when acquireTokenSilent throws InteractionRequiredAuthError, acquireTokenRedirect is called', async () => {
-    const redirectSpy = jasmine.createSpy('acquireTokenRedirect').and.returnValue(Promise.resolve());
+    const redirectSpy = vi.fn<(req: unknown) => Promise<void>>().mockResolvedValue(undefined);
     setup({
       acquireTokenSilent: async () => {
         throw new InteractionRequiredAuthError('interaction_required');
@@ -137,25 +139,36 @@ describe('AuthService', () => {
   });
 
   it('when acquireTokenSilent throws a non-interaction error, the error is re-thrown', async () => {
+    const networkError = new Error('network error');
     setup({
       acquireTokenSilent: async () => {
-        throw new Error('network error');
+        throw networkError;
       },
     });
-    await expectAsync(service.getAccessToken()).toBeRejectedWithError('network error');
+    const failure = service.getAccessToken();
+    // The same Error instance, so its type and message ('network error') are unchanged.
+    await expect(failure).rejects.toBe(networkError);
+    await expect(failure).rejects.toThrow(/^network error$/);
   });
 
   // ── Criterion: login/logout delegates ─────────────────────────────────────
 
-  it('when login is called, loginRedirect is invoked with environment scope', () => {
-    const spy = jasmine.createSpy('loginRedirect');
+  it('when login is called, loginRedirect is invoked with environment scope and its promise is returned', async () => {
+    const spy = vi.fn<(req: unknown) => Promise<void>>().mockResolvedValue(undefined);
     setup({ loginRedirect: spy });
-    service.login();
-    expect(spy).toHaveBeenCalled();
+    await expect(service.login()).resolves.toBeUndefined();
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith({ scopes: [environment.scope] });
+  });
+
+  it('when loginRedirect rejects, login rejects with the same error so the login page can report it', async () => {
+    const startError = new Error('interaction_in_progress');
+    setup({ loginRedirect: vi.fn<(req: unknown) => Promise<void>>().mockRejectedValue(startError) });
+    await expect(service.login()).rejects.toBe(startError);
   });
 
   it('when logout is called, logoutRedirect is invoked', () => {
-    const spy = jasmine.createSpy('logoutRedirect');
+    const spy = vi.fn<() => void>();
     setup({ logoutRedirect: spy });
     service.logout();
     expect(spy).toHaveBeenCalled();
