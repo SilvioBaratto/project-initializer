@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-13
+
+The Angular frontend template moves from Tailwind CSS to Angular Material 3 in every variant (base, token, supabase, entra).
+
+### Changed
+- **Frontend styling is Angular Material 3.** `@angular/material` and `@angular/cdk` 21.2 replace Tailwind: `mat.theme()` in `src/styles.scss` defines the `--mat-sys-*` tokens, light and dark switch through `color-scheme`, and there are no utility classes and no PostCSS config. Components are split into `.ts` + `.html` + `.css`, and component CSS uses tokens only (no color literals, `!important` or `::ng-deep`).
+- **The navigation shell follows the M3 window size classes** (600 / 840 / 1200 / 1600px, never 768px): a top app bar and a navigation bar below 600px, whose actions button opens a bottom sheet with the theme and account actions; from 600px a collapsed rail docked in `mat-sidenav`, which a toggle expands from 840px and which starts expanded from 1600px. The rail choice is remembered in `localStorage`.
+- **The theme choice is a selection, not a cycle.** The rail's Change theme button opens a menu of System, Light and Dark with the current mode checked; the compact sheet lists the same three as a single-selection list. Both share `THEME_OPTIONS` with the Settings page, and list items keep their focus overlay for keyboard focus only.
+
+### Added
+- Shared UI components on Material primitives and a `/components` catalog page.
+- `tests/test_frontend_nginx_csp.py` checks every variant's layered `nginx.conf` against the nonce policy.
+
+### Fixed
+- **The Docker frontend blocked its own styles and scripts.** nginx sent `Content-Security-Policy: default-src 'self'` with no nonce, which blocks Angular's inline styles and scripts. nginx now replaces the `CSP_NONCE` placeholder in `index.html` with `$request_id` through `sub_filter`, allows that nonce in `script-src` and `style-src`, allows the `fonts.bunny.net` web fonts, and serves `index.html` without validators so a stored page never meets a newer nonce. The supabase and entra frontend overlays ship their own `nginx.conf` whose policy also allows their provider in `connect-src` (and `frame-src` for MSAL).
+- **Entra sign-in could hang.** `AuthService.login()` dropped the promise from `loginRedirect()`, so a failure to start the redirect never reached the login page, which stayed busy with no message. `login()` now returns that promise.
+- **Compact snackbars could cover the navigation bar** when enlarged text made the bar taller than 64px. The bar now publishes its rendered height as `--app-nav-bar-block-size`, which the snackbar offset reads.
+
+### CI
+- The `ruff` dev dependency is capped at `<0.16`: ruff 0.16 adds rules that report findings across the templates, which will be adopted in their own change.
+- Component test helpers pick a component's `.ts` file by exact name instead of glob order, which differs between macOS and Linux.
+
 ## [0.3.9] - 2026-07-16
 
 ### Fixed
@@ -108,7 +130,12 @@ Every NestJS variant is now usable in Docker. Three chained bugs each hid the ne
 ### Added
 - Initial public release of the `project-initializer` CLI.
 
-[Unreleased]: https://github.com/SilvioBaratto/project-initializer/compare/v0.3.5...HEAD
+[Unreleased]: https://github.com/SilvioBaratto/project-initializer/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/SilvioBaratto/project-initializer/compare/v0.3.9...v0.4.0
+[0.3.9]: https://github.com/SilvioBaratto/project-initializer/compare/v0.3.8...v0.3.9
+[0.3.8]: https://github.com/SilvioBaratto/project-initializer/compare/v0.3.7...v0.3.8
+[0.3.7]: https://github.com/SilvioBaratto/project-initializer/compare/v0.3.6...v0.3.7
+[0.3.6]: https://github.com/SilvioBaratto/project-initializer/compare/v0.3.5...v0.3.6
 [0.3.5]: https://github.com/SilvioBaratto/project-initializer/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/SilvioBaratto/project-initializer/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/SilvioBaratto/project-initializer/compare/v0.3.2...v0.3.3
