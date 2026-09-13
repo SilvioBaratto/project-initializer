@@ -1,0 +1,98 @@
+/*
+ * Navigation catalog section. Demo groups stack on the 8px grid, each with an h3
+ * heading above its light and dark preview. The demos take color, type and state
+ * layers from their own components, and each preview region (theme-preview.css)
+ * paints the surface, padding and frame around a copy. This file lays the groups
+ * out and sets the heading and caption type from --mat-sys-* roles.
+ *
+ * Elements declared inside the <ng-template>s keep this component's encapsulation
+ * attribute when app-theme-preview stamps them, so these rules reach both copies.
+ */
+:host {
+  display: grid;
+  gap: 32px;
+}
+
+.demo-group {
+  display: grid;
+  gap: 12px;
+  /* Grid items default to min-width: auto; let wide demos shrink with the page. */
+  min-inline-size: 0;
+}
+
+.demo-heading {
+  margin: 0;
+  font: var(--mat-sys-title-medium);
+  letter-spacing: var(--mat-sys-title-medium-tracking);
+  color: var(--mat-sys-on-surface);
+}
+
+/* A demo and the destination preview its toggle drives, stacked 8px apart. */
+.nav-demo,
+.toggle-demo {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-inline-size: 0;
+}
+
+/*
+ * A toggle and its caption. The 8px gap keeps the caption clear of the 48px touch
+ * target, which reaches 4px past the 40px icon button on each side.
+ */
+.toggle-row {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: center;
+  gap: 8px;
+}
+
+/*
+ * Destination preview: plain rows, not links, so it never navigates. role="list" in the
+ * template keeps the list announced without list markers. label-large in
+ * on-surface-variant on the preview region's surface: 8.93:1 light, 14.33:1 dark.
+ */
+.nav-preview {
+  display: grid;
+  justify-content: start;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nav-preview-item {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: center;
+  gap: 12px;
+  padding-block: 8px;
+  padding-inline: 16px;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-label-large);
+  letter-spacing: var(--mat-sys-label-large-tracking);
+}
+
+/* A flex box leaves no baseline gap under the 24px svg. */
+.nav-preview-icon {
+  display: flex;
+}
+
+/* Collapsed docked rail: icon over a label-medium label, like the shell's collapsed rail. */
+.nav-preview-collapsed .nav-preview-item {
+  grid-auto-flow: row;
+  justify-items: center;
+  gap: 4px;
+  padding-inline: 0;
+  font: var(--mat-sys-label-medium);
+  letter-spacing: var(--mat-sys-label-medium-tracking);
+}
+
+/* on-surface-variant on the preview region's surface: 8.93:1 light, 14.33:1 dark. */
+.demo-caption {
+  font: var(--mat-sys-body-medium);
+  letter-spacing: var(--mat-sys-body-medium-tracking);
+  color: var(--mat-sys-on-surface-variant);
+}

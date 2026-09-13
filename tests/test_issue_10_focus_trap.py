@@ -4,7 +4,9 @@ Tests for issue #10: feat(ui): shared focus-trap directive for overlays and draw
 Source-blind: authored against acceptance criteria only, before any implementation.
 
 Criteria covered:
-  - [UNIT] Directive traps Tab + Shift+Tab within the host element
+  - [UNIT] Directive traps Tab + Shift+Tab within the host element (either a
+    hand-rolled keydown handler or, since the Material 3 migration, an Angular
+    CDK a11y ConfigurableFocusTrap whose focus anchors do the wrapping)
   - [UNIT] Escape emits a close event; focus returns to the previously-focused
     element on deactivate
   - [UNIT] Background siblings are inerted (inert/aria-hidden) while active and
@@ -91,14 +93,29 @@ def _directive_dir() -> pathlib.Path:
 
 
 def _full_source() -> str:
-    """Concatenate all non-spec .ts + .html files in the directive's folder."""
+    """Concatenate all non-spec .ts + .html + .css files in the directive's folder."""
     d = _directive_dir()
     parts: list[str] = []
-    for ext in ("*.ts", "*.html"):
+    for ext in ("*.ts", "*.html", "*.css"):
         for f in d.glob(ext):
             if ".spec." not in f.name:
                 parts.append(f.read_text(encoding="utf-8"))
     return "\n".join(parts)
+
+
+def _delegates_to_cdk_focus_trap(src: str) -> bool:
+    """True when the directive builds its trap with the Angular CDK a11y focus-trap factory.
+
+    A CDK ``FocusTrap`` (created by ``FocusTrapFactory`` or
+    ``ConfigurableFocusTrapFactory`` from ``@angular/cdk/a11y``) contains Tab and
+    Shift+Tab itself: it inserts tabbable focus anchors before and after the host
+    and, when one receives focus, moves focus to the last / first tabbable
+    descendant, which it discovers with the CDK ``InteractivityChecker``.
+    """
+    imports_a11y = bool(re.search(r"from\s+['\"]@angular/cdk/a11y['\"]", src))
+    uses_factory = bool(re.search(r"\b(?:Configurable)?FocusTrapFactory\b", src))
+    creates_trap = bool(re.search(r"\.create\s*\(", src))
+    return imports_a11y and uses_factory and creates_trap
 
 
 # ---------------------------------------------------------------------------
@@ -136,61 +153,65 @@ def test_when_focus_trap_ts_read_then_it_is_declared_as_an_angular_directive():
 
 
 def test_when_focus_trap_ts_read_then_tab_key_is_handled():
-    """The directive source must reference the Tab key to trap focus.
+    """The directive must contain Tab within the host.
 
     Per criterion: 'Directive traps Tab + Shift+Tab within the host element'.
-    Interpretation: the source must mention 'Tab' (as a KeyboardEvent.key
-    value) so that Tab-key press events are intercepted and constrained to
-    focusable children of the host.
+    Accepted implementations: delegating to an Angular CDK a11y focus trap
+    (``ConfigurableFocusTrapFactory`` / ``FocusTrapFactory``), whose focus
+    anchors wrap Tab from the last tabbable element to the first; or a
+    hand-rolled keydown handler that references 'Tab' as a KeyboardEvent.key.
     """
     src = _directive_source()
-    assert re.search(r"['\"]Tab['\"]|'Tab'|\"Tab\"|\.key\s*===\s*['\"]Tab", src), (
-        "Expected the string literal 'Tab' referenced as a keyboard key in "
-        "the focus-trap directive source. "
+    handles_tab_key = bool(
+        re.search(r"['\"]Tab['\"]|\.key\s*===\s*['\"]Tab", src)
+    )
+    assert _delegates_to_cdk_focus_trap(src) or handles_tab_key, (
+        "Expected the focus-trap directive to create a CDK a11y focus trap "
+        "(ConfigurableFocusTrapFactory.create from '@angular/cdk/a11y') or to "
+        "handle the 'Tab' key itself. "
         "Per criterion: 'Directive traps Tab + Shift+Tab within the host element'."
     )
 
 
 def test_when_focus_trap_ts_read_then_shift_tab_is_handled():
-    """The directive source must handle the Shift+Tab back-tab gesture.
+    """The directive must contain the Shift+Tab back-tab gesture within the host.
 
     Per criterion: 'Directive traps Tab + Shift+Tab within the host element'.
     Shift+Tab moves focus backwards through the focus ring; the trap must wrap
     focus back to the last focusable child rather than leaving the overlay.
-    Accepted indicators: reference to `shiftKey`, a `'ShiftTab'` sentinel, or
-    a conditional that checks both `shiftKey` and `'Tab'`.
+    Accepted implementations: a CDK a11y focus trap (its start anchor moves
+    focus to the last tabbable element), or a hand-rolled handler that checks
+    `shiftKey` together with 'Tab'.
     """
     src = _directive_source()
     has_shift = bool(re.search(r"\bshiftKey\b", src))
-    has_shift_tab = bool(
-        re.search(r"ShiftTab|shift.*tab|tab.*shift", src, re.IGNORECASE)
-    )
-    assert has_shift or has_shift_tab, (
-        "Expected a Shift+Tab guard in the focus-trap directive — e.g. checking "
-        "`event.shiftKey` in conjunction with `event.key === 'Tab'`. "
+    assert _delegates_to_cdk_focus_trap(src) or has_shift, (
+        "Expected the focus-trap directive to create a CDK a11y focus trap or to "
+        "guard Shift+Tab itself (e.g. `event.shiftKey` with `event.key === 'Tab'`). "
         "Per criterion: 'Directive traps Tab + Shift+Tab within the host element'."
     )
 
 
 def test_when_focus_trap_ts_read_then_focusable_children_are_queried():
-    """The directive must query focusable descendants of the host element.
+    """The directive must discover the focusable descendants of the host element.
 
     Per criterion: 'Directive traps Tab + Shift+Tab within the host element'.
     To trap focus it must know which elements are focusable inside the host.
-    Accepted indicators: a querySelectorAll call containing a focusable selector
-    (e.g. 'a[href]', 'button', 'input', '[tabindex]'), or a reference to
-    tabbable/focusable selector strings.
+    Accepted implementations: a CDK a11y focus trap (it walks the host with the
+    CDK InteractivityChecker), or a querySelectorAll call with a focusable
+    selector (e.g. 'a[href]', 'button', 'input', '[tabindex]').
     """
     src = _directive_source()
-    has_query = bool(re.search(r"querySelectorAll|querySelector", src))
-    has_focusable_sel = bool(
+    has_selector_query = bool(
         re.search(
-            r"button|input|select|textarea|a\[href\]|tabindex", src, re.IGNORECASE
+            r"querySelectorAll\s*\([^)]*(?:button|input|select|textarea|a\[href\]|tabindex|FOCUSABLE)",
+            src,
+            re.IGNORECASE,
         )
     )
-    assert has_query or has_focusable_sel, (
-        "Expected a querySelectorAll / focusable-selector expression in the "
-        "focus-trap directive to discover tabbable children of the host. "
+    assert _delegates_to_cdk_focus_trap(src) or has_selector_query, (
+        "Expected the focus-trap directive to create a CDK a11y focus trap or to "
+        "query the host with a focusable selector to discover tabbable children. "
         "Per criterion: 'Directive traps Tab + Shift+Tab within the host element'."
     )
 
@@ -482,7 +503,7 @@ _BROWSER_GLOBALS = st.sampled_from(
 
 
 @given(_BROWSER_GLOBALS)
-@settings(max_examples=8)
+@settings(max_examples=8, deadline=None)
 def test_when_browser_global_is_searched_then_it_is_not_at_class_field_scope(
     global_name: str,
 ):

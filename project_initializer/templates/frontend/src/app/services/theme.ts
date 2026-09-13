@@ -4,7 +4,6 @@ export type ThemeMode = 'light' | 'dark' | 'system';
 
 const STORAGE_KEY = 'app-theme';
 const TRANSITION_MS = 150;
-const NEXT: Record<ThemeMode, ThemeMode> = { system: 'light', light: 'dark', dark: 'system' };
 
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
@@ -23,43 +22,71 @@ export class ThemeService {
     effect(() => this._applyClass(this.isDark()));
   }
 
-  toggleTheme(): void {
-    this._beginTransition();
-    this.setTheme(NEXT[this._theme()]);
-  }
-
+  /** Every path to a new scheme (the rail's theme menu, the compact sheet, the Settings page) switches instantly, without transitions. */
   setTheme(theme: ThemeMode): void {
+    if (theme !== this._theme()) {
+      this._beginTransition();
+    }
     this._theme.set(theme);
     this._persist(theme);
   }
 
+  /**
+   * The localStorage getter throws a SecurityError when the browser blocks site data. This runs
+   * during app initialization, so a throw here would fail bootstrap: fall back to `system`.
+   */
   private _readStorage(): ThemeMode {
     if (typeof window === 'undefined') return 'system';
-    const value = localStorage.getItem(STORAGE_KEY);
-    return value === 'light' || value === 'dark' || value === 'system' ? value : 'system';
+    try {
+      const value = localStorage.getItem(STORAGE_KEY);
+      return value === 'light' || value === 'dark' || value === 'system' ? value : 'system';
+    } catch {
+      return 'system';
+    }
   }
 
   private _readOs(): boolean {
-    if (typeof window === 'undefined') return false;
+    if (!this._canMatchMedia()) return false;
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   }
 
+  /** False on the server and in DOM shims without matchMedia (jsdom). */
+  private _canMatchMedia(): boolean {
+    return typeof window !== 'undefined' && typeof window.matchMedia === 'function';
+  }
+
   private _initOsListener(): void {
-    if (typeof window === 'undefined') return;
+    if (!this._canMatchMedia()) return;
     const query = window.matchMedia('(prefers-color-scheme: dark)');
     const onChange = (e: MediaQueryListEvent) => this._osPrefersDark.set(e.matches);
     query.addEventListener('change', onChange);
     this.destroyRef.onDestroy(() => query.removeEventListener('change', onChange));
   }
 
+  /**
+   * Exactly one of `.dark` / `.light` sits on <html>. styles.scss maps each to a
+   * `color-scheme`, which resolves the `light-dark()` values that `mat.theme()`
+   * emits for every `--mat-sys-*` token.
+   *
+   * Until Angular boots, a script in index.html pins a stored choice as an inline
+   * `color-scheme`, because the inlined critical CSS has no `.light` / `.dark` rule.
+   * The class takes over here; left in place, that inline value would override every later switch.
+   */
   private _applyClass(isDark: boolean): void {
     if (typeof window === 'undefined') return;
-    document.documentElement.classList.toggle('dark', isDark);
+    const root = document.documentElement;
+    root.classList.toggle('dark', isDark);
+    root.classList.toggle('light', !isDark);
+    root.style.removeProperty('color-scheme');
   }
 
   private _persist(theme: ThemeMode): void {
     if (typeof window === 'undefined') return;
-    localStorage.setItem(STORAGE_KEY, theme);
+    try {
+      localStorage.setItem(STORAGE_KEY, theme);
+    } catch {
+      // Storage is blocked or full: the choice lasts for this session only.
+    }
   }
 
   private _beginTransition(): void {

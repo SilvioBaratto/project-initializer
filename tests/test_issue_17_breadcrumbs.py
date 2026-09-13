@@ -5,19 +5,24 @@ Criteria covered (per oracle report):
   [UNIT] nav[aria-label="Breadcrumb"] wrapping an ordered list of crumbs
   [UNIT] Last crumb has aria-current="page" and is not a link; separators
          are aria-hidden
-  [UNIT] Dark-mode tokens; accepts crumb items via a signal input
+  [UNIT] Material 3 theme tokens (light and dark via --mat-sys-* roles);
+         accepts crumb items via a signal input
 
 Skipped (not runtime-verifiable):
   All tests pass (boilerplate suite gate)
   SOLID / clean code (subjective code-quality prose)
 
 Design note: tests scaffold a frontend-only project and inspect the generated
-Breadcrumbs component files. Tests FAIL today (Red) because the Breadcrumbs
-component does not yet exist in the template tree; they will PASS once the
-implementation is added to
+Breadcrumbs component files under
   project_initializer/templates/frontend/src/app/shared/ui/breadcrumbs/.
+Markup asserts read breadcrumbs.html only (so a doc comment in the .ts can
+never satisfy them); styling asserts read breadcrumbs.css.
+Material 3 has no breadcrumbs component, so the trail is built on --mat-sys-*
+tokens: dark mode comes from the theme's light-dark() tokens rather than
+Tailwind dark: classes.
 """
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -31,6 +36,9 @@ from hypothesis import given, strategies as st
 
 BREADCRUMBS_RELATIVE_DIR = Path("frontend/src/app/shared/ui/breadcrumbs")
 
+# Color literals a token-only stylesheet must not contain.
+COLOR_LITERAL_RE = re.compile(r"#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(")
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -39,18 +47,38 @@ BREADCRUMBS_RELATIVE_DIR = Path("frontend/src/app/shared/ui/breadcrumbs")
 
 def _read_breadcrumbs_template(root: Path) -> str:
     """
-    Return the HTML/template content of the generated Breadcrumbs component.
-    Handles both inline-template (.ts only) and separate .html variants.
+    Return the markup of the generated Breadcrumbs component: breadcrumbs.html
+    alone, falling back to breadcrumbs.ts only when no .html exists (inline
+    template). Never joined with the .ts, so its doc comment cannot satisfy a
+    markup assert.
     """
     html_path = root / BREADCRUMBS_RELATIVE_DIR / "breadcrumbs.html"
     if html_path.exists():
         return html_path.read_text(encoding="utf-8")
-    ts_path = root / BREADCRUMBS_RELATIVE_DIR / "breadcrumbs.ts"
-    return ts_path.read_text(encoding="utf-8")
+    return _read_breadcrumbs_ts(root)
+
+
+def _read_breadcrumbs_sources(root: Path) -> str:
+    """
+    Return breadcrumbs.ts + breadcrumbs.html + breadcrumbs.css concatenated,
+    for checks that must hold across every component file (no Tailwind dark:).
+    """
+    component_dir = root / BREADCRUMBS_RELATIVE_DIR
+    parts = [
+        component_dir / name
+        for name in ("breadcrumbs.ts", "breadcrumbs.html", "breadcrumbs.css")
+    ]
+    return "\n".join(p.read_text(encoding="utf-8") for p in parts if p.exists())
 
 
 def _read_breadcrumbs_ts(root: Path) -> str:
     return (root / BREADCRUMBS_RELATIVE_DIR / "breadcrumbs.ts").read_text(
+        encoding="utf-8"
+    )
+
+
+def _read_breadcrumbs_css(root: Path) -> str:
+    return (root / BREADCRUMBS_RELATIVE_DIR / "breadcrumbs.css").read_text(
         encoding="utf-8"
     )
 
@@ -106,8 +134,17 @@ class TestNavLandmarkAndOrderedList:
     def test_when_breadcrumbs_template_is_generated_then_nav_has_aria_label_breadcrumb(
         self, scaffolded: Path
     ) -> None:
+        """The nav is named "Breadcrumb": either statically, or bound from a
+        label input that defaults to "Breadcrumb" (so pages with several trails
+        can give each landmark a distinct name)."""
         content = _read_breadcrumbs_template(scaffolded)
-        assert 'aria-label="Breadcrumb"' in content
+        ts = _read_breadcrumbs_ts(scaffolded)
+        static_label = 'aria-label="Breadcrumb"' in content
+        bound_label = bool(
+            re.search(r'<nav\b[^>]*\[attr\.aria-label\]="label\(\)"', content)
+            and re.search(r"\blabel\s*=\s*input\(\s*'Breadcrumb'\s*\)", ts)
+        )
+        assert static_label or bound_label
 
     def test_when_breadcrumbs_template_is_generated_then_ordered_list_is_present(
         self, scaffolded: Path
@@ -151,6 +188,15 @@ class TestCurrentPageCrumb:
             "crumb from navigable crumbs, but found none."
         )
 
+    def test_when_breadcrumbs_template_is_generated_then_routeless_crumbs_do_not_link_to_the_current_page(
+        self, scaffolded: Path
+    ) -> None:
+        """An ancestor crumb without a routerLink must not be bound as
+        [routerLink]="[]": RouterLink resolves an empty command list relative
+        to the current route, producing a focusable link to the page itself."""
+        content = _read_breadcrumbs_template(scaffolded)
+        assert not re.search(r'\[routerLink\]="[^"]*\?\?\s*\[\s*\]"', content)
+
 
 class TestSeparatorsAriaHidden:
     """Decorative separators between crumbs must be hidden from assistive
@@ -175,14 +221,44 @@ class TestSeparatorsAriaHidden:
 
 
 class TestDarkModeTokens:
-    """The component template must use Tailwind dark: utility classes to
-    honour the project's dark-mode token system."""
+    """Dark mode comes from the Material 3 theme: the component's own .css
+    paints only from --mat-sys-* roles (emitted as light-dark() by mat.theme),
+    so it must use those tokens and contain no color literals."""
 
-    def test_when_breadcrumbs_template_is_generated_then_dark_mode_classes_are_present(
+    def test_when_breadcrumbs_is_generated_then_template_and_styles_are_separate_files(
         self, scaffolded: Path
     ) -> None:
-        content = _read_breadcrumbs_template(scaffolded)
-        assert "dark:" in content
+        ts = _read_breadcrumbs_ts(scaffolded)
+        component_dir = scaffolded / BREADCRUMBS_RELATIVE_DIR
+        assert (component_dir / "breadcrumbs.html").is_file()
+        assert (component_dir / "breadcrumbs.css").is_file()
+        assert "templateUrl" in ts and "styleUrl" in ts
+        assert "ChangeDetectionStrategy.OnPush" in ts
+
+    def test_when_breadcrumbs_is_generated_then_colors_come_from_scheme_aware_tokens(
+        self, scaffolded: Path
+    ) -> None:
+        """Equivalent intent of the former Tailwind `dark:` check: colors come
+        from scheme-aware --mat-sys-* tokens, never from literals, and no
+        component file carries Tailwind dark: variants."""
+        css = _read_breadcrumbs_css(scaffolded)
+        assert "var(--mat-sys-" in css
+        assert not COLOR_LITERAL_RE.search(css), (
+            "breadcrumbs.css must paint only from --mat-sys-* tokens"
+        )
+        assert "dark:" not in _read_breadcrumbs_sources(scaffolded)
+
+    def test_when_breadcrumbs_css_is_generated_then_links_have_a_48px_target(
+        self, scaffolded: Path
+    ) -> None:
+        css = _read_breadcrumbs_css(scaffolded)
+        assert re.search(r"min-block-size:\s*48px", css)
+
+    def test_when_breadcrumbs_css_is_generated_then_separator_mirrors_in_rtl(
+        self, scaffolded: Path
+    ) -> None:
+        css = _read_breadcrumbs_css(scaffolded)
+        assert re.search(r":dir\(rtl\)[^{]*\{[^}]*scaleX\(-1\)", css)
 
 
 class TestSignalInput:

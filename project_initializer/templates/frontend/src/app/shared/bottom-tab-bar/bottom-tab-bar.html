@@ -1,15 +1,17 @@
-<nav
-    aria-label="Primary"
-    class="flex items-stretch bg-surface-raised/80 backdrop-blur-md border-t border-border pb-safe min-h-13">
+<!-- The label is visible text, so it is the link's accessible name: no aria-label. -->
+<nav class="nav-bar" aria-label="Primary">
   @for (tab of tabs; track tab.route) {
-    <a [routerLink]="tab.route"
-       routerLinkActive="text-primary"
-       ariaCurrentWhenActive="page"
-       [routerLinkActiveOptions]="{ exact: tab.route === '/home' }"
-       [attr.aria-label]="tab.name"
-       class="flex flex-1 flex-col items-center justify-center gap-0.5 text-text-secondary transition-colors">
-      <lucide-icon [name]="tab.icon" class="w-5 h-5" aria-hidden="true" />
-      <span class="text-[10px] font-medium">{{ tab.name }}</span>
+    <a
+      #link
+      class="nav-bar-item"
+      [routerLink]="tab.route"
+      routerLinkActive="nav-bar-item-active"
+      ariaCurrentWhenActive="page"
+    >
+      <span class="nav-bar-indicator" matRipple [matRippleTrigger]="link">
+        <lucide-icon class="nav-bar-icon" [name]="tab.icon" aria-hidden="true" />
+      </span>
+      <span class="nav-bar-label">{{ tab.name }}</span>
     </a>
   }
 </nav>

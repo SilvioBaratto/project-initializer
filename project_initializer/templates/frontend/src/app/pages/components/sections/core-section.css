@@ -1,0 +1,41 @@
+/*
+ * Core catalog section. Layout between demos comes from app-stack / app-grid; this sheet only sets
+ * the demo-group headings, the grid demo cells and the reopen button's alignment, on --mat-sys-* tokens.
+ *
+ * Elements declared inside the <ng-template>s keep this component's encapsulation attribute when
+ * app-theme-preview stamps them, so these rules reach both the light and the dark copy.
+ */
+
+/* 32px between demo groups, on the 8px grid. */
+:host {
+  display: grid;
+  row-gap: 32px;
+}
+
+/* h3 under the page's h2: the element follows the outline, the type role follows visual hierarchy. */
+.demo-heading {
+  margin-block: 0 12px;
+  font: var(--mat-sys-title-medium);
+  letter-spacing: var(--mat-sys-title-medium-tracking);
+  color: var(--mat-sys-on-surface);
+}
+
+/* on-surface-variant on surface-container-high clears 4.5:1 in both schemes. */
+.grid-cell {
+  display: grid;
+  place-content: center;
+  /* 40px content + 12px padding each side = 64px cell. */
+  min-block-size: 40px;
+  padding: 12px;
+  border-radius: var(--mat-sys-corner-medium);
+  background-color: var(--mat-sys-surface-container-high);
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-label-large);
+  letter-spacing: var(--mat-sys-label-large-tracking);
+  text-align: center;
+}
+
+/* A column stack stretches its items; keep the button at its content width. */
+.reopen-button {
+  align-self: start;
+}

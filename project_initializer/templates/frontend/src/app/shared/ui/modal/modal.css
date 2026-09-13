@@ -1,0 +1,14 @@
+/*
+ * Simple M3 dialog built on MatDialog. The template renders inside the body-level
+ * overlay panel, yet its elements keep this component's encapsulation attribute,
+ * so these rules still reach them (:host does not; the host element stays empty).
+ *
+ * Panel size, surface, shape, type and section padding come from Angular Material's M3
+ * dialog tokens: 280px min, 560px max, and 100vw - 32px (16px compact margins) below 600px.
+ * The headline is the content's direct sibling, so Material removes the content's top padding.
+ */
+
+/* A long unbroken headline (a file name) wraps inside the dialog instead of overflowing it. */
+.modal-title {
+  overflow-wrap: anywhere;
+}

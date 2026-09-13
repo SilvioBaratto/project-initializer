@@ -1,0 +1,118 @@
+/*
+ * Query container: the row adapts to the width the paginator actually has, not the window's. A
+ * docked rail and the page margins leave far less than the window width (504px of content in a
+ * 600px window). Inline-size containment sizes the host from its parent, never from its content,
+ * so place it in block flow or a stretched flex / grid item.
+ */
+:host {
+  display: block;
+  container: pagination / inline-size;
+}
+
+.pagination {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 8px;
+}
+
+/* "Page 2 of 5": visible while the paginator is too narrow for the page numbers, which it replaces. */
+.status {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-medium);
+  letter-spacing: var(--mat-sys-body-medium-tracking);
+  font-variant-numeric: tabular-nums;
+}
+
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/*
+ * Each slot is a 48px cell, so the 48px touch targets of neighbouring icon buttons (40px visual)
+ * meet without overlapping and wrapped rows never overlap either.
+ */
+.slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 48px;
+  min-inline-size: 48px;
+}
+
+/* Decorative gap between non-adjacent page numbers; not a target, so it can be narrower. */
+.gap {
+  min-inline-size: 24px;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-label-large);
+  letter-spacing: var(--mat-sys-label-large-tracking);
+  user-select: none;
+}
+
+/*
+ * Page number: a Material text button (40px visual, 48px touch target across its width) at least
+ * 48px wide. Other pages read in on-surface-variant like the icon buttons beside them; the current
+ * page switches to the tonal appearance (secondary-container) alongside aria-current="page".
+ */
+.page {
+  min-inline-size: 48px;
+  font-variant-numeric: tabular-nums;
+  /* Tonal padding defaults wider than text; match it so the row keeps its width as the page changes. */
+  --mat-button-tonal-horizontal-padding: 12px;
+  --mat-button-text-label-text-color: var(--mat-sys-on-surface-variant);
+  --mat-button-text-state-layer-color: var(--mat-sys-on-surface-variant);
+  --mat-button-text-ripple-color: color-mix(
+    in srgb,
+    var(--mat-sys-on-surface-variant) calc(var(--mat-sys-pressed-state-layer-opacity) * 100%),
+    transparent
+  );
+}
+
+/*
+ * The tonal fill is a weak cue on its own (secondary-container is 1.23:1 on surface and 1.00:1
+ * on surface-container-highest in the light scheme), so the current page also gets the prominent
+ * label weight: a cue that doesn't depend on color. The token only reaches tonal buttons.
+ */
+.page[aria-current='page'] {
+  --mat-button-tonal-label-text-weight: var(--mat-sys-label-large-weight-prominent);
+}
+
+/* Lucide host: `display: flex` lets the transform apply and drops the svg baseline gap. */
+.icon {
+  display: flex;
+}
+
+/* Directional chevrons point the other way in right-to-left layouts. */
+.icon:dir(rtl) {
+  transform: scaleX(-1);
+}
+
+/*
+ * The widest row is 11 slots of 48px (first, previous, seven page slots, next, last): 528px.
+ * Narrower than that: status, then first/previous/next/last; the page numbers and gaps step aside.
+ */
+@container pagination (max-width: 527.98px) {
+  .page-slot,
+  .gap {
+    display: none;
+  }
+}
+
+/* Room for the whole row: page numbers carry the position, so the status stays for screen readers only. */
+@container pagination (min-width: 528px) {
+  .status {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}

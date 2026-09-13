@@ -1,0 +1,183 @@
+@use 'sass:map';
+@use '@angular/cdk' as cdk;
+@use '@angular/material' as mat;
+
+// Overlay panels (dialogs, snackbars, side sheets) render inside the body-level
+// `.cdk-overlay-container`, outside every component's encapsulated CSS. Their
+// panel styles therefore live in one global partial per owning component,
+// selected through the `panelClass` that component passes to Material.
+@use 'styles/overlays/modal';
+@use 'styles/overlays/slide-over';
+@use 'styles/overlays/drawer';
+@use 'styles/overlays/toast';
+
+// ── Theme ────────────────────────────────────────────────────────────────────
+// Every color, type, shape and elevation value comes from a `--mat-sys-*` token.
+// Component stylesheets never contain hex literals.
+
+html {
+  // Tokens are emitted as `light-dark()`. `system` follows the OS; ThemeService
+  // pins one scheme by putting `.light` or `.dark` on <html> (see below).
+  color-scheme: light dark;
+
+  @include mat.theme(
+    (
+      color: (
+        primary: mat.$violet-palette,
+        tertiary: mat.$green-palette,
+      ),
+      // Each family keeps a sans-serif fallback stack (Material's own default is
+      // `Roboto, sans-serif`), so text stays sans-serif while the web font loads or
+      // when fonts.bunny.net is unreachable. index.html loads only the weights the
+      // type scale uses.
+      typography: (
+        plain-family: (Outfit, system-ui, sans-serif),
+        brand-family: ('Space Grotesk', system-ui, sans-serif),
+      ),
+      density: 0,
+    )
+  );
+
+  // Keyboard focus ring outside the component with a gap (3px, --mat-sys-secondary).
+  @include mat.strong-focus-indicators();
+
+  // Roles M3 has no token for, defined with `light-dark()`: 40/80 for the color,
+  // 100/20 on it, 90/30 for its container and 10/90 on the container. That is
+  // Material's `error` mapping except the light on-container tone, which is 10
+  // where `error` uses 30: darker, for more contrast.
+  // `success` shares the green palette with `tertiary`, so `--app-success*`
+  // resolve to the same colors as `--mat-sys-tertiary*`. A status therefore always
+  // pairs its color with an icon or text.
+  $status-palettes: (
+    success: mat.$green-palette,
+    warning: mat.$orange-palette,
+    info: mat.$blue-palette,
+  );
+  @each $role, $palette in $status-palettes {
+    --app-#{$role}: light-dark(#{map.get($palette, 40)}, #{map.get($palette, 80)});
+    --app-on-#{$role}: light-dark(#{map.get($palette, 100)}, #{map.get($palette, 20)});
+    --app-#{$role}-container: light-dark(#{map.get($palette, 90)}, #{map.get($palette, 30)});
+    --app-on-#{$role}-container: light-dark(#{map.get($palette, 10)}, #{map.get($palette, 90)});
+  }
+}
+
+// ThemeService / catalog previews: force a scheme on a subtree. Descendants that
+// paint `background`/`color` from `--mat-sys-*` tokens resolve to that scheme.
+.light {
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+// Suppress all transitions while ThemeService switches scheme.
+.theme-transitioning * {
+  transition: none !important;
+}
+
+// ── Base ─────────────────────────────────────────────────────────────────────
+
+html,
+body {
+  block-size: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-body-medium);
+  letter-spacing: var(--mat-sys-body-medium-tracking);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+// `.cdk-visually-hidden`: screen-reader-only text (route announcer, live regions).
+@include cdk.a11y-visually-hidden();
+
+// Prevent iOS auto-zoom on focused native inputs at the compact window size.
+@media (max-width: 599.98px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
+// Remove the ~300ms double-tap-zoom delay on tap targets while keeping pinch-to-zoom.
+// NEVER set user-scalable=no / maximum-scale=1 — pinch zoom must stay enabled (WCAG 1.4.4).
+a,
+button,
+[role='button'],
+label {
+  touch-action: manipulation;
+}
+
+// No global utility classes. iOS safe-area insets (`env(safe-area-inset-*)`, enabled
+// by viewport-fit=cover in index.html) are padded by each component at a screen edge:
+// the top app bar (navbar.css) and the navigation bar (bottom-tab-bar.css).
+
+// Skip navigation link — visually hidden until focused.
+.skip-link {
+  position: fixed;
+  inset-block-start: -100%;
+  inset-inline-start: 16px;
+  z-index: 1001;
+  padding: 8px 16px;
+  background: var(--mat-sys-inverse-surface);
+  color: var(--mat-sys-inverse-on-surface);
+  border-radius: var(--mat-sys-corner-small);
+  font: var(--mat-sys-label-large);
+  letter-spacing: var(--mat-sys-label-large-tracking);
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  inset-block-start: 16px;
+}
+
+// The same ring as every other control: outside the link with a gap, in the
+// focus-indicator color (--mat-sys-secondary on surface: 6.13:1 light, 10.88:1 dark).
+.skip-link:focus-visible {
+  outline: var(--mat-focus-indicator-border-width, 3px) solid
+    var(--mat-focus-indicator-border-color, var(--mat-sys-secondary));
+  outline-offset: 2px;
+}
+
+// Respect the reduced-motion preference. Material's indeterminate progress
+// indicators are exempt: they already slow down under this preference, and
+// freezing them would hide that work is still in progress.
+@media (prefers-reduced-motion: reduce) {
+  :where(*:not(.mat-mdc-progress-spinner *, .mat-mdc-progress-bar *)),
+  :where(*:not(.mat-mdc-progress-spinner *, .mat-mdc-progress-bar *))::before,
+  :where(*:not(.mat-mdc-progress-spinner *, .mat-mdc-progress-bar *))::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  // The router's view transitions (`withViewTransitions()` in app.config.ts) animate these
+  // pseudo-elements, which `*` doesn't match. Kept as its own rule: a browser without view
+  // transitions drops this selector list, and it must not take the rule above with it.
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/* Viewport units — the shell root uses `dvh`:
+     dvh — dynamic: shrinks/grows as the mobile browser toolbar shows/hides. Best for
+           full-screen shells that must exactly track the visible viewport live.
+     svh — small: height with toolbar fully visible (conservative floor). Use when you
+           want a guaranteed minimum without content jumping.
+     lvh — large: height with toolbar fully hidden (expanded ceiling). Avoid for
+           interactive shells; content may be clipped behind the toolbar on iOS.
+   Known fragile: sticky footers + env(safe-area-inset-bottom) when the toolbar hides
+   on iOS Safari — always verify on a real device.
+
+   Scroll containers set `overscroll-behavior: contain` so scroll chaining and
+   pull-to-refresh don't leak out of a pane. Carousels use plain CSS scroll-snap
+   (`scroll-snap-type: x mandatory` + `scroll-snap-align: start`); none exists yet. */

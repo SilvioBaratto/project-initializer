@@ -1,0 +1,10 @@
+// Global overlay-panel styles owned by shared/ui/modal.
+// Material renders this panel in the body-level .cdk-overlay-container, so the
+// component's own modal.css cannot reach it (Angular Material gotcha: overlay panels).
+// Select the panelClass the component passes to Material; tokens only, no literals.
+//
+// ModalComponent passes `panelClass: 'app-modal-panel'`, which lands on the
+// `.cdk-overlay-pane`. No rules are needed today: Angular Material's M3 dialog styles
+// already size that pane as a simple dialog (280px min, 560px max, 100vw - 32px below
+// 600px) and paint the surface, shape and typography from --mat-sys-* tokens.
+// Add pane-level rules here as `.cdk-overlay-pane.app-modal-panel { ... }`.

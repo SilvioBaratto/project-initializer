@@ -1,0 +1,10 @@
+/*
+ * Material's tab group already paints M3 primary tabs from the theme. Labels are 48px tall at
+ * density 0 and use title-small type in on-surface. The active tab gets a 2px indicator in
+ * primary, so it is not shown by color alone. State layers use the on-surface ripple, and a 1px
+ * divider sits in surface-variant. None of these tokens are overridden, so tabs keep the 48px
+ * target and follow the app theme in both color schemes.
+ */
+:host {
+  display: block;
+}

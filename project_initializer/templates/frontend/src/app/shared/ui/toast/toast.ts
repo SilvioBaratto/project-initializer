@@ -1,38 +1,84 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DOCUMENT, ElementRef, inject } from '@angular/core';
+import { MatIconButton } from '@angular/material/button';
+import {
+  MAT_SNACK_BAR_DATA,
+  MatSnackBarAction,
+  MatSnackBarActions,
+  MatSnackBarLabel,
+  MatSnackBarRef,
+} from '@angular/material/snack-bar';
+import { LucideAngularModule } from 'lucide-angular';
 
-import { Toast, ToastService, ToastVariant } from './toast.service';
+import type { ToastData, ToastVariant } from './toast.service';
 
-const VARIANT_CLASSES: Record<ToastVariant, string> = {
-  info: 'bg-info/10 border-info/30 text-info dark:bg-info/20',
-  success: 'bg-success/10 border-success/30 text-success dark:bg-success/20',
-  warning: 'bg-warning/10 border-warning/30 text-warning dark:bg-warning/20',
-  error: 'bg-danger/10 border-danger/30 text-danger dark:bg-danger/20',
+interface ToastVariantConfig {
+  /** Registered lucide icon name (icons.ts). The shape keeps color from being the only signal. */
+  readonly icon: string;
+  /** Visually hidden prefix announced before the message. */
+  readonly statusLabel: string;
+}
+
+const VARIANTS: Record<ToastVariant, ToastVariantConfig> = {
+  info: { icon: 'Info', statusLabel: 'Information' },
+  success: { icon: 'CircleCheckBig', statusLabel: 'Success' },
+  warning: { icon: 'TriangleAlert', statusLabel: 'Warning' },
+  error: { icon: 'CircleAlert', statusLabel: 'Error' },
 };
 
-const ITEM_BASE =
-  'flex items-center w-80 rounded-lg border px-4 py-3 shadow-md animate-fade-in-up';
-
+/**
+ * Snackbar content opened by ToastService (MatSnackBar.openFromComponent). Not placed
+ * in templates: it needs the MAT_SNACK_BAR_DATA and MatSnackBarRef the snackbar provides.
+ *
+ * A dismissible toast shows one action, a dismiss icon button. Escape inside the toast
+ * closes it too, and focus goes back to the element it came from.
+ */
 @Component({
   selector: 'app-toast',
+  imports: [LucideAngularModule, MatIconButton, MatSnackBarLabel, MatSnackBarActions, MatSnackBarAction],
   templateUrl: './toast.html',
+  styleUrl: './toast.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[class]': 'hostClass',
+    '(focusin)': 'rememberFocusOrigin($event)',
+    '(keydown.escape)': 'dismiss()',
+  },
 })
 export class ToastComponent {
-  private readonly toastService = inject(ToastService);
+  protected readonly data = inject<ToastData>(MAT_SNACK_BAR_DATA);
+  private readonly snackBarRef = inject<MatSnackBarRef<ToastComponent>>(MatSnackBarRef);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly document = inject(DOCUMENT);
 
-  readonly politeToasts = computed<Toast[]>(() =>
-    this.toastService.toasts().filter((t) => t.variant !== 'error'),
-  );
+  protected readonly icon = VARIANTS[this.data.variant].icon;
+  protected readonly statusLabel = VARIANTS[this.data.variant].statusLabel;
+  protected readonly hostClass = `toast toast-${this.data.variant}`;
 
-  readonly errorToasts = computed<Toast[]>(() =>
-    this.toastService.toasts().filter((t) => t.variant === 'error'),
-  );
+  /** The element that had focus before focus moved into the toast. */
+  private focusOrigin: HTMLElement | null = null;
 
-  itemClasses(variant: ToastVariant): string {
-    return `${ITEM_BASE} ${VARIANT_CLASSES[variant]}`;
+  /** Closes the snackbar, returning focus to where it came from if it was inside. */
+  dismiss(): void {
+    this.releaseFocus();
+    this.snackBarRef.dismissWithAction();
   }
 
-  dismiss(id: number): void {
-    this.toastService.dismiss(id);
+  /**
+   * Returns focus to the element it came from, if focus is inside this toast. ToastService calls
+   * it before the app closes or replaces the toast: removing a focused dismiss button would
+   * otherwise drop focus to <body>.
+   */
+  releaseFocus(): void {
+    const origin = this.focusOrigin;
+    if (origin?.isConnected && this.host.nativeElement.contains(this.document.activeElement)) {
+      origin.focus({ preventScroll: true });
+    }
+  }
+
+  protected rememberFocusOrigin(event: FocusEvent): void {
+    const origin = event.relatedTarget;
+    if (origin instanceof HTMLElement && !this.host.nativeElement.contains(origin)) {
+      this.focusOrigin = origin;
+    }
   }
 }

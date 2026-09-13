@@ -1,0 +1,16 @@
+<button
+  matIconButton
+  type="button"
+  class="hamburger"
+  [attr.aria-expanded]="open()"
+  [attr.aria-controls]="controls() || null"
+  [attr.aria-label]="label()"
+  (click)="toggle.emit()"
+>
+  <lucide-icon
+    class="hamburger-icon"
+    [class.hamburger-icon-directional]="directional()"
+    [name]="icon()"
+    aria-hidden="true"
+  />
+</button>

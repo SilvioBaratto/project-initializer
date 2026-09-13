@@ -1,0 +1,10 @@
+<span class="status" role="status">
+  <mat-progress-spinner
+    class="indicator"
+    mode="indeterminate"
+    [diameter]="diameter()"
+    [strokeWidth]="strokeWidth"
+    aria-hidden="true"
+  />
+  <span class="label" [class.cdk-visually-hidden]="!showLabel()">{{ label() }}</span>
+</span>

@@ -1,47 +1,27 @@
-@if (open()) {
-  <!-- Backdrop -->
-  <div
-    class="fixed inset-0 z-50 bg-black/40 dark:bg-black/60 flex items-center justify-center p-4"
-    data-testid="modal-backdrop"
-    (click)="handleClose()"
-    aria-hidden="true"
-  ></div>
+<!--
+  MatDialog renders this template in the body-level overlay container and supplies the scrim,
+  the dialog role, aria-hidden on the page outside the overlay container (aria-modal stays off by
+  Material's default), the focus trap, Esc and scrim dismissal and focus restore.
+  Elements declared here live in the dialog's own view, so mat-dialog-close and mat-dialog-actions
+  find its MatDialogRef. Projected elements do not: they close it through ModalComponent.close().
 
-  <!-- Dialog panel -->
-  <div
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="app-modal-title"
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
-    appFocusTrap
-    [active]="open()"
-    (close)="handleClose()"
-  >
-    <div
-      class="pointer-events-auto w-full max-w-lg rounded-xl shadow-xl
-             bg-surface-raised dark:bg-surface-raised
-             border border-border dark:border-border
-             animate-fade-in-up"
-      (click)="$event.stopPropagation()"
-    >
-      <!-- Header -->
-      <div class="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
-        <h2 id="app-modal-title" class="text-base font-semibold text-text">{{ label() }}</h2>
-        <button
-          type="button"
-          class="inline-flex items-center justify-center rounded-md p-1.5 text-text-secondary
-                 hover:text-text hover:bg-surface-inset transition-colors
-                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          aria-label="Close dialog"
-          (click)="handleClose()"
-        >
-          <lucide-icon name="X" class="w-5 h-5" aria-hidden="true" />
-        </button>
-      </div>
-      <!-- Body -->
-      <div class="px-6 py-4">
-        <ng-content />
-      </div>
-    </div>
-  </div>
-}
+  M3 simple dialog anatomy: headline, content, actions, and no close icon. The headline stays the
+  content's direct sibling, so Material drops the content's top padding by itself.
+-->
+<ng-template #dialogTemplate>
+  <h2 mat-dialog-title class="modal-title" [id]="titleId">{{ label() }}</h2>
+
+  <mat-dialog-content>
+    <ng-content />
+  </mat-dialog-content>
+
+  @if (actions()) {
+    <mat-dialog-actions align="end">
+      <ng-content select="app-modal-actions" />
+    </mat-dialog-actions>
+  } @else {
+    <mat-dialog-actions align="end">
+      <button matButton type="button" mat-dialog-close>Close</button>
+    </mat-dialog-actions>
+  }
+</ng-template>

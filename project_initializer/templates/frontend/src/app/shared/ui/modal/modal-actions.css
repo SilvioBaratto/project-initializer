@@ -1,0 +1,8 @@
+/*
+ * The slot adds no box of its own: the projected buttons become flex items of
+ * mat-dialog-actions, so Material's end alignment, wrapping and 8px spacing between
+ * adjacent buttons apply to them directly.
+ */
+:host {
+  display: contents;
+}

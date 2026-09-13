@@ -1,0 +1,83 @@
+/*
+ * Component catalog page. Colors, type and shape come from --mat-sys-* tokens only.
+ *
+ *   compact   (< 600px)    16px margins
+ *   medium+   (>= 600px)   24px margins
+ *
+ * The shell's main element adds no padding, so the page owns its margins. Content is capped at
+ * 64rem and centered, like the sibling pages. The light and dark regions of every demo, and the
+ * window size classes at which they sit side by side, belong to app-theme-preview (theme-preview.css).
+ */
+:host {
+  display: block;
+  padding-block: 16px;
+  padding-inline: 16px;
+}
+
+@media (min-width: 600px) {
+  :host {
+    padding-block: 24px;
+    padding-inline: 24px;
+  }
+}
+
+.catalog {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 48px;
+  max-inline-size: 64rem;
+  margin-inline: auto;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.catalog-header {
+  display: grid;
+  row-gap: 4px;
+}
+
+.catalog-title {
+  margin: 0;
+  font: var(--mat-sys-headline-small);
+  letter-spacing: var(--mat-sys-headline-small-tracking);
+  color: var(--mat-sys-on-surface);
+}
+
+/* Body text stays within about 60 characters per line. on-surface-variant on surface: 8.93:1 light, 14.33:1 dark. */
+.catalog-intro,
+.section-intro {
+  margin: 0;
+  max-inline-size: 60ch;
+  font: var(--mat-sys-body-medium);
+  letter-spacing: var(--mat-sys-body-medium-tracking);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+/* ── Sections ───────────────────────────────────────────────────────────── */
+
+.catalog-section {
+  min-inline-size: 0;
+}
+
+/* h2 under the page's h1: the element follows the outline, the type role follows visual hierarchy. */
+.section-heading {
+  margin: 0 0 24px;
+  font: var(--mat-sys-title-large);
+  letter-spacing: var(--mat-sys-title-large-tracking);
+  color: var(--mat-sys-on-surface);
+}
+
+/* The heading's 24px margin collapses with -16px, leaving 8px: the intro stays with its heading. */
+.section-intro {
+  margin-block: -16px 16px;
+}
+
+/* ── Overlay content ────────────────────────────────────────────────────── */
+
+/*
+ * Projected into the dialogs. These elements keep this page's encapsulation attribute inside the
+ * overlay container, so this rule still reaches them; type and color come from the dialog and sheet.
+ */
+.overlay-text {
+  margin: 0;
+}

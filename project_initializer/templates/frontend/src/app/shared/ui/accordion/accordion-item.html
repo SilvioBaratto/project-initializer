@@ -1,0 +1,8 @@
+<mat-expansion-panel [expanded]="expanded()" (expandedChange)="syncExpanded($event)">
+  <mat-expansion-panel-header>
+    <mat-panel-title>
+      <ng-content select="[slot=header]" />
+    </mat-panel-title>
+  </mat-expansion-panel-header>
+  <ng-content />
+</mat-expansion-panel>

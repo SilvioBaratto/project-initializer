@@ -1,0 +1,20 @@
+/*
+ * M3 standard icon button (matIconButton). Angular Material supplies the 40px
+ * container, the 48px touch target, the on-surface-variant icon color, the
+ * hover / focus / pressed state layers and the ripple; the keyboard focus ring
+ * outside the container comes from mat.strong-focus-indicators() in styles.scss.
+ */
+:host {
+  /* The button becomes a grid item, so the host adds no line box around it. */
+  display: inline-grid;
+}
+
+.hamburger-icon {
+  /* The 24px svg that matIconButton sizes becomes a grid item: no inline baseline gap below it. */
+  display: grid;
+}
+
+/* PanelLeftClose points at the rail's edge, so it mirrors with the layout in RTL. Menu and X are symmetric. */
+:host-context([dir='rtl']) .hamburger-icon-directional {
+  transform: scaleX(-1);
+}

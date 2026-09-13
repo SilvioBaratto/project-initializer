@@ -7,12 +7,26 @@ implementation.  No implementation source was read during authoring.
 Criteria covered:
   - [UNIT] Avatar: image variant uses NgOptimizedImage, initials fallback,
     sizes, required `alt`
+  - Material 3 migration: the avatar is split into avatar.ts + avatar.html +
+    avatar.css (templateUrl/styleUrl), styled only with `--mat-sys-*` tokens
+    (dark mode comes from the `light-dark()` tokens, so no color literals),
+    no Tailwind utility classes, sizes as px on the 4px grid, initials in the
+    plain type family at every size, the photo in NgOptimizedImage fill mode
+    (no bound width/height that could change after init), and screen-reader
+    text through the CDK `.cdk-visually-hidden` utility.
+  - StatCard (Material 3 migration, structural): split into stat-card.ts +
+    stat-card.html + stat-card.css, built on app-card, metric/label/delta
+    inputs kept, delta direction shown by color role (each direction's
+    selector pinned to its role: up `--app-success`, down `--mat-sys-error`,
+    neutral `--mat-sys-on-surface-variant`) plus a registered lucide chevron
+    and a `.cdk-visually-hidden` direction word, container-query aware through a
+    CSS `@container` rule, type from `--mat-sys-*` roles with their
+    tracking, no color literals and no Tailwind utility classes. Rendering
+    behavior is covered by stat-card.spec.ts.
 
 Criteria skipped (not runtime-verifiable per oracle):
-  - StatCard: metric/label/delta with directional color, container-query
-    aware, built on Card — no concrete runtime or unit check inferable.
-  - Dark-mode tokens; ≥44px when interactive — no concrete runtime or unit
-    check inferable.
+  - ≥48px when interactive — the avatar is not interactive; no concrete
+    runtime or unit check inferable.
   - All tests pass — boilerplate suite gate; no per-criterion assertion.
   - SOLID, clean code (methods < 10 lines …) — subjective prose; no
     concrete runtime or unit assertion.
@@ -88,10 +102,10 @@ def _avatar_dir() -> pathlib.Path:
 
 
 def _avatar_template_source() -> str:
-    """Return concatenated text of all non-spec .ts + .html files in the avatar folder."""
+    """Return concatenated text of all non-spec .ts + .html + .css files in the avatar folder."""
     d = _avatar_dir()
     parts: list[str] = []
-    for ext in ("*.ts", "*.html"):
+    for ext in ("*.ts", "*.html", "*.css"):
         for f in d.glob(ext):
             if ".spec." not in f.name:
                 parts.append(f.read_text(encoding="utf-8"))
@@ -300,6 +314,155 @@ def test_when_avatar_ts_read_then_onpush_change_detection_is_set():
 
 
 # ---------------------------------------------------------------------------
+# Material 3 migration: file separation, tokens, no Tailwind
+# ---------------------------------------------------------------------------
+
+
+def _avatar_css() -> str:
+    return "\n".join(
+        f.read_text(encoding="utf-8") for f in sorted(_avatar_dir().glob("*.css"))
+    )
+
+
+def _avatar_html() -> str:
+    return "\n".join(
+        f.read_text(encoding="utf-8") for f in sorted(_avatar_dir().glob("*.html"))
+    )
+
+
+def test_when_avatar_folder_inspected_then_template_and_styles_are_separate_files():
+    """The Avatar is split into avatar.ts + avatar.html + avatar.css.
+
+    The component wires them with templateUrl/styleUrl and keeps no inline
+    template or styles in the .ts file.
+    """
+    d = _avatar_dir()
+    assert (d / "avatar.html").is_file(), "Expected shared/ui/avatar/avatar.html"
+    assert (d / "avatar.css").is_file(), "Expected shared/ui/avatar/avatar.css"
+    src = _avatar_source()
+    assert re.search(r"templateUrl\s*:\s*['\"]\./avatar\.html['\"]", src)
+    assert re.search(r"styleUrl\s*:\s*['\"]\./avatar\.css['\"]", src)
+    assert not re.search(r"\btemplate\s*:\s*`", src), "Inline template found in avatar.ts"
+    assert not re.search(r"\bstyles\s*:", src), "Inline styles found in avatar.ts"
+
+
+def test_when_avatar_css_read_then_colors_and_shape_come_from_mat_sys_tokens():
+    """Dark mode comes from the `light-dark()` `--mat-sys-*` tokens.
+
+    Initials sit on primary-container with on-primary-container text (a
+    standard M3 pairing, 7.23:1 in both schemes for the violet palette), the
+    circle uses corner-full, and the stylesheet carries no color literals,
+    `!important` or `::ng-deep`.
+    """
+    css = _avatar_css()
+    for token in (
+        "--mat-sys-primary-container",
+        "--mat-sys-on-primary-container",
+        "--mat-sys-corner-full",
+    ):
+        assert f"var({token})" in css, f"Expected var({token}) in avatar.css"
+    assert not re.search(r"#[0-9a-fA-F]{3,8}\b|\b(rgb|rgba|hsl|hsla)\(", css), (
+        "avatar.css must not contain hex/rgb/hsl color literals"
+    )
+    assert "!important" not in css
+    assert "::ng-deep" not in css
+
+
+def test_when_avatar_css_read_then_every_type_role_is_paired_with_its_tracking():
+    """Typography uses `font: var(--mat-sys-<role>)` plus the role's tracking token."""
+    css = _avatar_css()
+    roles = re.findall(r"font:\s*var\(--mat-sys-([a-z]+-[a-z]+)\)", css)
+    assert roles, "Expected at least one `font: var(--mat-sys-<role>)` in avatar.css"
+    for role in roles:
+        assert f"letter-spacing: var(--mat-sys-{role}-tracking)" in css, (
+            f"Expected letter-spacing: var(--mat-sys-{role}-tracking) next to its font role"
+        )
+
+
+def test_when_avatar_css_read_then_sizes_are_px_on_the_4px_grid():
+    """The sm/md/lg/xl sizes map to 32/40/48/64px, all on the 4px grid."""
+    css = _avatar_css()
+    for size in ("sm", "lg", "xl"):
+        assert re.search(rf":host\(\[data-size=['\"]{size}['\"]\]\)", css), (
+            f"Expected a :host([data-size='{size}']) rule in avatar.css"
+        )
+    sizes = [int(v) for v in re.findall(r"--avatar-size:\s*(\d+)px", css)]
+    assert sorted(sizes) == [32, 40, 48, 64], f"Unexpected avatar sizes: {sizes}"
+    assert all(v % 4 == 0 for v in sizes)
+
+
+def test_when_avatar_sources_read_then_no_tailwind_utility_classes_remain():
+    """No Tailwind utility classes in the avatar template or class maps."""
+    text = _avatar_source() + "\n" + _avatar_html()
+    tailwind = re.compile(
+        r"\b(size-\d+|inline-flex|items-center|justify-center|rounded-full|"
+        r"overflow-hidden|shrink-0|object-cover|select-none|sr-only|"
+        r"text-(xs|sm|base|lg|xl|text-secondary)|bg-surface-inset|font-medium|"
+        r"w-full|h-full|dark:)"
+    )
+    match = tailwind.search(text)
+    assert match is None, f"Tailwind utility '{match.group(0) if match else ''}' in avatar"
+
+
+def test_when_avatar_template_read_then_screen_reader_text_uses_cdk_visually_hidden():
+    """The initials fallback names the person through `.cdk-visually-hidden`.
+
+    The visible initials are aria-hidden; the full `alt` text is read instead,
+    unless the avatar is `decorative` (a visible name already sits beside it).
+    """
+    html = _avatar_html()
+    assert "cdk-visually-hidden" in html
+    assert 'aria-hidden="true"' in html
+    src = _avatar_source()
+    assert re.search(r"decorative\s*=\s*input\(", src), "Expected a `decorative` input"
+    assert "booleanAttribute" in src
+
+
+def test_when_avatar_css_read_then_initials_keep_the_plain_type_family_at_every_size():
+    """Initials keep one typeface and weight across sm/md/lg/xl.
+
+    `mat.theme` sets display, headline and title-large in the brand family at
+    weight 400, and title-medium / label-large in the plain family at 500.
+    The avatar uses only plain-family `font` roles; lg and xl step the size up
+    with a `--mat-sys-*-size` token instead of switching to a brand role.
+    """
+    css = _avatar_css()
+    roles = set(re.findall(r"font:\s*var\(--mat-sys-([a-z]+-[a-z]+)\)", css))
+    assert roles, "Expected `font: var(--mat-sys-<role>)` in avatar.css"
+    assert roles <= {"title-medium", "label-large"}, (
+        f"Avatar initials must use plain-family type roles only, found: {sorted(roles)}"
+    )
+    for size in ("lg", "xl"):
+        block = re.search(rf":host\(\[data-size=['\"]{size}['\"]\]\)\s*\{{([^}}]*)\}}", css)
+        assert block, f"Expected a :host([data-size='{size}']) rule in avatar.css"
+        assert re.search(r"font-size:\s*var\(--mat-sys-[a-z]+-[a-z]+-size\)", block.group(1)), (
+            f"Expected the {size} rule to step the size with a --mat-sys-*-size token"
+        )
+
+
+def test_when_avatar_template_read_then_photo_uses_fill_mode_without_bound_dimensions():
+    """The photo renders in NgOptimizedImage `fill` mode.
+
+    NgOptimizedImage throws NG02953 when `width`/`height` change after init,
+    and a `size` change keeps the same <img>, so the template binds neither.
+    Fill mode positions the image absolutely, so the host is `position: relative`
+    and the image crops with `object-fit: cover`. A px `sizes` value would throw
+    NG02952 in dev mode, so none is set.
+    """
+    html = _avatar_html()
+    img = re.search(r"<img\b[^>]*>", html)
+    assert img, "Expected an <img> in avatar.html"
+    tag = img.group(0)
+    assert re.search(r"\sfill[\s/>]", tag), "Expected the fill attribute on the avatar <img>"
+    assert not re.search(r"\[?(width|height)\]?\s*=", tag), "Fill-mode <img> must not bind width/height"
+    assert not re.search(r"sizes\s*=\s*\"[^\"]*\d+px", tag), "A px sizes value throws NG02952"
+    css = _avatar_css()
+    host_rule = re.search(r":host\s*\{([^}]*)\}", css)
+    assert host_rule and re.search(r"position:\s*relative", host_rule.group(1))
+    assert "object-fit: cover" in css
+
+
+# ---------------------------------------------------------------------------
 # Hypothesis property-based tests
 # ---------------------------------------------------------------------------
 
@@ -318,7 +481,7 @@ _ALT_TEXTS = st.text(
 
 
 @given(_ALT_TEXTS)
-@settings(max_examples=20)
+@settings(max_examples=20, deadline=None)
 def test_when_alt_text_is_any_nonempty_string_then_template_does_not_hardcode_it(
     alt_text: str,
 ):
@@ -374,7 +537,7 @@ _NAME_TEXTS = st.text(
 
 
 @given(_NAME_TEXTS)
-@settings(max_examples=10)
+@settings(max_examples=10, deadline=None)
 def test_when_name_is_any_string_then_initials_are_uppercased_in_source(name: str):
     """For any name string, the avatar source must produce uppercase initials.
 
@@ -398,3 +561,165 @@ def test_when_name_is_any_string_then_initials_are_uppercased_in_source(name: st
         "source to ensure initials are rendered in uppercase for any name input. "
         "Per criterion: 'initials fallback'."
     )
+
+
+# ---------------------------------------------------------------------------
+# StatCard — Material 3 migration (structural)
+# ---------------------------------------------------------------------------
+
+STAT_CARD_DIR = SHARED_DIR / "ui" / "stat-card"
+
+
+def _stat_card_file(ext: str) -> str:
+    """Return the text of every non-spec stat-card file with the given extension."""
+    return "\n".join(
+        f.read_text(encoding="utf-8")
+        for f in sorted(STAT_CARD_DIR.glob(f"*.{ext}"))
+        if ".spec." not in f.name
+    )
+
+
+def test_when_stat_card_folder_inspected_then_template_and_styles_are_separate_files():
+    """The StatCard is split into stat-card.ts + stat-card.html + stat-card.css.
+
+    The component wires them with templateUrl/styleUrl, keeps no inline
+    template or styles, and keeps its OnPush change detection.
+    """
+    for name in ("stat-card.ts", "stat-card.html", "stat-card.css"):
+        assert (STAT_CARD_DIR / name).is_file(), f"Expected shared/ui/stat-card/{name}"
+    src = _stat_card_file("ts")
+    assert re.search(r"templateUrl\s*:\s*['\"]\./stat-card\.html['\"]", src)
+    assert re.search(r"styleUrl\s*:\s*['\"]\./stat-card\.css['\"]", src)
+    assert not re.search(r"\btemplate\s*:\s*`", src), "Inline template found in stat-card.ts"
+    assert not re.search(r"\bstyles\s*:", src), "Inline styles found in stat-card.ts"
+    assert "ChangeDetectionStrategy.OnPush" in src
+
+
+def test_when_stat_card_ts_read_then_public_inputs_and_direction_type_are_kept():
+    """Selector, the metric/label/delta/deltaDirection inputs and DeltaDirection stay stable."""
+    src = _stat_card_file("ts")
+    assert re.search(r"selector\s*:\s*['\"]app-stat-card['\"]", src)
+    assert re.search(r"metric\s*=\s*input\.required<string>\(\)", src)
+    assert re.search(r"label\s*=\s*input\.required<string>\(\)", src)
+    assert re.search(r"delta\s*=\s*input<string \| null>\(null\)", src)
+    assert re.search(r"deltaDirection\s*=\s*input<DeltaDirection>\(['\"]neutral['\"]\)", src)
+    assert re.search(
+        r"export type DeltaDirection\s*=\s*'up'\s*\|\s*'down'\s*\|\s*'neutral'", src
+    )
+
+
+def test_when_stat_card_template_read_then_it_is_built_on_card():
+    """The tile renders inside the shared app-card (a Material card)."""
+    assert "<app-card" in _stat_card_file("html")
+    assert "CardComponent" in _stat_card_file("ts")
+
+
+def test_when_stat_card_read_then_delta_direction_is_not_signaled_by_color_alone():
+    """Up and down pair their color role with an icon and a hidden word.
+
+    The icons are registered lucide names typed as `IconName`, so an
+    unregistered name fails the build instead of throwing at runtime; the
+    direction word is read through `.cdk-visually-hidden`.
+    """
+    src = _stat_card_file("ts")
+    html = _stat_card_file("html")
+    assert "IconName" in src
+    assert "'ChevronUp'" in src and "'ChevronDown'" in src
+    assert "<lucide-icon" in html
+    assert "cdk-visually-hidden" in html
+    assert "data-direction" in html
+
+
+def test_when_stat_card_css_read_then_colors_and_type_come_from_tokens():
+    """Colors use `--mat-sys-*` and the `--app-success` status role; no literals.
+
+    Dark mode comes from the `light-dark()` tokens, so the stylesheet has no
+    color literals, `!important` or `::ng-deep`, and every `font` role is
+    paired with its tracking token.
+    """
+    css = _stat_card_file("css")
+    for token in (
+        "--mat-sys-on-surface-variant",
+        "--mat-sys-on-surface",
+        "--mat-sys-error",
+        "--app-success",
+    ):
+        assert f"var({token})" in css, f"Expected var({token}) in stat-card.css"
+    assert not re.search(r"#[0-9a-fA-F]{3,8}\b|\b(rgb|rgba|hsl|hsla)\(", css), (
+        "stat-card.css must not contain hex/rgb/hsl color literals"
+    )
+    assert "!important" not in css
+    assert "::ng-deep" not in css
+    roles = re.findall(r"font:\s*var\(--mat-sys-([a-z]+-[a-z]+)\)", css)
+    assert {"label-large", "headline-medium", "display-small"} <= set(roles)
+    for role in roles:
+        assert f"letter-spacing: var(--mat-sys-{role}-tracking)" in css, (
+            f"Expected letter-spacing: var(--mat-sys-{role}-tracking) next to its font role"
+        )
+
+
+def _stat_card_css_rules() -> dict[str, str]:
+    """Map each selector in stat-card.css to its declarations, comments stripped.
+
+    Attribute quotes are normalized to single quotes and whitespace collapsed.
+    A rule nested in an at-rule is keyed by its own selector; declarations
+    of repeated selectors are concatenated in source order.
+    """
+    css = re.sub(r"/\*.*?\*/", "", _stat_card_file("css"), flags=re.S)
+    rules: dict[str, str] = {}
+    for selector, declarations in re.findall(r"([^{}]+)\{([^{}]*)\}", css):
+        key = re.sub(r"\s+", " ", selector).strip().replace('"', "'")
+        rules[key] = rules.get(key, "") + declarations
+    return rules
+
+
+def _declared_color(declarations: str) -> str | None:
+    """The last `color` value in a declaration block (later wins), ignoring `*-color` properties."""
+    colors = re.findall(r"(?<![-\w])color\s*:\s*([^;]+)", declarations)
+    return colors[-1].strip() if colors else None
+
+
+def test_when_stat_card_css_read_then_each_delta_direction_maps_to_its_color_role():
+    """Each delta direction is pinned to its own color role, not just present somewhere.
+
+    `up` takes `--app-success`, `down` takes `--mat-sys-error`, and the base
+    `.stat-card-delta` rule (the `neutral` look) takes
+    `--mat-sys-on-surface-variant`; a `neutral` rule, if one is ever added,
+    must keep that role. Swapping the up and down roles fails here. The
+    rendered side (the template's `data-direction` hitting these rules) is
+    asserted in stat-card.spec.ts.
+    """
+    rules = _stat_card_css_rules()
+    expected = {
+        ".stat-card-delta": "var(--mat-sys-on-surface-variant)",
+        ".stat-card-delta[data-direction='up']": "var(--app-success)",
+        ".stat-card-delta[data-direction='down']": "var(--mat-sys-error)",
+    }
+    for selector, role in expected.items():
+        assert selector in rules, f"Expected a `{selector}` rule in stat-card.css"
+        assert _declared_color(rules[selector]) == role, (
+            f"Expected `{selector}` to set color: {role}, got {_declared_color(rules[selector])!r}"
+        )
+    neutral = rules.get(".stat-card-delta[data-direction='neutral']")
+    if neutral is not None and _declared_color(neutral) is not None:
+        assert _declared_color(neutral) == "var(--mat-sys-on-surface-variant)"
+
+
+def test_when_stat_card_css_read_then_metric_steps_up_with_a_container_query():
+    """Container-query aware: the metric grows with the card's own width, not the window."""
+    css = _stat_card_file("css")
+    assert re.search(r"container:\s*stat-card\s*/\s*inline-size", css)
+    block = re.search(r"@container\s+stat-card\s*\([^)]*\)\s*\{(.*?)\n\}", css, re.S)
+    assert block, "Expected an @container stat-card (...) rule in stat-card.css"
+    assert "--mat-sys-display-small" in block.group(1)
+
+
+def test_when_stat_card_sources_read_then_no_tailwind_utility_classes_remain():
+    """No Tailwind utility classes in the stat-card template or TypeScript."""
+    text = _stat_card_file("ts") + "\n" + _stat_card_file("html")
+    tailwind = re.compile(
+        r"(@container\b|@sm:|\b(flex-col|gap-\d|text-(xs|sm|2xl|3xl|success|danger|text)|"
+        r"font-semibold|font-medium|tabular-nums|truncate|mt-0\.5|dark:))"
+    )
+    match = tailwind.search(text)
+    assert match is None, f"Tailwind utility '{match.group(0) if match else ''}' in stat-card"

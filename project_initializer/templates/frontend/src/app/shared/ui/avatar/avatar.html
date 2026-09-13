@@ -1,0 +1,12 @@
+@if (imageSrc(); as url) {
+  @if (!isInlineUrl()) {
+    <img class="image" [ngSrc]="url" fill [alt]="imageAlt()" (error)="onImageError()" />
+  } @else {
+    <img class="image image-inline" [src]="url" [alt]="imageAlt()" (error)="onImageError()" />
+  }
+} @else {
+  <span class="initials" aria-hidden="true">{{ initials() }}</span>
+  @if (!decorative()) {
+    <span class="cdk-visually-hidden">{{ alt() }}</span>
+  }
+}

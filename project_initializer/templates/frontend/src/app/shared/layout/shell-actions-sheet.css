@@ -1,0 +1,10 @@
+/*
+ * Contents of the compact bottom sheet. The sheet container is an overlay panel that this
+ * stylesheet can't reach; it paints surface-container-low itself. The content pads by the
+ * safe-area insets so the last action clears the iOS home indicator. Physical on purpose:
+ * safe-area insets are physical edges, whatever the text direction.
+ */
+:host {
+  display: block;
+  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}

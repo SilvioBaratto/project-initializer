@@ -1,0 +1,19 @@
+/*
+ * The panel is a tab stop unless `focusable` is false, so keyboard users can move from the tab list
+ * into text-only content. `:focus-visible` only matches while it has a tabindex.
+ * Material's tab body sets `outline: 0` on itself, so the focus ring is drawn here instead: 3px
+ * in secondary, outside the panel with a 2px gap. The body scrolls and clips its contents, so an
+ * 8px margin leaves room for that ring (3px + 2px), and 8px of padding keeps content 16px from
+ * the edge.
+ */
+.panel {
+  margin: 8px;
+  padding: 8px;
+  font: var(--mat-sys-body-medium);
+  letter-spacing: var(--mat-sys-body-medium-tracking);
+}
+
+.panel:focus-visible {
+  outline: 3px solid var(--mat-sys-secondary);
+  outline-offset: 2px;
+}

@@ -1,26 +1,46 @@
 import {
+  afterRenderEffect,
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
+  ElementRef,
   forwardRef,
+  inject,
   input,
+  linkedSignal,
   signal,
+  viewChild,
 } from '@angular/core';
+import { UniqueSelectionDispatcher } from '@angular/cdk/collections';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
+import { MatRadioButton } from '@angular/material/radio';
 
-const LABEL_BASE =
-  'inline-flex items-center gap-3 min-h-[44px] cursor-pointer select-none ' +
-  'text-sm text-text';
+let nextUniqueId = 0;
 
-const INPUT_BASE =
-  'size-4 shrink-0 rounded-full border border-border bg-surface-raised accent-primary ' +
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ' +
-  'disabled:cursor-not-allowed disabled:opacity-50 transition-colors';
-
-const INPUT_ERROR = 'border-danger accent-danger focus-visible:ring-danger';
-
+/**
+ * Material 3 radio button (MatRadioButton) with a string label, an error message
+ * and a value-based ControlValueAccessor: bind the same `[formControl]` or
+ * `ngModel` to every radio of a set, and each radio is checked when the value
+ * equals its own `value`. The plain `checked` / `disabled` inputs work too.
+ *
+ * Radios that share a `name` form one set. Selecting one unchecks the others,
+ * and because the native inputs share that name the browser keeps the set to a
+ * single Tab stop and moves the selection with the arrow keys. Material links
+ * the set through a root-level dispatcher, so equal names form one set across
+ * the whole app, even in separate `<form>` elements: give each set its own name.
+ *
+ * A radio with no `name` gets a generated one, so it stays independent like a
+ * native radio with an empty name instead of joining every other unnamed radio.
+ *
+ * Material renders the `<label for>` around the projected label text and gives
+ * the native input a 48px touch target at density 0.
+ */
 @Component({
   selector: 'app-radio',
+  imports: [MatRadioButton],
+  templateUrl: './radio.html',
+  styleUrl: './radio.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [
     {
@@ -29,31 +49,11 @@ const INPUT_ERROR = 'border-danger accent-danger focus-visible:ring-danger';
       multi: true,
     },
   ],
-  template: `
-    <label [class]="labelClasses()">
-      <input
-        type="radio"
-        [id]="id()"
-        [name]="name()"
-        [value]="value()"
-        [class]="inputClasses()"
-        [checked]="isChecked()"
-        [disabled]="isDisabled()"
-        [attr.aria-invalid]="errorText() ? 'true' : null"
-        (change)="onChange()"
-        (blur)="onTouched()"
-      />
-      @if (label()) {
-        <span>{{ label() }}</span>
-      }
-    </label>
-    @if (errorText()) {
-      <span class="mt-1 text-sm text-danger" role="alert">{{ errorText() }}</span>
-    }
-  `,
 })
 export class RadioComponent implements ControlValueAccessor {
+  /** Id of the `<mat-radio-button>` host; Material gives the native input `<id>-input`. */
   readonly id = input('');
+  /** Radios with the same name form one set. With no name, the radio stands alone. */
   readonly name = input('');
   readonly value = input('');
   readonly label = input('');
@@ -61,25 +61,53 @@ export class RadioComponent implements ControlValueAccessor {
   readonly disabled = input(false);
   readonly checked = input(false);
 
-  // CVA override: null means "use the checked input", boolean means "CVA controls it"
-  private readonly _formChecked = signal<boolean | null>(null);
+  // Follows the checked input. writeValue, a user selection and a selection in
+  // another radio of the same set override it until the checked input changes.
+  private readonly _checked = linkedSignal(() => this.checked());
   private readonly _formDisabled = signal(false);
+  private readonly _uniqueId = `app-radio-${nextUniqueId++}`;
 
-  readonly isChecked = computed(() => this._formChecked() ?? this.checked());
+  readonly isChecked = this._checked.asReadonly();
   readonly isDisabled = computed(() => this._formDisabled() || this.disabled());
+  readonly hasError = computed(() => this.errorText() !== '');
+  readonly radioId = computed(() => this.id() || this._uniqueId);
+  readonly errorId = computed(() => `${this.radioId()}-error`);
 
-  readonly labelClasses = computed(() =>
-    this.isDisabled() ? `${LABEL_BASE} opacity-50` : LABEL_BASE,
-  );
+  // Material's dispatcher treats equal names as one set, and '' === '' would
+  // link every unnamed radio in the app. A generated name keeps each one alone.
+  protected readonly groupName = computed(() => this.name() || this._uniqueId);
 
-  readonly inputClasses = computed(() =>
-    this.errorText() ? `${INPUT_BASE} ${INPUT_ERROR}` : INPUT_BASE,
-  );
+  private readonly _radio = viewChild(MatRadioButton);
+  private readonly _radioRef = viewChild.required(MatRadioButton, { read: ElementRef });
 
   private _onChange: (v: string) => void = () => {};
   private _onTouched: () => void = () => {};
 
+  constructor() {
+    // MatRadioButton unchecks itself, without emitting, when another radio with
+    // the same name is checked. Mirror that rule so isChecked() and the [checked]
+    // binding never go stale and a later writeValue can check this radio again.
+    const stopListening = inject(UniqueSelectionDispatcher).listen((id, name) => {
+      const radio = this._radio();
+      if (radio && id !== radio.id && name === radio.name) {
+        this._checked.set(false);
+      }
+    });
+    inject(DestroyRef).onDestroy(stopListening);
+
+    // MatRadioButton renders a static aria-invalid="false" on its native input
+    // and has no input for it, so the error state is written onto that input.
+    afterRenderEffect({
+      write: () => {
+        const host = this._radioRef().nativeElement as HTMLElement;
+        const nativeInput = host.querySelector('input[type="radio"]');
+        nativeInput?.setAttribute('aria-invalid', String(this.hasError()));
+      },
+    });
+  }
+
   onChange(): void {
+    this._checked.set(true);
     this._onChange(this.value());
   }
 
@@ -88,7 +116,7 @@ export class RadioComponent implements ControlValueAccessor {
   }
 
   writeValue(v: string): void {
-    this._formChecked.set(v === this.value());
+    this._checked.set(v === this.value());
   }
 
   registerOnChange(fn: (v: string) => void): void {

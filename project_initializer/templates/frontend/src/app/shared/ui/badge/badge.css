@@ -1,0 +1,79 @@
+/*
+ * Inline status label. matBadge only overlays a count on another element, so
+ * this pill is built on --mat-sys-* tokens. M3 badges inherit no interaction
+ * states, so there is no state layer, focus ring or 48px target here.
+ *
+ * Sizes on the 4px grid: 16px line + 4px block padding = 24px pill, 8px inline
+ * padding (4px before a 16px status icon, centring it in the rounded end).
+ * No fixed block-size, so the label wraps instead of clipping at 200% text.
+ */
+:host {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
+  max-inline-size: 100%;
+  padding-block: 4px;
+  padding-inline: 8px;
+  vertical-align: middle;
+  border-radius: var(--mat-sys-corner-full);
+  font: var(--mat-sys-label-medium);
+  letter-spacing: var(--mat-sys-label-medium-tracking);
+  /* default: neutral, no status */
+  background: var(--mat-sys-surface-container-highest);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+:host(.app-badge--with-icon) {
+  padding-inline-start: 4px;
+}
+
+:host([data-variant='primary']) {
+  background: var(--mat-sys-primary-container);
+  color: var(--mat-sys-on-primary-container);
+}
+
+/* Status roles M3 lacks come from styles.scss as --app-* container pairs. */
+:host([data-variant='info']) {
+  background: var(--app-info-container);
+  color: var(--app-on-info-container);
+}
+
+:host([data-variant='success']) {
+  background: var(--app-success-container);
+  color: var(--app-on-success-container);
+}
+
+:host([data-variant='warning']) {
+  background: var(--app-warning-container);
+  color: var(--app-on-warning-container);
+}
+
+:host([data-variant='danger']) {
+  background: var(--mat-sys-error-container);
+  color: var(--mat-sys-on-error-container);
+}
+
+/* The svg strokes with currentColor, so the icon follows the variant's on-container role. */
+.icon {
+  display: flex;
+  flex-shrink: 0;
+}
+
+/*
+ * break-word, not anywhere: both break an overlong word at 200% text, but only
+ * anywhere counts those breaks toward min-content, which would let a badge in a
+ * tight flex row shrink to one glyph and split short words mid-word.
+ */
+.label {
+  min-inline-size: 0;
+  overflow-wrap: break-word;
+}
+
+/* Forced colors drop backgrounds: keep the pill's edge visible. */
+@media (forced-colors: active) {
+  :host {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+}

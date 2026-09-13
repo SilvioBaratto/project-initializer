@@ -1,0 +1,75 @@
+<nav class="pagination" [attr.aria-label]="label()" (focusout)="onFocusOut($event)">
+  <!-- Shown in place of the page numbers while the row doesn't fit; announces page changes at every width. -->
+  <p class="status" aria-live="polite">Page {{ page() }} of {{ total() }}</p>
+
+  <!-- role="list": list-style: none drops list semantics in WebKit/VoiceOver -->
+  <ul class="list" role="list">
+    <li class="slot">
+      <button
+        #firstButton
+        matIconButton
+        type="button"
+        aria-label="First page"
+        [disabled]="isFirstPage()"
+        (click)="onFirst()"
+      >
+        <lucide-icon class="icon" name="ChevronsLeft" />
+      </button>
+    </li>
+    <li class="slot">
+      <button
+        #previousButton
+        matIconButton
+        type="button"
+        aria-label="Previous page"
+        [disabled]="isFirstPage()"
+        (click)="onPrev()"
+      >
+        <lucide-icon class="icon" name="ChevronLeft" />
+      </button>
+    </li>
+
+    @for (p of pages(); track p) {
+      @if (gapBefore().has(p)) {
+        <li class="slot gap" aria-hidden="true">…</li>
+      }
+      <li class="slot page-slot">
+        <button
+          class="page"
+          type="button"
+          [matButton]="p === page() ? 'tonal' : 'text'"
+          [attr.aria-current]="p === page() ? 'page' : null"
+          attr.aria-label="Page {{ p }}"
+          (click)="onPage(p)"
+        >
+          {{ p }}
+        </button>
+      </li>
+    }
+
+    <li class="slot">
+      <button
+        #nextButton
+        matIconButton
+        type="button"
+        aria-label="Next page"
+        [disabled]="isLastPage()"
+        (click)="onNext()"
+      >
+        <lucide-icon class="icon" name="ChevronRight" />
+      </button>
+    </li>
+    <li class="slot">
+      <button
+        #lastButton
+        matIconButton
+        type="button"
+        aria-label="Last page"
+        [disabled]="isLastPage()"
+        (click)="onLast()"
+      >
+        <lucide-icon class="icon" name="ChevronsRight" />
+      </button>
+    </li>
+  </ul>
+</nav>

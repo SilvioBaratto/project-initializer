@@ -1,0 +1,249 @@
+/*
+ * Chat view. Rendered inside the shell's <main>, which adds no padding, so the
+ * page owns its pane margins: 16px at compact (< 600px), 24px from 600px.
+ * Every color, type, shape and elevation value comes from a --mat-sys-* token.
+ *
+ * The view fills main's block size: the log scrolls, the composer stays at the
+ * bottom (directly above the compact navigation bar, which the shell renders
+ * outside main).
+ */
+
+:host {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  block-size: 100%;
+  min-block-size: 0;
+}
+
+/* ── Message log ──────────────────────────────────────────────────────────── */
+
+.messages {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-block-size: 0;
+  overflow-y: auto;
+  /* Keep scroll chaining and pull-to-refresh inside the log. */
+  overscroll-behavior: contain;
+  /*
+   * main scrolls and clips, so an 8px margin leaves room for the log's outside focus ring
+   * (3px + 2px gap). Margin plus padding make the pane margin: 8 + 8 = 16px at compact,
+   * and 8 + 16 = 24px from 600px; 8 + 16 = 24px above the first message.
+   */
+  margin-block-start: 8px;
+  margin-inline: 8px;
+  padding-block: 16px 24px;
+  padding-inline: 8px;
+}
+
+/* Keyboard focus ring outside the log with a 2px gap, matching mat.strong-focus-indicators(). */
+.messages:focus-visible {
+  outline: 3px solid var(--mat-sys-secondary);
+  outline-offset: 2px;
+}
+
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  inline-size: 100%;
+  /* In rem, so the column widens with the user's text size. */
+  max-inline-size: 45rem;
+  margin-inline: auto;
+}
+
+.message {
+  box-sizing: border-box;
+  /* Body text stays near 60 characters per line. */
+  max-inline-size: min(85%, 60ch);
+  padding-block: 8px;
+  padding-inline: 16px;
+  border-radius: var(--mat-sys-corner-large);
+  font: var(--mat-sys-body-large);
+  letter-spacing: var(--mat-sys-body-large-tracking);
+  overflow-wrap: anywhere;
+}
+
+.message-text {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.message-user {
+  align-self: flex-end;
+  border-end-end-radius: var(--mat-sys-corner-extra-small);
+  background: var(--mat-sys-primary);
+  color: var(--mat-sys-on-primary);
+}
+
+.message-assistant {
+  align-self: flex-start;
+  border-end-start-radius: var(--mat-sys-corner-extra-small);
+  background: var(--mat-sys-surface-container-high);
+  color: var(--mat-sys-on-surface);
+}
+
+.message-error {
+  display: flex;
+  align-self: flex-start;
+  align-items: flex-start;
+  gap: 8px;
+  border-end-start-radius: var(--mat-sys-corner-extra-small);
+  background: var(--mat-sys-error-container);
+  color: var(--mat-sys-on-error-container);
+}
+
+/* A 20px icon centered on the first 24px line. */
+.message-icon {
+  display: flex;
+  flex-shrink: 0;
+  margin-block-start: 2px;
+  color: var(--mat-sys-error);
+}
+
+/* ── Typing indicator ─────────────────────────────────────────────────────── */
+
+.typing-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  block-size: 24px;
+}
+
+.typing-dot {
+  inline-size: 6px;
+  block-size: 6px;
+  border-radius: var(--mat-sys-corner-full);
+  background: var(--mat-sys-on-surface-variant);
+  animation: typing-bounce 1s ease-in-out infinite;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: 150ms;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 300ms;
+}
+
+@keyframes typing-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+  }
+
+  30% {
+    transform: translateY(-4px);
+  }
+}
+
+/* Reduced motion: three still dots; the status text still announces the wait. */
+@media (prefers-reduced-motion: reduce) {
+  .typing-dot {
+    animation: none;
+  }
+}
+
+/* ── Empty state ──────────────────────────────────────────────────────────── */
+
+.empty-state {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  max-inline-size: 24rem;
+  margin: auto;
+  text-align: center;
+}
+
+.empty-icon {
+  display: grid;
+  place-items: center;
+  inline-size: 48px;
+  block-size: 48px;
+  margin-block-end: 12px;
+  border-radius: var(--mat-sys-corner-large);
+  background: var(--mat-sys-primary-container);
+  color: var(--mat-sys-on-primary-container);
+}
+
+.empty-icon lucide-icon {
+  display: flex;
+}
+
+.empty-title {
+  margin: 0;
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-title-medium);
+  letter-spacing: var(--mat-sys-title-medium-tracking);
+}
+
+.empty-text {
+  margin: 0;
+  max-inline-size: 60ch;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-medium);
+  letter-spacing: var(--mat-sys-body-medium-tracking);
+}
+
+/* ── Composer ─────────────────────────────────────────────────────────────── */
+
+.composer-region {
+  padding-block: 8px 16px;
+  padding-inline: 16px;
+}
+
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  /* Same 45rem column as the thread above it. */
+  max-inline-size: 45rem;
+  margin-inline: auto;
+}
+
+.composer-field {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  /* Fully rounded composer; Material pads the text past the larger corner. */
+  --mat-form-field-outlined-container-shape: var(--mat-sys-corner-extra-large);
+}
+
+/*
+ * Filled icon button (M3 icon button spec) built on matIconButton tokens:
+ * a 40px primary container inside Material's 48px touch target.
+ */
+.send-button {
+  --mat-icon-button-icon-color: var(--mat-sys-on-primary);
+  --mat-icon-button-state-layer-color: var(--mat-sys-on-primary);
+  --mat-icon-button-ripple-color: color-mix(
+    in srgb,
+    var(--mat-sys-on-primary) calc(var(--mat-sys-pressed-state-layer-opacity) * 100%),
+    transparent
+  );
+  --mat-icon-button-disabled-icon-color: color-mix(in srgb, var(--mat-sys-on-surface) 38%, transparent);
+  flex-shrink: 0;
+  /* Centers the 40px container on the 56px single-row field; stays bottom-aligned as it grows. */
+  margin-block-end: 8px;
+  background-color: var(--mat-sys-primary);
+}
+
+.send-button:disabled {
+  background-color: color-mix(in srgb, var(--mat-sys-on-surface) 12%, transparent);
+}
+
+/* ── Medium and wider (≥ 600px) ───────────────────────────────────────────── */
+
+@media (min-width: 600px) {
+  .messages {
+    /* 8px margin + 16px padding = the 24px pane margin. */
+    padding-inline: 16px;
+  }
+
+  .composer-region {
+    padding-inline: 24px;
+    /* No navigation bar below the view from 600px: clear the home indicator ourselves. */
+    padding-block-end: calc(16px + env(safe-area-inset-bottom));
+  }
+}

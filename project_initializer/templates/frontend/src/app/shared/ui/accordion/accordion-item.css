@@ -1,0 +1,92 @@
+:host {
+  display: block;
+}
+
+/* Rows after the first are separated by a divider in the decorative outline role. */
+:host(:not(:first-child)) {
+  border-block-start: 1px solid var(--mat-sys-outline-variant);
+}
+
+/*
+ * Material's header has a fixed 48px (collapsed) / 64px (expanded) height, which clips a
+ * wrapped title at 200% text size. The height tokens become `auto` and the same values
+ * return as minimums, so the 48px target stays and long titles grow the row instead.
+ * Title typography stays Material's default: title-medium.
+ *
+ * Material paints its hover background only on collapsed headers, and there it replaces
+ * the focus layer instead of stacking on it. The hover token is cleared here and the
+ * ::after layer below draws hover on every header, so the header background carries
+ * only the focus layer. Middle rows are square: their ring and state layers have no radius.
+ */
+.mat-expansion-panel-header {
+  --mat-expansion-header-collapsed-state-height: auto;
+  --mat-expansion-header-expanded-state-height: auto;
+  --mat-expansion-header-hover-state-layer-color: transparent;
+  --mat-focus-indicator-border-radius: 0;
+  position: relative;
+  box-sizing: border-box;
+  min-block-size: 48px;
+  padding-block: 12px;
+  border-radius: 0;
+}
+
+.mat-expansion-panel-header.mat-expanded {
+  min-block-size: 64px;
+}
+
+/* A focused collapsed header keeps its focus layer while hovered (Material's hover rule wins there). */
+.mat-expansion-panel-header.cdk-keyboard-focused,
+.mat-expansion-panel-header.cdk-program-focused {
+  --mat-expansion-header-hover-state-layer-color: color-mix(
+    in srgb,
+    var(--mat-sys-on-surface) calc(var(--mat-sys-focus-state-layer-opacity) * 100%),
+    transparent
+  );
+}
+
+/* Hover state layer in the content color, collapsed or expanded. ::before is the focus ring. */
+@media (hover: hover) {
+  .mat-expansion-panel-header:not([aria-disabled='true']):hover::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--mat-sys-on-surface);
+    opacity: var(--mat-sys-hover-state-layer-opacity);
+    pointer-events: none;
+  }
+}
+
+/*
+ * The outer rows curve with the container's clip (--ui-accordion-inner-corner, set by
+ * ui-accordion). The header radius and the ring token get the same values, because the
+ * ring reads one or the other depending on which Material stylesheet loaded last.
+ * Top and bottom corner pairs are symmetric, so the physical token shorthand is RTL-safe.
+ */
+:host(:first-child) .mat-expansion-panel-header {
+  --mat-focus-indicator-border-radius: var(--ui-accordion-inner-corner)
+    var(--ui-accordion-inner-corner) 0 0;
+  border-start-start-radius: var(--ui-accordion-inner-corner);
+  border-start-end-radius: var(--ui-accordion-inner-corner);
+}
+
+/* An expanded last row has its body below the header, so only a collapsed one rounds its bottom. */
+:host(:last-child) .mat-expansion-panel-header:not(.mat-expanded) {
+  --mat-focus-indicator-border-radius: 0 0 var(--ui-accordion-inner-corner)
+    var(--ui-accordion-inner-corner);
+  border-end-start-radius: var(--ui-accordion-inner-corner);
+  border-end-end-radius: var(--ui-accordion-inner-corner);
+}
+
+:host(:first-child:last-child) .mat-expansion-panel-header:not(.mat-expanded) {
+  --mat-focus-indicator-border-radius: var(--ui-accordion-inner-corner);
+}
+
+/*
+ * With `auto` heights Material's `height` transition has nothing to animate, so the minimum
+ * carries the 48px to 64px change, on Material's expansion timing, alongside the body.
+ * Gated on the class the panel adds only when animations are enabled.
+ */
+.mat-expansion-panel-animations-enabled .mat-expansion-panel-header {
+  transition: min-block-size 225ms cubic-bezier(0.4, 0, 0.2, 1);
+}

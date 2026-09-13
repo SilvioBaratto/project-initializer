@@ -1,0 +1,9 @@
+/*
+ * The panel renders inside the MatDialog surface in the body-level overlay container, so this
+ * host adds no box where it is declared. The sheet header, body padding and on-surface text come
+ * from app-drawer (drawer.css); the pane size, surface-container-low color, level 1 elevation,
+ * large inner corners, safe-area insets and edge slide come from src/styles/overlays/_drawer.scss.
+ */
+:host {
+  display: contents;
+}

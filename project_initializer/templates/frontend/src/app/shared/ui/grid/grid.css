@@ -1,0 +1,77 @@
+/*
+ * Material 3 layout grid: column counts per window size class from the M3 breakpoints and
+ * grids pages.
+ *
+ *   window / container width   columns   cells per row (span 4)   gutter
+ *   below 600px                4         1                        16px
+ *   600px and up               8         2                        24px
+ *   1200px and up              12        3                        24px
+ *
+ * Medium (600-839px) and expanded (840-1199px) share 8 columns, so nothing changes at 840px.
+ * The gutter follows the M3 margins and pane spacers: 16px compact, 24px from medium.
+ *
+ * Encapsulation is None (the cells are projected content), so every selector is scoped under the
+ * .app-grid host class and uses the child combinator: a grid nested in a cell keeps its own columns.
+ * Media and container queries repeat the M3 literals because custom properties cannot be used there.
+ */
+
+/*
+ * A custom element is display: inline by default, and inline-size containment has no effect on an
+ * inline box, so container mode depends on this rule.
+ */
+.app-grid {
+  display: block;
+}
+
+.app-grid > .app-grid__cells {
+  --app-grid-columns: 4;
+  --app-grid-cell-span: 4;
+  display: grid;
+  grid-template-columns: repeat(var(--app-grid-columns), minmax(0, 1fr));
+  gap: 16px;
+}
+
+/*
+ * Each cell spans --app-grid-cell-span columns (4, inherited from .app-grid__cells). To widen one cell,
+ * set the property on the cell itself: --app-grid-cell-span: 8 on the cell beats the inherited 4 whatever
+ * the selector specificity. :where() gives this default zero specificity, so a consumer rule that sets
+ * grid-column on a cell also wins, whatever the order of style elements in the document.
+ * Keep a span at or below the column count at that width (4 below 600px), or the grid adds implicit columns.
+ */
+:where(.app-grid > .app-grid__cells) > * {
+  grid-column: span var(--app-grid-cell-span);
+}
+
+/* ── Window size classes (default) ───────────────────────────────────────── */
+
+@media (min-width: 600px) {
+  .app-grid:not(.app-grid--container-query) > .app-grid__cells {
+    --app-grid-columns: 8;
+    gap: 24px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .app-grid:not(.app-grid--container-query) > .app-grid__cells {
+    --app-grid-columns: 12;
+  }
+}
+
+/* ── Container query option: the host is the query container ─────────────── */
+
+.app-grid.app-grid--container-query {
+  container-type: inline-size;
+}
+
+@container (min-width: 600px) {
+  .app-grid.app-grid--container-query > .app-grid__cells {
+    --app-grid-columns: 8;
+    gap: 24px;
+  }
+}
+
+@container (min-width: 1200px) {
+  .app-grid.app-grid--container-query > .app-grid__cells {
+    --app-grid-columns: 12;
+  }
+}

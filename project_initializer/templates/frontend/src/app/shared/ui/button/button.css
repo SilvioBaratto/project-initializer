@@ -1,0 +1,58 @@
+/*
+ * app-button: an Angular Material `matButton`, tuned only through its token custom properties.
+ *
+ * Variant to M3 appearance: primary = filled, secondary = outlined, ghost = text,
+ * danger = filled on the error roles (error / on-error).
+ *
+ * Size: baseline M3 buttons have one height (40px container with a 48px touch target at
+ * density 0), so `size` only changes the horizontal padding on the 4/8px grid. The label keeps
+ * label-large, the M3 type role for buttons. md keeps Material's defaults: 24px for filled and
+ * outlined, 12px for text (16px with an icon).
+ */
+
+/* A grid host blockifies the inner button, so no inline line box adds space under it. */
+:host {
+  display: inline-grid;
+  vertical-align: middle;
+}
+
+.app-button--danger {
+  --mat-button-filled-container-color: var(--mat-sys-error);
+  --mat-button-filled-label-text-color: var(--mat-sys-on-error);
+  --mat-button-filled-state-layer-color: var(--mat-sys-on-error);
+  --mat-button-filled-ripple-color: color-mix(
+    in srgb,
+    var(--mat-sys-on-error) calc(var(--mat-sys-pressed-state-layer-opacity) * 100%),
+    transparent
+  );
+}
+
+.app-button--sm {
+  --mat-button-filled-horizontal-padding: 16px;
+  --mat-button-outlined-horizontal-padding: 16px;
+  --mat-button-text-horizontal-padding: 8px;
+  --mat-button-text-with-icon-horizontal-padding: 12px;
+}
+
+.app-button--lg {
+  --mat-button-filled-horizontal-padding: 32px;
+  --mat-button-outlined-horizontal-padding: 32px;
+  --mat-button-text-horizontal-padding: 16px;
+  --mat-button-text-with-icon-horizontal-padding: 20px;
+}
+
+/*
+ * Loading spinner in the leading icon slot. Material's icon offset and spacing target .mat-icon
+ * only, so repeat them here: -8px / 8px on filled and outlined, -4px / 8px on text buttons.
+ * The minimum size keeps the 18px spinner from being squeezed when the button is narrow.
+ * The stroke follows the label color, which is the disabled label color while loading.
+ */
+.app-button__spinner {
+  --mat-progress-spinner-active-indicator-color: currentColor;
+  min-inline-size: 18px;
+  margin-inline: -8px 8px;
+}
+
+.app-button--ghost .app-button__spinner {
+  margin-inline: -4px 8px;
+}

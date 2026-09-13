@@ -1,0 +1,109 @@
+/*
+ * Home view. Rendered inside the shell's <main>, which adds no padding, so the
+ * page owns its pane margins: 16px at compact (< 600px), 24px from 600px.
+ * Content is capped at 64rem and centered, the same frame as the dashboard,
+ * settings and catalog pages. Every color, type, shape and elevation value
+ * comes from a --mat-sys-* token. The stat tiles (app-stat-card) and the hero
+ * tag (app-badge) style themselves.
+ */
+
+:host {
+  display: block;
+  /*
+   * Card columns react to the width left beside the navigation, not only the
+   * window. @container queries measure this host's content box, not its border box.
+   */
+  container-type: inline-size;
+  padding-block: 16px;
+  padding-inline: 16px;
+}
+
+.page {
+  display: grid;
+  gap: 24px;
+  max-inline-size: 64rem;
+  margin-inline: auto;
+}
+
+/* ── Hero ─────────────────────────────────────────────────────────────────── */
+
+.hero {
+  --mat-card-outlined-container-shape: var(--mat-sys-corner-large);
+  display: grid;
+  place-items: start;
+  padding: 24px;
+  /* Violet-to-green wash at 60% over the card's surface container. */
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--mat-sys-primary-container) 60%, transparent),
+    color-mix(in srgb, var(--mat-sys-tertiary-container) 60%, transparent)
+  );
+}
+
+.hero-title {
+  margin: 12px 0 0;
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-headline-medium);
+  letter-spacing: var(--mat-sys-headline-medium-tracking);
+}
+
+.hero-text {
+  margin: 8px 0 0;
+  max-inline-size: 60ch;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-large);
+  letter-spacing: var(--mat-sys-body-large-tracking);
+}
+
+/* ── Stats ────────────────────────────────────────────────────────────────── */
+
+.stats {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A grid cell, so the tile stretches and tiles in one row share a height. */
+.stat-item {
+  display: grid;
+}
+
+/* ── Window size classes (M3: 600 / 840 / 1200 / 1600) ───────────────────── */
+
+@media (min-width: 600px) {
+  :host {
+    padding-block: 24px;
+    padding-inline: 24px;
+  }
+
+  .hero {
+    padding: 32px;
+  }
+
+  .hero-title {
+    font: var(--mat-sys-headline-large);
+    letter-spacing: var(--mat-sys-headline-large-tracking);
+  }
+
+  .stats {
+    gap: 24px;
+  }
+}
+
+/*
+ * Three stat columns from the medium window class, and only while the host's
+ * content box is at least 600px wide. The container query measures the content
+ * box (the host minus its 24px inline padding), so the host itself must be at
+ * least 648px wide; a docked navigation rail can leave less, and the cards then
+ * stay in one column.
+ */
+@media (min-width: 600px) {
+  @container (min-width: 600px) {
+    .stats {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+}

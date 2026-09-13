@@ -1,0 +1,15 @@
+<mat-card class="app-card__surface" [appearance]="appearance()" [attr.data-padding]="resolvedPadding()">
+  <mat-card-header class="app-card__header">
+    <div class="app-card__header-slot">
+      <ng-content select="[slot-header]" />
+    </div>
+  </mat-card-header>
+
+  <mat-card-content class="app-card__body">
+    <ng-content />
+  </mat-card-content>
+
+  <mat-card-footer class="app-card__footer">
+    <ng-content select="[slot-footer]" />
+  </mat-card-footer>
+</mat-card>

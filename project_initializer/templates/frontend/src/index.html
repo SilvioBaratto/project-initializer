@@ -6,10 +6,28 @@
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <!-- Paints a stored Light or Dark choice from the first frame. ThemeService reads the same
+       'app-theme' key and removes this inline color-scheme once it puts .light or .dark on <html>.
+       The build copies the ngCspNonce value below onto this script. -->
+  <script>
+    try {
+      var storedScheme = localStorage.getItem('app-theme');
+      if (storedScheme === 'light' || storedScheme === 'dark') {
+        document.documentElement.style.colorScheme = storedScheme;
+      }
+    } catch (error) {
+      // Site data is blocked: the OS appearance applies, as it does in ThemeService.
+    }
+  </script>
   <link rel="preconnect" href="https://fonts.bunny.net">
-  <link href="https://fonts.bunny.net/css?family=space-grotesk:500,600,700|outfit:400,500,600|fira-code:400,500&display=swap" rel="stylesheet">
+  <!-- Only the weights the M3 type scale uses: brand roles 400; plain roles 400, 500 and 700 (prominent labels). -->
+  <link href="https://fonts.bunny.net/css?family=space-grotesk:400|outfit:400,500,700&display=swap" rel="stylesheet">
 </head>
-<body class="bg-surface text-text font-sans">
-  <app-root></app-root>
+<body>
+  <!-- Content-Security-Policy nonce. The value is a placeholder that the server replaces with a
+       fresh random nonce on every response, allowed by its script-src and style-src (nginx.conf).
+       The build copies it onto inline <script> and <style> tags, and Angular adds it to every
+       component style it injects. -->
+  <app-root ngCspNonce="CSP_NONCE"></app-root>
 </body>
 </html>

@@ -1,0 +1,114 @@
+<div class="demo-group" data-demo="layout">
+  <h3 class="demo-heading">Container, stack, and card</h3>
+  <app-theme-preview>
+    <ng-template>
+      <app-container size="sm">
+        <app-stack>
+          <app-card>
+            <span slot-header>Outlined card</span>
+            <p>Groups related content with a thin outline</p>
+            <span slot-footer>Updated 5 minutes ago</span>
+          </app-card>
+          <app-card appearance="raised">
+            <span slot-header>Elevated card</span>
+            <p>Raises content above the surface</p>
+          </app-card>
+          <app-card appearance="filled">
+            <span slot-header>Filled card</span>
+            <p>Sets content apart on a tinted container</p>
+          </app-card>
+        </app-stack>
+      </app-container>
+    </ng-template>
+  </app-theme-preview>
+</div>
+
+<div class="demo-group" data-demo="grid">
+  <h3 class="demo-heading">Grid</h3>
+  <app-theme-preview>
+    <ng-template>
+      <app-grid>
+        <div class="grid-cell">Cell 1</div>
+        <div class="grid-cell">Cell 2</div>
+        <div class="grid-cell">Cell 3</div>
+      </app-grid>
+    </ng-template>
+  </app-theme-preview>
+</div>
+
+<div class="demo-group" data-demo="loading">
+  <h3 class="demo-heading">Spinner and skeleton</h3>
+  <app-theme-preview>
+    <ng-template>
+      <app-stack [gap]="6">
+        <app-stack direction="row" align="center" [wrap]="true" [gap]="6">
+          <app-spinner size="sm" />
+          <app-spinner />
+          <app-spinner size="lg" />
+          <app-spinner size="sm" showLabel label="Loading orders…" />
+        </app-stack>
+
+        <!--
+          The skeletons are aria-hidden, so this status text names what is loading. It sits outside the
+          busy stack, which assistive technology may skip while aria-busy is true.
+        -->
+        <p class="cdk-visually-hidden" role="status">Loading profile…</p>
+        <app-stack aria-busy="true" [gap]="4">
+          <app-stack direction="row" align="center" [gap]="4">
+            <app-skeleton shape="avatar" />
+            <app-stack [gap]="2">
+              <app-skeleton width="192px" height="12px" />
+              <app-skeleton width="128px" height="12px" />
+            </app-stack>
+          </app-stack>
+          <app-skeleton shape="block" />
+        </app-stack>
+      </app-stack>
+    </ng-template>
+  </app-theme-preview>
+</div>
+
+<div class="demo-group" data-demo="status">
+  <h3 class="demo-heading">Alert and badge</h3>
+  <app-theme-preview>
+    <ng-template>
+      <app-stack [gap]="6">
+        <app-stack [gap]="3">
+          <app-alert variant="info">Your trial ends in 3 days</app-alert>
+          <app-alert variant="success">Payment received</app-alert>
+          <app-alert variant="warning">Your session expires in 5 minutes</app-alert>
+          <app-alert variant="danger">Payment failed. Check your card details and try again.</app-alert>
+        </app-stack>
+
+        <app-stack [gap]="2">
+          <app-alert
+            #storageAlert
+            variant="warning"
+            dismissible
+            dismissLabel="Dismiss storage warning"
+          >
+            Your storage is almost full
+          </app-alert>
+          <!-- Right after the alert, so a dismiss moves focus here (the alert's nearest-tabbable fallback). -->
+          <button
+            matButton="outlined"
+            type="button"
+            class="reopen-button"
+            (click)="storageAlert.open.set(true)"
+          >
+            Show storage warning
+          </button>
+        </app-stack>
+
+        <app-stack direction="row" align="center" [wrap]="true" [gap]="2">
+          <app-badge>Draft</app-badge>
+          <app-badge variant="primary">New</app-badge>
+          <app-badge variant="info">In review</app-badge>
+          <app-badge variant="success">Paid</app-badge>
+          <app-badge variant="warning">Pending</app-badge>
+          <app-badge variant="danger">Failed</app-badge>
+        </app-stack>
+      </app-stack>
+    </ng-template>
+  </app-theme-preview>
+</div>

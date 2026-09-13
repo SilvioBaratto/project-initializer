@@ -1,0 +1,128 @@
+/*
+ * Card on <mat-card>. Container color, outline, shape and elevation come from Material's
+ * card tokens (--mat-card-*, resolved from --mat-sys-* roles); this sheet only sets content
+ * color, type roles and the slot insets on the 4/8px grid.
+ *
+ * Encapsulation is None (the slot rules must reach projected content), so every selector is
+ * scoped under the .app-card host class and uses the child combinator: a card nested inside
+ * another card's body keeps its own insets.
+ *
+ *   padding   body inset (block / inline)   header + footer inset (outer edge and inline)
+ *   none      0                             16px
+ *   sm        8px / 12px                    12px
+ *   md        16px                          16px
+ *   lg        24px                          24px
+ */
+
+.app-card {
+  display: block;
+}
+
+.app-card > .app-card__surface {
+  /* Outer edge and inline inset of the header and footer; the body shares it inline. */
+  --app-card-inset: 16px;
+  /* Fills a stretched grid cell so cards in one row share a height; auto elsewhere. */
+  block-size: 100%;
+  color: var(--mat-sys-on-surface);
+}
+
+.app-card > .app-card__surface[data-padding='sm'] {
+  --app-card-inset: 12px;
+}
+
+.app-card > .app-card__surface[data-padding='lg'] {
+  --app-card-inset: 24px;
+}
+
+/* ── Header ───────────────────────────────────────────────────────────────── */
+
+/* The inset lives on the slot wrapper, so an empty header collapses to zero height. */
+.app-card > .app-card__surface > .app-card__header {
+  padding: 0;
+}
+
+.app-card > .app-card__surface > .app-card__header > .app-card__header-slot {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  padding-block: var(--app-card-inset) 0;
+  padding-inline: var(--app-card-inset);
+  font: var(--mat-sys-title-medium);
+  letter-spacing: var(--mat-sys-title-medium-tracking);
+}
+
+.app-card > .app-card__surface > .app-card__header > .app-card__header-slot:empty {
+  display: none;
+}
+
+/*
+ * A projected heading or paragraph drops the browser's margins and size so the slot's inset and
+ * title-medium type apply. :where() keeps the specificity at zero: this still beats the browser
+ * defaults, and any class the consumer puts on the element wins over it.
+ */
+:where(.app-card > .app-card__surface > .app-card__header > .app-card__header-slot) > :where(h1, h2, h3, h4, h5, h6, p) {
+  margin: 0;
+  font: inherit;
+  letter-spacing: inherit;
+}
+
+/* ── Body ─────────────────────────────────────────────────────────────────── */
+
+.app-card > .app-card__surface > .app-card__body {
+  /* Grows so the footer sits at the bottom of a stretched card. */
+  flex: 1 1 auto;
+  font: var(--mat-sys-body-medium);
+  letter-spacing: var(--mat-sys-body-medium-tracking);
+}
+
+.app-card > .app-card__surface[data-padding='none'] > .app-card__body {
+  padding: 0;
+}
+
+.app-card > .app-card__surface[data-padding='sm'] > .app-card__body {
+  padding-block: 8px;
+  padding-inline: var(--app-card-inset);
+}
+
+.app-card > .app-card__surface[data-padding='md'] > .app-card__body,
+.app-card > .app-card__surface[data-padding='lg'] > .app-card__body {
+  padding: var(--app-card-inset);
+}
+
+/* Material removes the last child's bottom margin; remove the first child's top margin to match. */
+:where(.app-card > .app-card__surface > .app-card__body) > :where(:first-child) {
+  margin-block-start: 0;
+}
+
+/* Full-bleed body: keep the header and footer text off the edge of the content. */
+.app-card > .app-card__surface[data-padding='none'] > .app-card__header > .app-card__header-slot {
+  padding-block-end: 16px;
+}
+
+.app-card > .app-card__surface[data-padding='none'] > .app-card__footer {
+  padding-block-start: 16px;
+}
+
+/* ── Footer ───────────────────────────────────────────────────────────────── */
+
+.app-card > .app-card__surface > .app-card__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  /* 8px between adjacent controls keeps their 48px targets apart. */
+  gap: 8px;
+  padding-block: 0 var(--app-card-inset);
+  padding-inline: var(--app-card-inset);
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-medium);
+  letter-spacing: var(--mat-sys-body-medium-tracking);
+}
+
+.app-card > .app-card__surface > .app-card__footer:empty {
+  display: none;
+}
+
+/* A paragraph in the footer row keeps the row's inset instead of adding its browser margins. */
+:where(.app-card > .app-card__surface > .app-card__footer) > :where(p) {
+  margin-block-start: 0;
+  margin-block-end: 0;
+}

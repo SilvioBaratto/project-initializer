@@ -1,49 +1,150 @@
-<aside
-    class="fixed left-0 top-0 z-50 h-screen w-64 bg-surface-raised border-r border-border flex flex-col transition-transform duration-200 md:z-30 md:translate-x-0"
-    [class.translate-x-0]="showSidebar()"
-    [class.-translate-x-full]="!showSidebar()">
-
-  <!-- Header -->
-  <div class="hidden md:flex items-center h-14 px-5 border-b border-border">
-    <span class="text-sm font-semibold tracking-tight text-text">Acme</span>
-  </div>
-
-  <!-- Mobile close -->
-  <div class="flex items-center justify-between h-14 px-4 border-b border-border md:hidden">
-    <span class="text-sm font-semibold tracking-tight text-text">Acme</span>
-    <button (click)="closeSidebar.emit()" class="p-1.5 rounded-md text-text-secondary hover:text-text hover:bg-surface-inset transition-colors" aria-label="Close menu">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-      </svg>
-    </button>
-  </div>
-
-  <!-- Navigation -->
-  <nav class="flex-1 px-3 py-3">
-    @for (item of navItems; track item.route) {
-      <a [routerLink]="item.route" routerLinkActive="bg-surface-inset text-text" ariaCurrentWhenActive="page" [routerLinkActiveOptions]="{ exact: item.route === '/' }"
-         class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm text-text-secondary hover:text-text hover:bg-surface-inset transition-colors mb-0.5"
-         (click)="onNavClick()">
-        @switch (item.icon) {
-          @case ('chat') {
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
-            </svg>
-          }
+<div class="sidebar" [class.sidebar-collapsed]="collapsed()">
+  @if (showDestinations()) {
+    @if (collapsed()) {
+      <!-- Collapsed rail: custom icon-over-label items (Angular Material has no rail). -->
+      <nav class="rail-nav" aria-label="Primary">
+        @for (item of navItems; track item.route) {
+          <a
+            #link
+            class="rail-item"
+            [routerLink]="item.route"
+            routerLinkActive="rail-item-active"
+            ariaCurrentWhenActive="page"
+            (click)="onNavClick()"
+          >
+            <span class="rail-indicator" matRipple [matRippleTrigger]="link">
+              <lucide-icon class="rail-icon" [name]="item.icon" aria-hidden="true" />
+            </span>
+            <span class="rail-label">{{ item.name }}</span>
+          </a>
         }
-        <span>{{ item.name }}</span>
-      </a>
+      </nav>
+    } @else {
+      <!-- Expanded rail: mat-nav-list renders role="navigation" itself, so it takes the label. -->
+      <mat-nav-list class="sidebar-list" aria-label="Primary">
+        @for (item of navItems; track item.route) {
+          <a
+            mat-list-item
+            [routerLink]="item.route"
+            routerLinkActive
+            #rla="routerLinkActive"
+            [activated]="rla.isActive"
+            (click)="onNavClick()"
+          >
+            <lucide-icon matListItemIcon class="sidebar-icon" [name]="item.icon" aria-hidden="true" />
+            <span matListItemTitle>{{ item.name }}</span>
+          </a>
+        }
+      </mat-nav-list>
     }
-  </nav>
+  }
 
-  <!-- Logout -->
-  <div class="px-3 py-3 border-t border-border">
-    <button (click)="onLogout()"
-      class="flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-md text-sm text-text-secondary hover:text-text hover:bg-surface-inset transition-colors">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
-      </svg>
-      <span>Sign out</span>
-    </button>
+  <div class="sidebar-footer">
+    @if (collapsed()) {
+      <button
+        matIconButton
+        type="button"
+        class="sidebar-theme-toggle"
+        aria-label="Change theme"
+        matTooltip="Change theme"
+        matTooltipPosition="after"
+        [matMenuTriggerFor]="themeMenu"
+      >
+        <!-- One icon for the action in every mode: the menu, not the icon, shows the current choice. -->
+        <lucide-icon class="sidebar-icon" name="SunMoon" aria-hidden="true" />
+      </button>
+      <button
+        matIconButton
+        type="button"
+        class="sidebar-logout"
+        aria-label="Sign out"
+        matTooltip="Sign out"
+        matTooltipPosition="after"
+        [attr.aria-busy]="signingOut() || null"
+        (click)="onLogout()"
+      >
+        @if (signingOut()) {
+          <mat-progress-spinner class="sidebar-progress" mode="indeterminate" [diameter]="24" aria-hidden="true" />
+        } @else {
+          <lucide-icon class="sidebar-icon sidebar-icon-directional" name="LogOut" aria-hidden="true" />
+        }
+      </button>
+    } @else {
+      @if (accountName(); as name) {
+        <div class="sidebar-account">
+          <lucide-icon class="sidebar-icon" name="User" aria-hidden="true" />
+          <span class="sidebar-account-name">{{ name }}</span>
+        </div>
+      }
+      @if (modal()) {
+        <!-- Compact sheet: the choices sit inline, with a radio on the current one. -->
+        <h2 class="sidebar-subheader" id="sidebar-theme-heading">Theme</h2>
+        <mat-selection-list
+          class="sidebar-list sidebar-theme-options"
+          aria-labelledby="sidebar-theme-heading"
+          [multiple]="false"
+          (selectionChange)="setTheme($event.options[0].value)"
+        >
+          @for (option of themeOptions; track option.mode) {
+            <mat-list-option [value]="option.mode" [selected]="theme() === option.mode">
+              <lucide-icon matListItemIcon class="sidebar-icon" [name]="option.icon" aria-hidden="true" />
+              <span matListItemTitle>{{ option.label }}</span>
+            </mat-list-option>
+          }
+        </mat-selection-list>
+      }
+      <mat-action-list class="sidebar-list">
+        @if (!modal()) {
+          <button mat-list-item type="button" class="sidebar-theme-toggle" [matMenuTriggerFor]="themeMenu">
+            <lucide-icon matListItemIcon class="sidebar-icon" name="SunMoon" aria-hidden="true" />
+            <span matListItemTitle>Change theme</span>
+            <!-- Points where the menu opens, so the row reads as a menu button rather than a destination. -->
+            <lucide-icon matListItemMeta class="sidebar-icon" name="ChevronUp" aria-hidden="true" />
+          </button>
+        }
+        <button
+          mat-list-item
+          type="button"
+          class="sidebar-logout"
+          [attr.aria-busy]="signingOut() || null"
+          (click)="onLogout()"
+        >
+          @if (signingOut()) {
+            <mat-progress-spinner
+              matListItemIcon
+              class="sidebar-progress"
+              mode="indeterminate"
+              [diameter]="24"
+              aria-hidden="true"
+            />
+          } @else {
+            <lucide-icon matListItemIcon class="sidebar-icon sidebar-icon-directional" name="LogOut" aria-hidden="true" />
+          }
+          <span matListItemTitle>Sign out</span>
+        </button>
+      </mat-action-list>
+    }
   </div>
-</aside>
+</div>
+
+<!-- Theme menu of the docked rails: it opens upward from the footer, and the current mode is the checked radio item. -->
+<mat-menu #themeMenu="matMenu" class="sidebar-theme-menu" yPosition="above">
+  @for (option of themeOptions; track option.mode) {
+    <button
+      mat-menu-item
+      type="button"
+      role="menuitemradio"
+      [attr.aria-checked]="theme() === option.mode"
+      (click)="setTheme(option.mode)"
+    >
+      <!-- The current mode shows a check mark in place of its icon, as on the Settings page. -->
+      <lucide-icon
+        matMenuItemIcon
+        class="sidebar-menu-icon"
+        [name]="theme() === option.mode ? 'Check' : option.icon"
+        aria-hidden="true"
+      />
+      {{ option.label }}
+    </button>
+  }
+</mat-menu>

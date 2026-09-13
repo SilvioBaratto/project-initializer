@@ -1,0 +1,66 @@
+/*
+ * Light and dark preview regions of one catalog demo. Colors, type and shape come from --mat-sys-*
+ * tokens only. Each region sets its color-scheme through the light / dark class (styles.scss), and
+ * the light-dark() tokens below resolve under that scheme, so the dark region paints the dark
+ * surface even on a light page, and the other way round.
+ */
+
+/*
+ * The host is the query container for the two-column rule: a docked navigation rail can leave the
+ * page much narrower than the window.
+ */
+:host {
+  display: block;
+  container: theme-preview / inline-size;
+}
+
+/* Optional caption above both regions. on-surface-variant on surface: 8.93:1 light, 14.33:1 dark. */
+.preview-label {
+  margin: 0 0 8px;
+  font: var(--mat-sys-label-large);
+  letter-spacing: var(--mat-sys-label-large-tracking);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+/*
+ * One column below 840px (compact and medium windows). From the expanded window size class up, the
+ * regions sit side by side, but only while the preview itself is at least 720px wide (two regions of
+ * at least 352px plus the 16px gap). The width guard sits inside the window query, so it can only
+ * narrow the result.
+ */
+.preview-regions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+@media (min-width: 840px) {
+  @container theme-preview (min-inline-size: 720px) {
+    .preview-regions {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+}
+
+/*
+ * The region paints its own ground in its scheme. on-surface on surface: 16.33:1 light, 14.32:1 dark.
+ * The outline-variant frame is decorative (the filled surface already sets the region apart), so the
+ * 3:1 boundary rule doesn't apply to it.
+ */
+.preview-region {
+  display: block;
+  min-inline-size: 0;
+  padding: 16px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: var(--mat-sys-corner-large);
+  background-color: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+}
+
+/* "Light" / "Dark". on-surface-variant on surface: 8.93:1 light, 14.33:1 dark. */
+.preview-caption {
+  margin: 0 0 8px;
+  font: var(--mat-sys-label-medium);
+  letter-spacing: var(--mat-sys-label-medium-tracking);
+  color: var(--mat-sys-on-surface-variant);
+}

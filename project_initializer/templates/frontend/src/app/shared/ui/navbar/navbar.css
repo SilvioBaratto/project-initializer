@@ -1,0 +1,65 @@
+/*
+ * M3 small top app bar on mat-toolbar. Angular Material supplies the row, its 16px
+ * inline padding, the forced-colors outline and, through its own tokens, the M3
+ * defaults: surface container, on-surface content and title-large type
+ * (--mat-toolbar-container-*, --mat-toolbar-title-text-*). This stylesheet leaves
+ * those tokens undeclared, so a theme-level mat.toolbar-overrides() still reaches
+ * the bar and its brand. The bar draws no state layer of its own: hover, focus and
+ * pressed states belong to the projected actions (Material buttons bring their own),
+ * and their focus ring comes from mat.strong-focus-indicators().
+ */
+:host {
+  display: block;
+}
+
+.navbar {
+  /*
+   * The header, not the toolbar row, pads by the top and side safe-area insets, so the bar
+   * sits below the system status region and keeps its own height. Physical on purpose:
+   * safe-area insets are physical edges, whatever the text direction.
+   */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+  /* Same tokens and fallbacks as the toolbar, so the safe-area strip always matches the bar. */
+  background-color: var(--mat-toolbar-container-background-color, var(--mat-sys-surface));
+  color: var(--mat-toolbar-container-text-color, var(--mat-sys-on-surface));
+}
+
+.navbar-toolbar {
+  /*
+   * M3 small top app bar: 64px at every width (Material's row drops to 56px below 600px).
+   * A minimum rather than a fixed height, so a title that wraps at 200% text grows the
+   * bar instead of spilling out of it.
+   */
+  block-size: auto;
+  min-block-size: var(--mat-toolbar-standard-height, 64px);
+  padding-block: 4px;
+  gap: 8px;
+}
+
+.navbar-brand {
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: 8px;
+  /*
+   * The brand gives up space before the actions do. Its columns are auto-sized, so the
+   * title column can narrow down to its minimum content width. The toolbar row sets
+   * nowrap, so the title wraps again here, and a single word breaks only when it alone is
+   * wider than the slot. The slot never clips: that would cut off the projected toggle's
+   * 48px touch target and its focus ring, which both sit outside the 40px button.
+   */
+  min-inline-size: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.navbar-actions {
+  display: grid;
+  grid-auto-flow: column;
+  /* Max-content columns: the actions never narrow, the brand yields instead. */
+  grid-auto-columns: max-content;
+  align-items: center;
+  /* 8px keeps the 48px touch targets of adjacent 40px icon buttons from overlapping. */
+  gap: 8px;
+  margin-inline-start: auto;
+}

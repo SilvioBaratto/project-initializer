@@ -1,0 +1,40 @@
+:host {
+  display: inline-grid;
+  place-items: start;
+}
+
+/*
+ * MatRadioButton paints a 40px state layer with a 48px touch target centered on it.
+ * A 48px row keeps that target inside the component, so stacked radios never
+ * overlap their targets.
+ */
+.radio {
+  display: grid;
+  align-content: center;
+  min-block-size: 48px;
+}
+
+/*
+ * Error state, matching the checkbox: the ring, the dot and the state layers take
+ * the error role. The error text below stays the primary cue, never color alone.
+ */
+.radio-invalid {
+  --mat-radio-unselected-icon-color: var(--mat-sys-error);
+  --mat-radio-unselected-hover-icon-color: var(--mat-sys-error);
+  --mat-radio-unselected-focus-icon-color: var(--mat-sys-error);
+  --mat-radio-unselected-pressed-icon-color: var(--mat-sys-error);
+  --mat-radio-selected-icon-color: var(--mat-sys-error);
+  --mat-radio-selected-hover-icon-color: var(--mat-sys-error);
+  --mat-radio-selected-focus-icon-color: var(--mat-sys-error);
+  --mat-radio-selected-pressed-icon-color: var(--mat-sys-error);
+  --mat-radio-ripple-color: var(--mat-sys-error);
+  --mat-radio-checked-ripple-color: var(--mat-sys-error);
+}
+
+/* Aligned with the label text: state layer width plus the 4px label padding. */
+.error-text {
+  padding-inline-start: calc(var(--mat-radio-state-layer-size, 40px) + 4px);
+  color: var(--mat-sys-error);
+  font: var(--mat-sys-body-small);
+  letter-spacing: var(--mat-sys-body-small-tracking);
+}

@@ -1,0 +1,15 @@
+<mat-radio-button
+  class="radio"
+  [class.radio-invalid]="hasError()"
+  [id]="radioId()"
+  [name]="groupName()"
+  [value]="value()"
+  [checked]="isChecked()"
+  [disabled]="isDisabled()"
+  [aria-describedby]="hasError() ? errorId() : null"
+  (change)="onChange()"
+  (focusout)="onTouched()"
+>{{ label() }}</mat-radio-button>
+@if (hasError()) {
+  <span class="error-text" [id]="errorId()" role="alert">{{ errorText() }}</span>
+}

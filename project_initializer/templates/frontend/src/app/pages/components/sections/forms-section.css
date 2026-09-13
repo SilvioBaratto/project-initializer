@@ -1,0 +1,83 @@
+/*
+ * Forms catalog section. Demo groups stack on the 8px grid, each with an h3 heading above its light
+ * and dark preview. The controls take color, type, shape and state layers from their own Material
+ * components (button, form field, select, checkbox, radio); this sheet only lays the demos out and
+ * sets the heading, caption and legend type from --mat-sys-* roles, so each preview region resolves
+ * the tokens in its own color scheme.
+ *
+ * Elements declared inside the <ng-template>s keep this component's encapsulation attribute when
+ * app-theme-preview stamps them, so these rules reach both the light and the dark copy.
+ */
+
+/* 32px between demo groups. */
+:host {
+  display: grid;
+  gap: 32px;
+}
+
+.demo-group {
+  display: grid;
+  gap: 12px;
+  /* Grid items default to min-width: auto; let the fields shrink with the page. */
+  min-inline-size: 0;
+}
+
+/* h3 under the page's h2: the element follows the outline, the type role follows visual hierarchy. */
+.demo-heading {
+  margin: 0;
+  font: var(--mat-sys-title-medium);
+  letter-spacing: var(--mat-sys-title-medium-tracking);
+  color: var(--mat-sys-on-surface);
+}
+
+/* A button with its caption below, both at their content width. The wrapping row is an app-stack. */
+.button-demo {
+  display: grid;
+  place-items: start;
+  row-gap: 4px;
+}
+
+/* on-surface-variant clears 4.5:1 on surface and on every surface-container role in both schemes. */
+.demo-caption {
+  font: var(--mat-sys-body-small);
+  letter-spacing: var(--mat-sys-body-small-tracking);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+/*
+ * One column of form fields. The outlined fields are 56px tall and grow a supporting-text line
+ * only when they show a hint or an error, so 16px keeps every field clear of the next.
+ */
+.field-demos {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+/* The checkbox set and the radio set, 16px apart: the spacing between groups of controls. */
+.choice-demos {
+  display: grid;
+  gap: 16px;
+}
+
+/*
+ * One set of choices. Each checkbox and radio row is 48px tall with its touch target inside it, so
+ * rows stack with no gap and their targets touch without overlapping. The fieldset's default
+ * border, padding, margin and min-content width are reset: the legend alone marks the set.
+ */
+.choice-set {
+  display: grid;
+  place-items: start;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* Group label: label-large in on-surface-variant, the same contrast as the captions. */
+.choice-legend {
+  padding: 0 0 4px;
+  font: var(--mat-sys-label-large);
+  letter-spacing: var(--mat-sys-label-large-tracking);
+  color: var(--mat-sys-on-surface-variant);
+}

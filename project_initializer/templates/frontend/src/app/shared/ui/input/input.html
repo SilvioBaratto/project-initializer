@@ -1,0 +1,20 @@
+<mat-form-field class="field" appearance="outline" subscriptSizing="dynamic">
+  @if (label()) {
+    <mat-label>{{ label() }}</mat-label>
+  }
+  <input
+    matInput
+    [id]="inputId()"
+    [disabled]="isDisabled()"
+    [value]="value()"
+    [attr.aria-label]="ariaLabel() || null"
+    (input)="onInput($event)"
+    (blur)="onTouched()"
+  />
+  @if (helpText()) {
+    <mat-hint [id]="hintId">{{ helpText() }}</mat-hint>
+  }
+  @if (hasError()) {
+    <mat-error [id]="errorId">{{ resolvedErrorText() }}</mat-error>
+  }
+</mat-form-field>

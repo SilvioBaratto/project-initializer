@@ -1,0 +1,82 @@
+/* Routed view inside the shell's <main>: the page owns its pane margins
+   (M3 window size classes: 16px below 600px, 24px from 600px). */
+:host {
+  display: block;
+  padding-block: 16px;
+  padding-inline: 16px;
+}
+
+@media (min-width: 600px) {
+  :host {
+    padding-block: 24px;
+    padding-inline: 24px;
+  }
+}
+
+.settings {
+  display: grid;
+  gap: 24px;
+  max-inline-size: 64rem;
+  margin-inline: auto;
+}
+
+.settings-header {
+  display: grid;
+  gap: 4px;
+}
+
+.settings-title {
+  margin: 0;
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-headline-small);
+  letter-spacing: var(--mat-sys-headline-small-tracking);
+}
+
+.settings-intro {
+  margin: 0;
+  max-inline-size: 60ch;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-medium);
+  letter-spacing: var(--mat-sys-body-medium-tracking);
+}
+
+/* Card section title steps down to title-medium; supporting text is body copy. */
+.settings-card {
+  --mat-card-title-text-font: var(--mat-sys-title-medium-font);
+  --mat-card-title-text-line-height: var(--mat-sys-title-medium-line-height);
+  --mat-card-title-text-size: var(--mat-sys-title-medium-size);
+  --mat-card-title-text-tracking: var(--mat-sys-title-medium-tracking);
+  --mat-card-title-text-weight: var(--mat-sys-title-medium-weight);
+  --mat-card-subtitle-text-color: var(--mat-sys-on-surface-variant);
+  --mat-card-subtitle-text-font: var(--mat-sys-body-medium-font);
+  --mat-card-subtitle-text-line-height: var(--mat-sys-body-medium-line-height);
+  --mat-card-subtitle-text-size: var(--mat-sys-body-medium-size);
+  --mat-card-subtitle-text-tracking: var(--mat-sys-body-medium-tracking);
+  --mat-card-subtitle-text-weight: var(--mat-sys-body-medium-weight);
+}
+
+.settings-card-subtitle {
+  max-inline-size: 60ch;
+}
+
+.settings-card-content {
+  padding-block-start: 16px;
+}
+
+/* Button toggles ship a 40px segment and no touch target: raise it to 48px. */
+.theme-options {
+  --mat-button-toggle-height: 48px;
+}
+
+.theme-option-icon {
+  display: inline-grid;
+  margin-inline-end: 8px;
+}
+
+/* Compact windows show labels only so three segments fit a 320px viewport;
+   the check mark still marks the selected segment. */
+@media (max-width: 599.98px) {
+  .theme-option-icon {
+    display: none;
+  }
+}

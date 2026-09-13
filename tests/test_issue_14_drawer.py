@@ -7,10 +7,13 @@ Oracle-verified verifiable criterion (UNIT):
 
 All tests are authored source-blind from the acceptance criteria text.
 The Drawer component is expected at:
-  frontend/src/app/shared/ui/drawer/drawer.ts
+  frontend/src/app/shared/ui/drawer/drawer.ts (+ drawer.html + drawer.css)
 
-These are Red-phase tests: they are expected to FAIL until the Drawer component
-is implemented.
+After the Material 3 migration the Drawer is an M3 modal side sheet built on
+Angular Material's `MatDialog`, which supplies the scrim (overlay click-out),
+Escape dismissal and the CDK focus trap. The criteria below therefore accept
+either a hand-rolled implementation or a `MatDialog` one that leaves those
+built-in dismissal paths enabled.
 """
 
 from __future__ import annotations
@@ -38,17 +41,43 @@ FRONTEND_ROOT = (
 
 COMPONENT_FILE = FRONTEND_ROOT / "drawer.ts"
 TEMPLATE_FILE = FRONTEND_ROOT / "drawer.html"
+STYLE_FILE = FRONTEND_ROOT / "drawer.css"
+OVERLAY_PARTIAL = (
+    Path(__file__).parent.parent
+    / "project_initializer"
+    / "templates"
+    / "frontend"
+    / "src"
+    / "styles"
+    / "overlays"
+    / "_drawer.scss"
+)
 
 
 def _src() -> str:
-    """Return combined source of drawer.ts + drawer.html (if present)."""
+    """Return the combined drawer.ts + drawer.html + drawer.css source.
+
+    Spec files are excluded so assertions only see the component itself.
+    """
     assert COMPONENT_FILE.exists(), (
         f"DrawerComponent not found at {COMPONENT_FILE}. "
         "Create the file before running this test."
     )
-    ts = COMPONENT_FILE.read_text(encoding="utf-8")
-    html = TEMPLATE_FILE.read_text(encoding="utf-8") if TEMPLATE_FILE.exists() else ""
-    return ts + "\n" + html
+    parts = [
+        path.read_text(encoding="utf-8")
+        for pattern in ("drawer.ts", "drawer.html", "drawer.css")
+        for path in sorted(FRONTEND_ROOT.glob(pattern))
+    ]
+    return "\n".join(parts)
+
+
+def _uses_mat_dialog(src: str) -> bool:
+    """True when the drawer is built on MatDialog with its dismissal paths enabled."""
+    return (
+        "@angular/material/dialog" in src
+        and re.search(r"\bMatDialog\b", src) is not None
+        and re.search(r"disableClose\s*:\s*true", src) is None
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -140,23 +169,24 @@ def test_when_drawer_is_open_then_overlay_click_emits_close():
     output.  The criterion lists 'overlay click-out' as an explicit dismissal
     path.
 
-    Decision: we verify that the template wires a click handler on an overlay
-    element (host, backdrop div, or cdkOverlayBackdrop) that calls the close
-    logic.  Acceptable patterns:
-        (click)="close.emit()"
-        (click)="onClose()"
-        (click)="handleClose()"
-    on an element whose class/role suggests it is the overlay backdrop.
+    Decision: accepted evidence is either
+      (a) a MatDialog-based sheet that keeps the scrim (no `hasBackdrop: false`)
+          and does not disable its built-in dismissal (`disableClose: true`), and
+          still offers a visible close control wired with a (click) close handler;
+      OR
+      (b) a template (click) handler on an overlay element that calls the close
+          logic, e.g. (click)="close.emit()" / "onClose()" / "handleClose()".
     """
     src = _src()
-    # A (click) binding that resolves to the close path must exist.
     has_click_close = bool(
         re.search(r'\(click\)\s*=\s*"[^"]*[Cc]lose[^"]*"', src)
         or re.search(r"\(click\)\s*=\s*'[^']*[Cc]lose[^']*'", src)
     )
-    assert has_click_close, (
-        "DrawerComponent must wire a (click) handler on its overlay/backdrop "
-        "element that emits the `close` output."
+    keeps_scrim = re.search(r"hasBackdrop\s*:\s*false", src) is None
+    assert has_click_close and (keeps_scrim or not _uses_mat_dialog(src)), (
+        "DrawerComponent must dismiss on scrim/overlay click (MatDialog backdrop "
+        "left enabled, or a (click) handler on its overlay) and expose a close "
+        "control that emits the `close` output."
     )
 
 
@@ -173,7 +203,11 @@ def test_when_escape_key_is_pressed_then_close_is_emitted():
     Decision: we verify that either
       (a) a @HostListener('keydown.escape') or equivalent is present in the TS,
       OR
-      (b) the template binds (keydown.escape) / (keydown) and routes to close.
+      (b) the template binds (keydown.escape) / (keydown) and routes to close,
+      OR
+      (c) the panel is a MatDialog whose built-in Escape dismissal is left on
+          (no `disableClose: true`) and the close emission is wired to
+          afterClosed(), so Escape reaches the `close` output.
     """
     src = _src()
     has_escape_handler = bool(
@@ -182,6 +216,7 @@ def test_when_escape_key_is_pressed_then_close_is_emitted():
         or re.search(r"HostListener\(['\"]keydown", src)
         or re.search(r"'Escape'", src)
         or re.search(r'"Escape"', src)
+        or (_uses_mat_dialog(src) and "afterClosed" in src)
     )
     assert has_escape_handler, (
         "DrawerComponent must handle the Escape key to emit `close` "
@@ -205,17 +240,24 @@ def test_when_drawer_component_exists_then_focus_trap_is_integrated():
         import { createFocusTrap } from 'focus-trap'
         import ... from '@angular/cdk/a11y'   (FocusTrap / FocusTrapFactory)
         focusTrap / FocusTrap / createFocusTrap references
+        import { MatDialog } from '@angular/material/dialog'
+            (MatDialog creates a CDK FocusTrap for every dialog it opens)
     """
     src = _src()
+    imports_mat_dialog = bool(
+        re.search(r"import\s*\{[^}]*\bMatDialog\b[^}]*\}\s*from\s*['\"]@angular/material/dialog['\"]", src)
+    )
     has_focus_trap = bool(
         re.search(r"focus-trap", src, re.IGNORECASE)
         or re.search(r"FocusTrap", src)
         or re.search(r"createFocusTrap", src)
         or re.search(r"a11y.*FocusTrap|FocusTrap.*a11y", src)
+        or imports_mat_dialog
     )
     assert has_focus_trap, (
         "DrawerComponent must integrate a focus-trap "
-        "(import from 'focus-trap' or '@angular/cdk/a11y' FocusTrapFactory)."
+        "(import from 'focus-trap', '@angular/cdk/a11y' FocusTrapFactory, "
+        "or open the panel with MatDialog, which traps focus)."
     )
 
 
@@ -268,8 +310,23 @@ def test_when_multiple_dismissal_paths_exist_then_they_reference_same_handler():
     Decision: we verify that a single unified close method name appears in
     the source for both the (click) binding and the escape handler, OR that
     both directly call `close.emit()`.
+
+    For a MatDialog-based sheet, Escape, scrim click and the close button all
+    close the dialog, so they must converge in one `afterClosed()` subscription
+    with a single `close.emit()` call site.
     """
     src = _src()
+
+    if _uses_mat_dialog(src):
+        assert "afterClosed" in src, (
+            "A MatDialog-based Drawer must emit `close` from afterClosed() so "
+            "every dismissal path shares one handler."
+        )
+        emit_sites = re.findall(r"\bclose\.emit\s*\(", src)
+        assert len(emit_sites) == 1, (
+            f"Expected exactly one `close.emit()` call site, found {len(emit_sites)}."
+        )
+        return
 
     # Extract the handler name used in the (click) binding
     click_match = re.search(r'\(click\)\s*=\s*["\']([^"\']+)["\']', src)
@@ -290,3 +347,100 @@ def test_when_multiple_dismissal_paths_exist_then_they_reference_same_handler():
         )
     # If only one (or neither) matched, the earlier per-criterion tests already
     # enforce existence — this property only fires when both are detectable.
+
+
+# ---------------------------------------------------------------------------
+# Material 3 styling: tokens instead of Tailwind `dark:` variants
+# ---------------------------------------------------------------------------
+
+
+def test_when_drawer_styles_inspected_then_side_sheet_uses_m3_tokens_only():
+    """
+    The Drawer is styled with Angular Material / M3 tokens, not Tailwind
+    utilities (the old `dark:` variants).  Light and dark both come from the
+    `--mat-sys-*` tokens, so no color literal may appear.
+
+    Decision: the component has its own template and stylesheet files; both
+    drawer.css and the global overlay partial (which styles the MatDialog pane
+    the component CSS cannot reach) use `var(--mat-sys-*)` with no hex/rgb/hsl
+    literal, `!important` or `::ng-deep`; and the partial selects the panel
+    class the component passes to MatDialog.
+    """
+    assert STYLE_FILE.exists(), f"Expected component styles at {STYLE_FILE}."
+    assert OVERLAY_PARTIAL.exists(), f"Expected overlay partial at {OVERLAY_PARTIAL}."
+    ts = COMPONENT_FILE.read_text(encoding="utf-8")
+    assert re.search(r"templateUrl\s*:\s*['\"]\./drawer\.html['\"]", ts)
+    assert re.search(r"styleUrl\s*:\s*['\"]\./drawer\.css['\"]", ts)
+
+    for path in (STYLE_FILE, OVERLAY_PARTIAL):
+        text = path.read_text(encoding="utf-8")
+        assert "var(--mat-sys-" in text, f"{path.name} must use --mat-sys-* tokens."
+        assert not re.search(r"#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(", text), (
+            f"{path.name} must not contain color literals."
+        )
+        assert "!important" not in text and "::ng-deep" not in text, path.name
+
+    assert "dark:" not in _src(), "Tailwind dark: variants must be gone."
+
+    panel_class = re.search(r"DRAWER_PANEL_CLASS\s*=\s*['\"]([\w-]+)['\"]", ts)
+    assert panel_class, "DrawerComponent must name the MatDialog panel class."
+    assert f".{panel_class.group(1)}" in OVERLAY_PARTIAL.read_text(encoding="utf-8"), (
+        "The overlay partial must style the panel class the component passes to MatDialog."
+    )
+
+
+def test_when_overlay_partial_inspected_then_direction_and_insets_key_on_overlay_host():
+    """
+    The side sheet follows the direction passed in its dialog config, which CDK
+    writes as `dir` on `.cdk-global-overlay-wrapper` (the pane's parent), not
+    the direction of an ancestor such as `<html dir="rtl">`.
+
+    Decision: every `[dir=...]` selector in the overlay partial is attached to
+    `.cdk-global-overlay-wrapper` (no descendant `[dir='rtl'] .cdk-overlay-pane`),
+    and the full-height sheet pads the physical edge it is pinned to with
+    `env(safe-area-inset-left)` / `env(safe-area-inset-right)`, because
+    index.html sets `viewport-fit=cover`.
+    """
+    scss = OVERLAY_PARTIAL.read_text(encoding="utf-8")
+    code = "\n".join(line.split("//", 1)[0] for line in scss.splitlines())
+
+    dir_selectors = re.findall(r"(\S*)\[dir=['\"]?rtl['\"]?\]", code)
+    assert dir_selectors, "The overlay partial must mirror the slide-in under RTL."
+    for prefix in dir_selectors:
+        assert prefix.endswith(".cdk-global-overlay-wrapper") or prefix.endswith(
+            ".cdk-global-overlay-wrapper:not("
+        ), (
+            "RTL selectors must key on the overlay host `.cdk-global-overlay-wrapper[dir]`, "
+            f"not on an arbitrary ancestor (found prefix {prefix!r})."
+        )
+    assert not re.search(r"(^|[\s,])\[dir=['\"]?rtl['\"]?\]\s+\.cdk-overlay-pane", code), (
+        "A descendant `[dir='rtl'] .cdk-overlay-pane` selector also matches <html dir>."
+    )
+
+    for inset in ("safe-area-inset-left", "safe-area-inset-right"):
+        assert f"env({inset})" in code, (
+            f"The full-height side sheet must pad its pinned edge with env({inset})."
+        )
+
+
+def test_when_drawer_opens_then_dialog_has_an_accessible_name():
+    """
+    A `role="dialog"` needs an accessible name. The Drawer names it from its
+    visible headline (`matDialogTitle`, which keeps `aria-labelledby` in sync as
+    the headline appears, changes or disappears) or, without a headline, from an
+    `ariaLabel` input passed to the MatDialog config.
+
+    Decision: the template carries a `matDialogTitle` / `mat-dialog-title`
+    headline, the component declares `label` and `ariaLabel` inputs and passes
+    `ariaLabel` into the dialog config.
+    """
+    src = _src()
+    html = TEMPLATE_FILE.read_text(encoding="utf-8")
+    assert re.search(r"<h2[^>]*\b(matDialogTitle|mat-dialog-title)\b", html), (
+        "The sheet headline must be an <h2 matDialogTitle> so it names the dialog."
+    )
+    assert re.search(r"\blabel\s*=\s*input\b", src), "DrawerComponent must declare `label`."
+    assert re.search(r"\bariaLabel\s*=\s*input\b", src), (
+        "DrawerComponent must declare `ariaLabel` for sheets without a visible headline."
+    )
+    assert re.search(r"ariaLabel\s*:", src), "`ariaLabel` must reach the MatDialog config."

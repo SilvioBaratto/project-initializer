@@ -1,8 +1,13 @@
-import { Component } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { LucideIconConfig } from 'lucide-angular';
+import { By } from '@angular/platform-browser';
+import { ComponentHarness, HarnessLoader, TestKey } from '@angular/cdk/testing';
+import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
+import {
+  MatAccordionHarness,
+  MatExpansionPanelHarness,
+} from '@angular/material/expansion/testing';
 
-import { ICON_PROVIDER } from '../../../icons';
 import { AccordionComponent, AccordionItemComponent } from './accordion';
 
 // ---------------------------------------------------------------------------
@@ -12,7 +17,7 @@ import { AccordionComponent, AccordionItemComponent } from './accordion';
 @Component({
   imports: [AccordionComponent, AccordionItemComponent],
   template: `
-    <ui-accordion [single]="single">
+    <ui-accordion [single]="single()">
       <ui-accordion-item [index]="0">
         <span slot="header">Section 1</span>
         Content 1
@@ -29,234 +34,321 @@ import { AccordionComponent, AccordionItemComponent } from './accordion';
   `,
 })
 class HostComponent {
-  single = false;
+  readonly single = signal(false);
+}
+
+/** The panel harness keeps its header private; this reaches the header host to send keys. */
+class PanelHeaderHarness extends ComponentHarness {
+  static hostSelector = '.mat-expansion-panel-header';
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function setupHost(single = false): Promise<ComponentFixture<HostComponent>> {
-  await TestBed.configureTestingModule({
-    imports: [HostComponent],
-    providers: [
-      ICON_PROVIDER,
-      {
-        provide: LucideIconConfig,
-        useFactory: () => {
-          const cfg = new LucideIconConfig();
-          cfg.size = 16;
-          cfg.strokeWidth = 1.5;
-          return cfg;
-        },
-      },
-    ],
-  }).compileComponents();
-
-  const f = TestBed.createComponent(HostComponent);
-  f.componentInstance.single = single;
-  f.detectChanges();
-  return f;
+interface Setup {
+  fixture: ComponentFixture<HostComponent>;
+  loader: HarnessLoader;
+  accordion: AccordionComponent;
 }
 
-async function setupDirect(): Promise<ComponentFixture<AccordionComponent>> {
-  await TestBed.configureTestingModule({
-    imports: [AccordionComponent],
-    providers: [ICON_PROVIDER],
-  }).compileComponents();
-  const f = TestBed.createComponent(AccordionComponent);
-  f.detectChanges();
-  return f;
+async function setupHost(single = false): Promise<Setup> {
+  await TestBed.configureTestingModule({ imports: [HostComponent] }).compileComponents();
+
+  const fixture = TestBed.createComponent(HostComponent);
+  fixture.componentInstance.single.set(single);
+  fixture.detectChanges();
+  const loader = TestbedHarnessEnvironment.loader(fixture);
+  const accordion = fixture.debugElement.query(By.directive(AccordionComponent))
+    .componentInstance as AccordionComponent;
+  return { fixture, loader, accordion };
 }
 
-function headerButtons(f: ComponentFixture<unknown>): HTMLButtonElement[] {
+function headers(f: ComponentFixture<unknown>): HTMLElement[] {
   const root = f.nativeElement as HTMLElement;
-  return Array.from(root.querySelectorAll<HTMLButtonElement>('button[aria-expanded]'));
+  return Array.from(root.querySelectorAll<HTMLElement>('.mat-expansion-panel-header'));
 }
 
-function panels(f: ComponentFixture<unknown>): HTMLElement[] {
+function regionFor(f: ComponentFixture<unknown>, header: HTMLElement): HTMLElement | null {
   const root = f.nativeElement as HTMLElement;
-  return Array.from(root.querySelectorAll<HTMLElement>('[role="region"]'));
+  return root.querySelector<HTMLElement>(`[id="${header.getAttribute('aria-controls')}"]`);
 }
 
-function accordion(f: ComponentFixture<HostComponent>): AccordionComponent {
-  return f.debugElement.children[0].componentInstance as AccordionComponent;
-}
-
-function dispatchKey(target: EventTarget, key: string): void {
-  target.dispatchEvent(
-    new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
-  );
+/** Material's header reads the legacy `keyCode`, which a constructed KeyboardEvent leaves at 0. */
+function keydown(key: string, keyCode: number): KeyboardEvent {
+  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'keyCode', { get: () => keyCode });
+  return event;
 }
 
 // ===========================================================================
-// Criterion — button[aria-expanded][aria-controls] headers
+// Header semantics (provided by Material's expansion panel header)
 // ===========================================================================
 
-describe('AccordionComponent — header buttons', () => {
-  it('when rendered, each item has a <button> element', async () => {
-    const f = await setupHost();
-    const btns = headerButtons(f);
+describe('AccordionComponent — header semantics', () => {
+  it('when rendered, each item has one header exposed as a button', async () => {
+    const { fixture } = await setupHost();
+    const btns = headers(fixture);
     expect(btns.length).toBe(3);
+    btns.forEach((btn) => expect(btn.getAttribute('role')).toBe('button'));
   });
 
-  it('when rendered, each header button has aria-expanded', async () => {
-    const f = await setupHost();
-    headerButtons(f).forEach((btn) => {
+  it('when rendered, each header is in the tab order', async () => {
+    const { fixture } = await setupHost();
+    headers(fixture).forEach((btn) => expect(btn.getAttribute('tabindex')).toBe('0'));
+  });
+
+  it('when rendered, each header has aria-expanded and aria-controls', async () => {
+    const { fixture } = await setupHost();
+    headers(fixture).forEach((btn) => {
       expect(btn.hasAttribute('aria-expanded')).toBe(true);
-    });
-  });
-
-  it('when rendered, each header button has aria-controls', async () => {
-    const f = await setupHost();
-    headerButtons(f).forEach((btn) => {
       expect(btn.getAttribute('aria-controls')).toBeTruthy();
     });
   });
 
-  it('when an item is collapsed, its button has aria-expanded="false"', async () => {
-    const f = await setupHost();
-    expect(headerButtons(f)[0].getAttribute('aria-expanded')).toBe('false');
+  it('when an item is collapsed, its header has aria-expanded="false"', async () => {
+    const { fixture } = await setupHost();
+    expect(headers(fixture)[0].getAttribute('aria-expanded')).toBe('false');
   });
 
-  it('when an item is toggled open, its button has aria-expanded="true"', async () => {
-    const f = await setupHost();
-    headerButtons(f)[0].click();
-    f.detectChanges();
-    expect(headerButtons(f)[0].getAttribute('aria-expanded')).toBe('true');
+  it('when a header is clicked, its header has aria-expanded="true"', async () => {
+    const { fixture } = await setupHost();
+    headers(fixture)[0].click();
+    fixture.detectChanges();
+    expect(headers(fixture)[0].getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('when rendered, the projected header slot is the panel title', async () => {
+    const { loader } = await setupHost();
+    const panels = await loader.getAllHarnesses(MatExpansionPanelHarness);
+    expect(await Promise.all(panels.map((p) => p.getTitle()))).toEqual([
+      'Section 1',
+      'Section 2',
+      'Section 3',
+    ]);
+  });
+
+  it('when rendered, Material draws the chevron and no extra icon is added', async () => {
+    const { fixture, loader } = await setupHost();
+    const panel = await loader.getHarness(MatExpansionPanelHarness);
+    expect(await panel.hasToggleIndicator()).toBe(true);
+    expect((fixture.nativeElement as HTMLElement).querySelector('lucide-icon')).toBeNull();
   });
 });
 
 // ===========================================================================
-// Criterion — panels role="region" + aria-labelledby
+// Panels: role="region" + aria-labelledby, hidden while collapsed
 // ===========================================================================
 
 describe('AccordionComponent — panels', () => {
-  it('when an item is expanded, its panel has role="region"', async () => {
-    const f = await setupHost();
-    headerButtons(f)[1].click();
-    f.detectChanges();
-    const panel = panels(f)[0];
-    expect(panel.getAttribute('role')).toBe('region');
+  it('when rendered, each header controls a role="region" panel labelled by the header', async () => {
+    const { fixture } = await setupHost();
+    headers(fixture).forEach((btn) => {
+      const panel = regionFor(fixture, btn);
+      expect(panel).not.toBeNull();
+      expect(panel!.getAttribute('role')).toBe('region');
+      expect(btn.id).toBeTruthy();
+      expect(panel!.getAttribute('aria-labelledby')).toBe(btn.id);
+    });
   });
 
-  it('when an item is expanded, its panel has aria-labelledby pointing to its header id', async () => {
-    const f = await setupHost();
-    headerButtons(f)[0].click();
-    f.detectChanges();
-    const btn = headerButtons(f)[0];
-    const panel = panels(f)[0];
-    const labelledBy = panel.getAttribute('aria-labelledby');
-    expect(labelledBy).toBeTruthy();
-    expect(labelledBy).toBe(btn.id);
+  it('when an item is collapsed, its panel content is inert', async () => {
+    const { fixture } = await setupHost();
+    const panel = regionFor(fixture, headers(fixture)[0])!;
+    expect(panel.parentElement!.hasAttribute('inert')).toBe(true);
   });
 
-  it('when an item is expanded, its panel content is rendered', async () => {
-    const f = await setupHost();
-    expect(f.nativeElement.textContent).not.toContain('Content 1');
-    headerButtons(f)[0].click();
-    f.detectChanges();
-    expect(f.nativeElement.textContent).toContain('Content 1');
+  it('when an item is expanded, its panel content is reachable and rendered', async () => {
+    const { fixture, loader } = await setupHost();
+    const [first] = await loader.getAllHarnesses(MatExpansionPanelHarness);
+    await first.expand();
+    const panel = regionFor(fixture, headers(fixture)[0])!;
+    expect(panel.parentElement!.hasAttribute('inert')).toBe(false);
+    expect(await first.getTextContent()).toContain('Content 1');
   });
 
-  it('when an item is collapsed after being expanded, its panel is hidden', async () => {
-    const f = await setupHost();
-    headerButtons(f)[0].click();
-    f.detectChanges();
-    expect(f.nativeElement.textContent).toContain('Content 1');
-    headerButtons(f)[0].click();
-    f.detectChanges();
-    expect(f.nativeElement.textContent).not.toContain('Content 1');
-  });
-
-  it('when two items are expanded (multi mode), both panels are visible', async () => {
-    const f = await setupHost(false);
-    headerButtons(f)[0].click();
-    f.detectChanges();
-    headerButtons(f)[1].click();
-    f.detectChanges();
-    expect(panels(f).length).toBe(2);
+  it('when an item is collapsed after being expanded, its panel is inert again', async () => {
+    const { fixture, loader } = await setupHost();
+    const [first] = await loader.getAllHarnesses(MatExpansionPanelHarness);
+    await first.expand();
+    await first.collapse();
+    expect(await first.isExpanded()).toBe(false);
+    const panel = regionFor(fixture, headers(fixture)[0])!;
+    expect(panel.parentElement!.hasAttribute('inert')).toBe(true);
   });
 });
 
 // ===========================================================================
-// Criterion — keyboard operable
+// Keyboard
 // ===========================================================================
 
-describe('AccordionComponent — keyboard activation', () => {
-  it('when Enter is pressed on a header button, the item toggles', async () => {
-    const f = await setupHost();
-    const btn = headerButtons(f)[0];
-    // Native button handles Enter natively; dispatch click to simulate
-    btn.click();
-    f.detectChanges();
-    expect(btn.getAttribute('aria-expanded')).toBe('true');
+describe('AccordionComponent — keyboard', () => {
+  it('when Enter is pressed on a header, the item toggles', async () => {
+    const { accordion, loader } = await setupHost();
+    const [header] = await loader.getAllHarnesses(PanelHeaderHarness);
+    await (await header.host()).sendKeys(TestKey.ENTER);
+    expect(accordion.isExpanded(0)).toBe(true);
+    await (await header.host()).sendKeys(TestKey.ENTER);
+    expect(accordion.isExpanded(0)).toBe(false);
   });
 
-  it('when Space is pressed on a header button, default scroll is prevented', async () => {
-    const f = await setupHost();
-    const btn = headerButtons(f)[0];
-    const evt = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
-    btn.dispatchEvent(evt);
-    expect(evt.defaultPrevented).toBe(true);
+  it('when Space is pressed on a header, the item toggles and page scroll is prevented', async () => {
+    const { fixture, accordion } = await setupHost();
+    const event = keydown(' ', 32);
+    headers(fixture)[1].dispatchEvent(event);
+    fixture.detectChanges();
+    expect(event.defaultPrevented).toBe(true);
+    expect(accordion.isExpanded(1)).toBe(true);
+    expect(headers(fixture)[1].getAttribute('aria-expanded')).toBe('true');
   });
 
-  it('when a header button is clicked, the accordion toggles expanded state', async () => {
-    const f = await setupHost();
-    const acc = accordion(f);
-    expect(acc.isExpanded(0)).toBe(false);
-    headerButtons(f)[0].click();
-    f.detectChanges();
-    expect(acc.isExpanded(0)).toBe(true);
+  it('when ArrowDown is pressed on a header, focus moves to the next header', async () => {
+    const { fixture, loader } = await setupHost();
+    const hs = await loader.getAllHarnesses(PanelHeaderHarness);
+    await (await hs[0].host()).sendKeys(TestKey.DOWN_ARROW);
+    expect(document.activeElement).toBe(headers(fixture)[1]);
   });
-});
 
-// ===========================================================================
-// Criterion — single-open mode
-// ===========================================================================
-
-describe('AccordionComponent — single-open mode', () => {
-  it('when single=true and item 0 is open, opening item 1 closes item 0', async () => {
-    const f = await setupHost(true);
-    const acc = accordion(f);
-    headerButtons(f)[0].click();
-    f.detectChanges();
-    expect(acc.isExpanded(0)).toBe(true);
-
-    headerButtons(f)[1].click();
-    f.detectChanges();
-    expect(acc.isExpanded(0)).toBe(false);
-    expect(acc.isExpanded(1)).toBe(true);
+  it('when ArrowUp is pressed on the first header, focus wraps to the last header', async () => {
+    const { fixture, loader } = await setupHost();
+    const hs = await loader.getAllHarnesses(PanelHeaderHarness);
+    await (await hs[0].host()).sendKeys(TestKey.UP_ARROW);
+    expect(document.activeElement).toBe(headers(fixture)[2]);
   });
-});
 
-// ===========================================================================
-// Criterion — aria-controls / aria-labelledby relationship integrity
-// ===========================================================================
+  it('when End and Home are pressed, focus jumps to the last and first header', async () => {
+    const { fixture, loader } = await setupHost();
+    const hs = await loader.getAllHarnesses(PanelHeaderHarness);
+    await (await hs[0].host()).sendKeys(TestKey.END);
+    expect(document.activeElement).toBe(headers(fixture)[2]);
+    await (await hs[2].host()).sendKeys(TestKey.HOME);
+    expect(document.activeElement).toBe(headers(fixture)[0]);
+  });
 
-describe('AccordionComponent — ARIA relationship integrity', () => {
-  it('when an item is expanded, aria-controls on the button matches the panel id', async () => {
-    const f = await setupHost();
-    headerButtons(f)[2].click();
-    f.detectChanges();
-    const btn = headerButtons(f)[2];
-    const panel = f.nativeElement.querySelector(`#${btn.getAttribute('aria-controls')}`)!;
-    expect(panel).not.toBeNull();
-    expect(panel.getAttribute('role')).toBe('region');
+  it('when an arrow key moves focus, no item changes its expansion', async () => {
+    const { accordion, loader } = await setupHost();
+    const hs = await loader.getAllHarnesses(PanelHeaderHarness);
+    await (await hs[0].host()).sendKeys(TestKey.DOWN_ARROW);
+    expect([0, 1, 2].map((i) => accordion.isExpanded(i))).toEqual([false, false, false]);
   });
 });
 
 // ===========================================================================
-// Criterion — dark-mode tokens; no hardcoded hex
+// Multi-open (default) and single-open modes
+// ===========================================================================
+
+describe('AccordionComponent — expansion modes', () => {
+  it('when single is false, the Material accordion is multi and two items stay open', async () => {
+    const { loader, accordion } = await setupHost(false);
+    const acc = await loader.getHarness(MatAccordionHarness);
+    expect(await acc.isMulti()).toBe(true);
+
+    const panels = await acc.getExpansionPanels();
+    await panels[0].expand();
+    await panels[1].expand();
+    expect(await acc.getExpansionPanels({ expanded: true })).toHaveLength(2);
+    expect(accordion.isExpanded(0)).toBe(true);
+    expect(accordion.isExpanded(1)).toBe(true);
+  });
+
+  it('when single is true and item 0 is open, opening item 1 closes item 0', async () => {
+    const { loader, accordion } = await setupHost(true);
+    const acc = await loader.getHarness(MatAccordionHarness);
+    expect(await acc.isMulti()).toBe(false);
+
+    const panels = await acc.getExpansionPanels();
+    await panels[0].expand();
+    expect(accordion.isExpanded(0)).toBe(true);
+
+    await panels[1].expand();
+    expect(await panels[0].isExpanded()).toBe(false);
+    expect(await panels[1].isExpanded()).toBe(true);
+    expect(accordion.isExpanded(0)).toBe(false);
+    expect(accordion.isExpanded(1)).toBe(true);
+  });
+
+  it('when single changes at runtime, the Material accordion follows it', async () => {
+    const { fixture, loader } = await setupHost(false);
+    const acc = await loader.getHarness(MatAccordionHarness);
+    fixture.componentInstance.single.set(true);
+    fixture.detectChanges();
+    expect(await acc.isMulti()).toBe(false);
+  });
+
+  it('when single is given as a bare attribute, it is coerced to true and the accordion is not multi', async () => {
+    @Component({
+      imports: [AccordionComponent, AccordionItemComponent],
+      template: `
+        <ui-accordion single>
+          <ui-accordion-item [index]="0">
+            <span slot="header">Section 1</span>
+            Content 1
+          </ui-accordion-item>
+          <ui-accordion-item [index]="1">
+            <span slot="header">Section 2</span>
+            Content 2
+          </ui-accordion-item>
+        </ui-accordion>
+      `,
+    })
+    class BareSingleHostComponent {}
+
+    await TestBed.configureTestingModule({ imports: [BareSingleHostComponent] }).compileComponents();
+    const fixture = TestBed.createComponent(BareSingleHostComponent);
+    fixture.detectChanges();
+    const acc = await TestbedHarnessEnvironment.loader(fixture).getHarness(MatAccordionHarness);
+    expect(await acc.isMulti()).toBe(false);
+  });
+});
+
+// ===========================================================================
+// Programmatic API (AccordionContext)
+// ===========================================================================
+
+describe('AccordionComponent — toggle() / isExpanded()', () => {
+  it('when toggle() is called, the panel and its header reflect the new state', async () => {
+    const { fixture, loader, accordion } = await setupHost();
+    accordion.toggle(2);
+    fixture.detectChanges();
+    const panels = await loader.getAllHarnesses(MatExpansionPanelHarness);
+    expect(await panels[2].isExpanded()).toBe(true);
+    expect(headers(fixture)[2].getAttribute('aria-expanded')).toBe('true');
+
+    accordion.toggle(2);
+    fixture.detectChanges();
+    expect(await panels[2].isExpanded()).toBe(false);
+  });
+
+  it('when single is true, toggle() on another item closes the open one', async () => {
+    const { fixture, loader, accordion } = await setupHost(true);
+    accordion.toggle(0);
+    fixture.detectChanges();
+    accordion.toggle(2);
+    fixture.detectChanges();
+    const panels = await loader.getAllHarnesses(MatExpansionPanelHarness);
+    expect(await Promise.all(panels.map((p) => p.isExpanded()))).toEqual([false, false, true]);
+  });
+
+  it('when a header is clicked, isExpanded() reports the toggle', async () => {
+    const { fixture, accordion } = await setupHost();
+    expect(accordion.isExpanded(0)).toBe(false);
+    headers(fixture)[0].click();
+    fixture.detectChanges();
+    expect(accordion.isExpanded(0)).toBe(true);
+  });
+});
+
+// ===========================================================================
+// Token colours only
 // ===========================================================================
 
 describe('AccordionComponent — token colours only', () => {
   it('when rendered, no hardcoded hex colours appear in inline element styles', async () => {
-    const f = await setupHost();
-    headerButtons(f)[0].click();
-    f.detectChanges();
+    const { fixture } = await setupHost();
+    headers(fixture)[0].click();
+    fixture.detectChanges();
     const hexPattern = /#[0-9a-fA-F]{3,8}\b/;
-    const root = f.nativeElement as HTMLElement;
+    const root = fixture.nativeElement as HTMLElement;
     const all: HTMLElement[] = [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))];
     for (const el of all) {
       expect(el.getAttribute('style') ?? '').not.toMatch(hexPattern);
@@ -265,12 +357,64 @@ describe('AccordionComponent — token colours only', () => {
 });
 
 // ===========================================================================
+// State layers, ring corners and header motion (hooks the item CSS keys on)
+// ===========================================================================
+
+/** Text of every stylesheet Angular has attached to the document for the rendered components. */
+function documentStyles(): string {
+  return Array.from(document.querySelectorAll('style'))
+    .map((style) => style.textContent ?? '')
+    .join('\n');
+}
+
+describe('AccordionComponent — state layers and header motion', () => {
+  it('when rendered, each header hosts Material focus indicator, which the ring corner tokens drive', async () => {
+    const { fixture } = await setupHost();
+    headers(fixture).forEach((btn) => expect(btn.classList).toContain('mat-focus-indicator'));
+  });
+
+  it('when an item is expanded, only its header carries .mat-expanded', async () => {
+    const { fixture } = await setupHost();
+    headers(fixture)[2].click();
+    fixture.detectChanges();
+    expect(headers(fixture).map((btn) => btn.classList.contains('mat-expanded'))).toEqual([
+      false,
+      false,
+      true,
+    ]);
+  });
+
+  it('when rendered, the item stylesheet draws a hover layer on every header, expanded included', async () => {
+    await setupHost();
+    const css = documentStyles();
+    const hoverRule = css.match(
+      /@media\s*\(hover:\s*hover\)\s*\{\s*([^{}]*:hover::after)\s*\{([^{}]*)\}/,
+    );
+    expect(hoverRule).not.toBeNull();
+    expect(hoverRule![1]).toContain('.mat-expansion-panel-header');
+    expect(hoverRule![1]).not.toContain('mat-expanded');
+    expect(hoverRule![2]).toMatch(/opacity:\s*var\(--mat-sys-hover-state-layer-opacity\)/);
+    expect(hoverRule![2]).toMatch(/background:\s*var\(--mat-sys-on-surface\)/);
+  });
+
+  it('when animations are enabled, the header minimum height transitions with the body', async () => {
+    await setupHost();
+    expect(documentStyles()).toMatch(
+      /\.mat-expansion-panel-animations-enabled[^{}]*\.mat-expansion-panel-header[^{}]*\{\s*transition:\s*min-block-size 225ms/,
+    );
+  });
+});
+
+// ===========================================================================
 // Sanity — direct component
 // ===========================================================================
 
 describe('AccordionComponent — direct setup', () => {
-  it('when created, the component renders without error', async () => {
-    const f = await setupDirect();
+  it('when created, the component renders as a Material accordion', async () => {
+    await TestBed.configureTestingModule({ imports: [AccordionComponent] }).compileComponents();
+    const f = TestBed.createComponent(AccordionComponent);
+    f.detectChanges();
     expect(f.componentInstance).toBeTruthy();
+    expect((f.nativeElement as HTMLElement).classList).toContain('mat-accordion');
   });
 });
