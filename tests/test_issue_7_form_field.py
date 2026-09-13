@@ -44,12 +44,17 @@ SELECT_DIR = UI_ROOT / "select"
 
 
 def _primary_ts(component_dir: pathlib.Path) -> pathlib.Path:
-    candidates = [f for f in component_dir.glob("*.ts") if ".spec." not in f.name]
+    candidates = {f.name: f for f in component_dir.glob("*.ts") if ".spec." not in f.name}
     if not candidates:
         raise FileNotFoundError(f"No non-spec .ts file found in {component_dir}")
+    # The component class lives in <folder>.ts (or <folder>.component.ts). Match the whole file
+    # name: form-field-context.ts also contains "form-field", and glob order differs between
+    # filesystems, so a substring match picked the context file on Linux CI.
     name = component_dir.name
-    primary = [f for f in candidates if name in f.name]
-    return (primary or candidates)[0]
+    for primary in (f"{name}.ts", f"{name}.component.ts"):
+        if primary in candidates:
+            return candidates[primary]
+    return candidates[sorted(candidates)[0]]
 
 
 def _full_source(component_dir: pathlib.Path) -> str:

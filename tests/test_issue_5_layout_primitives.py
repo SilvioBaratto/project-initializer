@@ -72,12 +72,15 @@ def _component_dir(name: str) -> pathlib.Path:
 def _ts_file(name: str) -> pathlib.Path:
     """Return the primary (non-spec) TypeScript file for a component."""
     comp_dir = _component_dir(name)
-    candidates = [f for f in comp_dir.glob("*.ts") if ".spec." not in f.name]
+    candidates = {f.name: f for f in comp_dir.glob("*.ts") if ".spec." not in f.name}
     if not candidates:
         raise FileNotFoundError(f"No non-spec .ts file found in {comp_dir}")
-    # Prefer the file whose name matches the component (e.g. grid.ts, grid.component.ts)
-    primary = [f for f in candidates if name in f.name]
-    return (primary or candidates)[0]
+    # Prefer the file named after the component (grid.ts, grid.component.ts). Match the whole
+    # file name, not a substring, and never rely on glob order, which differs between filesystems.
+    for primary in (f"{name}.ts", f"{name}.component.ts"):
+        if primary in candidates:
+            return candidates[primary]
+    return candidates[sorted(candidates)[0]]
 
 
 def _full_source(name: str) -> str:

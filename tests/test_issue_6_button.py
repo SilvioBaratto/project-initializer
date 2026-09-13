@@ -60,11 +60,15 @@ BUTTON_DIR = UI_ROOT / "button"
 
 def _ts_file() -> pathlib.Path:
     """Return the primary (non-spec) TypeScript file for the button component."""
-    candidates = [f for f in BUTTON_DIR.glob("*.ts") if ".spec." not in f.name]
+    candidates = {f.name: f for f in BUTTON_DIR.glob("*.ts") if ".spec." not in f.name}
     if not candidates:
         raise FileNotFoundError(f"No non-spec .ts file found in {BUTTON_DIR}")
-    primary = [f for f in candidates if "button" in f.name]
-    return (primary or candidates)[0]
+    # Match the whole file name, not a substring, and never rely on glob order, which differs
+    # between filesystems.
+    for primary in ("button.ts", "button.component.ts"):
+        if primary in candidates:
+            return candidates[primary]
+    return candidates[sorted(candidates)[0]]
 
 
 def _full_source() -> str:
