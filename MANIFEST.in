@@ -25,6 +25,7 @@ recursive-include project_initializer/templates-entra-nestjs .*
 recursive-include project_initializer/templates-entra-frontend *
 recursive-include project_initializer/templates-entra-frontend .*
 include project_initializer/py.typed
+include project_initializer/env_defaults.env
 include project_initializer/templates/.gitignore
 include project_initializer/templates/.gitattributes
 include project_initializer/templates/.env.example

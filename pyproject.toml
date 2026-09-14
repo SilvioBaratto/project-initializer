@@ -63,6 +63,7 @@ include = ["project_initializer*"]
 
 [tool.setuptools.package-data]
 "project_initializer" = [
+    "env_defaults.env", "py.typed",
     "templates/**/*", "templates/**/.*",
     "templates-api-fastapi/**/*", "templates-api-fastapi/**/.*",
     "templates-api-nestjs/**/*", "templates-api-nestjs/**/.*",
