@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-09-14
+
+### Fixed
+- **Scaffolds from the PyPI package got a `.env` without working defaults.** The wheel and sdist left out `env_defaults.env`, so `project-initializer` installed from PyPI wrote a root `.env` and `.env.example` with an empty `DATABASE_URL`, `AUTH_TOKEN` and Entra IDs and a narrower `CORS_ORIGINS` for every api scope, and `docker compose up` did not run as-is. A scaffold from a checkout was unaffected. Every release published to PyPI up to 0.3.9 had this gap; 0.4.0 was tagged but not published. The file is now packaged, and `tests/test_package_data.py` builds a wheel and fails on any tracked package file missing from it.
+
 ## [0.4.0] - 2026-09-13
 
 The Angular frontend template moves from Tailwind CSS to Angular Material 3 in every variant (base, token, supabase, entra).
@@ -130,7 +135,8 @@ Every NestJS variant is now usable in Docker. Three chained bugs each hid the ne
 ### Added
 - Initial public release of the `project-initializer` CLI.
 
-[Unreleased]: https://github.com/SilvioBaratto/project-initializer/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/SilvioBaratto/project-initializer/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/SilvioBaratto/project-initializer/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/SilvioBaratto/project-initializer/compare/v0.3.9...v0.4.0
 [0.3.9]: https://github.com/SilvioBaratto/project-initializer/compare/v0.3.8...v0.3.9
 [0.3.8]: https://github.com/SilvioBaratto/project-initializer/compare/v0.3.7...v0.3.8
