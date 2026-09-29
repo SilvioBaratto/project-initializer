@@ -86,7 +86,12 @@ guarded by `tests/test_nestjs_node_base_image.py`. Runtime `node -v` check defer
 
 ### Phase 1 — NestJS 12 core + native validation + queue (coupled, fail-fast)
 
-#### Task 2 — Manifests: NestJS 12 set + queue + pino, remove nestjs-zod
+#### Task 2 ✅ DONE — Manifests: NestJS 12 set + queue + pino, remove nestjs-zod
+Committed on `chore/nestjs-node24-deps-upgrade`; guarded by `tests/test_nestjs_deps_nestjs12.py`
+(19 green). Versions live-verified against npm at edit time (pino 10.3.1, pino-http 11.0.0,
+pino-pretty held 13.1.3; bullmq 6.3.9 ioredis peer `>=5.0.0` admits ioredis 6.0.0). Lockfile-sync is
+red by design until T5 regenerates the three locks on `node:24-alpine`.
+
 **Description:** In all 3 `package.json`, apply the version table above: the 11 `@nestjs/*` targets,
 `@nestjs/bullmq` 12.0.0, `bullmq` 6.3.9, **add `ioredis` 6.0.0**, `@bull-board/*` 9.10.1,
 `nestjs-pino` 5.2.1 + `pino` 10.x + `pino-http` 11.x (+ `pino-pretty`), and **delete the `nestjs-zod`

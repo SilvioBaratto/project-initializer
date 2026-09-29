@@ -10,8 +10,8 @@ Legend: scope XS/S/M/L · `→` verification gate.
 - [x] **T1** Docker base `node:22-alpine` → `node:24-alpine` (both `FROM`, base Dockerfile) · XS — committed `b8c7686`
 
 ## Phase 1 — NestJS 12 core + native validation + queue (coupled, fail fast)
-- [ ] **T2** Manifests (3 `package.json`): NestJS 12 set (11 pkgs → core 12.1.1 / config 12.0.1 / swagger 12.0.2 / terminus 12.1.0 / throttler 6.7.1 / cli 12.0.8 / schematics 12.0.6) + `@nestjs/bullmq`12.0.0 + `bullmq`6.3.9 + **add `ioredis`6.0.0** + `@bull-board/*`9.10.1 + `nestjs-pino`5.2.1 (+`pino`10 +`pino-http`11 +`pino-pretty`); **remove `nestjs-zod`**; keep `zod`4.4.3; don't touch `typescript` · S
-  → JSON valid; `nestjs-zod` absent + `ioredis` present in all 3; swagger 12.0.2; targets consistent.
+- [x] **T2** Manifests (3 `package.json`): NestJS 12 set (11 pkgs → core 12.1.1 / config 12.0.1 / swagger 12.0.2 / terminus 12.1.0 / throttler 6.7.1 / cli 12.0.8 / schematics 12.0.6) + `@nestjs/bullmq`12.0.0 + `bullmq`6.3.9 + **add `ioredis`6.0.0** + `@bull-board/*`9.10.1 + `nestjs-pino`5.2.1 (+`pino`10.3.1 +`pino-http`11.0.0 +`pino-pretty`13.1.3); **remove `nestjs-zod`**; keep `zod`4.4.3; don't touch `typescript` · S
+  → JSON valid; `nestjs-zod` absent + `ioredis` present in all 3; swagger 12.0.2; targets consistent. Guarded by `tests/test_nestjs_deps_nestjs12.py` (19 green). Lock drift red until T5 (deferred by design).
 - [ ] **T3** Native validation refactor (drop `nestjs-zod` in code, ~15 `.ts` + 2 tests): global `StandardSchemaValidationPipe`/`StandardSchemaSerializerInterceptor` ×4 `app.module.ts`; `createZodDto`→`z.infer` + `@Body({schema})`; `@ZodSerializerDto`→`@SerializeOptions({schema})` + `@ApiOkResponse/@ApiCreatedResponse({standardSchema})`; drop `cleanupOpenApiDoc` in `main.ts`; update `serialization.spec.ts` + `test_issue_003_zod_serialization.py` · L
   → zero `nestjs-zod` imports; OpenAPI doc has request **and** response schemas; TS compiles.
 - [ ] **T4** bullmq 6 wiring + audit (guard only — no removed-API usage): processor/queue typecheck on bullmq 6; `BullModule` connection resolves via `ioredis` · XS
