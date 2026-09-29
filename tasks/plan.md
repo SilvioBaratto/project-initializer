@@ -151,14 +151,25 @@ build the API image; run the mandatory runtime smoke.
 → `GET /api/v1/health/readiness` = `database: up`; Bull-board reachable at `/api/v1/admin/queues`;
 `npm test` green (ESM v12 loads under Node ≥ 24.9); generated OpenAPI has request schemas (response
 docs dropped per T3 decision); `@nestjs/bull-shared` 12.x resolves in the lock.
-**Verification:** `docker run --rm -v "$PWD:/w" -w /w node:24-alpine npm install --package-lock-only
---ignore-scripts` per api dir; `pytest tests/test_nestjs_lockfile_sync.py`; smoke curl + `npm test`.
+**Verification:** for a major bump the stale lock must be **deleted first** — a plain
+`npm install --package-lock-only` ERESOLVEs (stale lock anchors `@nestjs/bull-shared`11 vs core 12).
+Command used per api dir: `docker run --rm -v "<api>:/w" -w /w node:24-alpine sh -c "rm -f
+package-lock.json && npm install --package-lock-only --ignore-scripts"`. Then `npm ci` install check
+per lock + `pytest tests/test_nestjs_lockfile_sync.py`.
+**Status:** 🟡 PARTIAL on `chore/nestjs-node24-deps-upgrade` (commit `3bbdc95`).
+- ✅ 3 locks regenerated (core 12.1.1 / bullmq 12.0.0 / bull-shared 12.0.0 / bullmq 6.3.9 / ioredis 6.0.0).
+- ✅ `npm ci --ignore-scripts` installs each on node:24-alpine (base 547 / supabase 549 / entra 564, exit 0).
+- ✅ `test_nestjs_lockfile_sync.py` green (all 4 modes); `@nestjs/bull-shared` 12 resolves.
+- ⏳ `docker compose build/up` runtime smoke + `npm run build` (tsc) + `npm test` — **defer to CI/Linux**;
+  local Windows-Docker bind-mount I/O + prisma/baml binary fetches made them impractical here.
 **Depends on:** T2, T3, T4. **Files:** the 3 `package-lock.json`. **Scope:** M
 
 > ### Checkpoint 1 — Core platform + native validation green
-> - [ ] Node 24 confirmed in-container (`node -v` ≥ 24.9).
-> - [ ] base + entra build; readiness = up; queue + Swagger + validation tests pass.
-> - [ ] `test_nestjs_lockfile_sync.py` green. **Review with human before Phase 2.**
+> - [x] Node 24 confirmed in-container (`node -v` = v24.21.0 ≥ 24.9).
+> - [x] `test_nestjs_lockfile_sync.py` green; all 3 locks `npm ci`-install on node:24-alpine.
+> - [x] Static gates green: native-validation (`test_issue_003`, 21) + bullmq-6 audit (`test_nestjs_bullmq6_audit`, 8).
+> - [ ] Runtime smoke — base + entra `docker compose build`/`up`, readiness = up, `/admin/queues`, `npm run build` (tsc), `npm test` — **pending CI/Linux** (impractical in local Windows-Docker).
+> **Review with human before Phase 2.**
 
 ### Phase 2 — Remaining upgrades + toolchain + docs
 

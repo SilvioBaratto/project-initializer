@@ -16,10 +16,11 @@ Legend: scope XS/S/M/L · `→` verification gate.
   → **Decision (memory `nestjs12-native-validation-decision`): `@ApiOkResponse({standardSchema})` is NOT a real NestJS 12 API — response OpenAPI docs dropped (runtime serialization unchanged); requests still auto-document from `@Body({schema})`.** Guarded by `test_issue_003` (21 green): zero `nestjs-zod` imports in all 4 overlays, native pipe+interceptor ×4, `@SerializeOptions` on every data handler. `tsc`/`npm test` deferred to T5.
 - [x] **T4** bullmq 6 wiring + audit (guard only — no source change): processor/queue use only bullmq-6-supported surface (`@Processor`/`WorkerHost`/`OnWorkerEvent`, `Queue.add`/`getJob`, `registerQueue` job opts); `BullModule.forRoot` wires a `connection` (ioredis path) · XS
   → new guard `tests/test_nestjs_bullmq6_audit.py` (8 green): no removed bullmq-6 API (`Queue#client`, legacy repeatable jobs, `debounce`) in any overlay, proven non-vacuous by a completeness property + a probe RED check. Live BullMQ→ioredis→Redis path verified by T5 readiness smoke.
-- [ ] **T5** Regenerate 3 locks on `node:24-alpine` + core verify — 3 `package-lock.json` · M
-  → `docker compose build api` (base+entra) green; `/health/readiness` = up; `/admin/queues` reachable; `npm test` green on Node ≥24.9; `@nestjs/bull-shared`12 resolves; `pytest tests/test_nestjs_lockfile_sync.py` green.
+- [~] **T5** Regenerate 3 locks on `node:24-alpine` + core verify — 3 `package-lock.json` · M
+  → **Locks DONE + install-verified** (commit `3bbdc95`): regenerated fresh (delete-stale-then-resolve fixes the 11→12 ERESOLVE where the stale lock pinned `@nestjs/bull-shared`11); pins `@nestjs/core`12.1.1 / `@nestjs/bullmq`12.0.0 / `@nestjs/bull-shared`12.0.0 / bullmq6.3.9 / ioredis6.0.0. `npm ci --ignore-scripts` installs each on `node:24-alpine` (base 547 / supabase 549 / entra 564 pkgs, exit 0); `pytest tests/test_nestjs_lockfile_sync.py` green (all 4 modes); `@nestjs/bull-shared`12 resolves.
+  → **PENDING (runtime smoke — run in CI/Linux, not local Windows-Docker):** `docker compose build api` (base+entra); `docker compose up` → `/health/readiness` = up; `/admin/queues` reachable; `npm run build` (tsc — confirms T3/T4 type-correctness); `npm test` green on Node ≥24.9. Local Windows bind-mount I/O + prisma/baml binary fetches made these impractical here.
 
-- [ ] **✔ CHECKPOINT 1 — core + native validation green** → review with human before Phase 2.
+- [ ] **✔ CHECKPOINT 1 — core + native validation green** → review with human before Phase 2. Static gates green (locks install, lockfile-sync, native-validation + bullmq audits). Runtime smoke (compile/test/`docker compose up`) to be confirmed in CI/Linux.
 
 ## Phase 2 — Remaining upgrades + toolchain + docs
 - [ ] **T6** Prisma trio→7.10.0 + prisma-zod-generator→3.3.1 + jest30.5.2/ts-jest29.4.14/tsc-alias1.9.5/eslint10.11.0 + `@types/node`→24.19.0 + supertest pair — 3 `package.json` · S · **do NOT touch `typescript`**
