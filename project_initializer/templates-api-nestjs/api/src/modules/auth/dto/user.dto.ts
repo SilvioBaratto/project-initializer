@@ -1,10 +1,9 @@
 import { z } from 'zod';
-import { createZodDto } from 'nestjs-zod';
 
 /**
  * Response-facing whitelist for the Prisma `User` row.
  *
- * Only safe, non-secret columns are listed here. `ZodSerializerInterceptor`
+ * Only safe, non-secret columns are listed here. `StandardSchemaSerializerInterceptor`
  * (registered globally as `APP_INTERCEPTOR`) parses every outgoing User payload
  * against this schema, so any sensitive column that a future migration might add
  * to the `users` table (e.g. a credential hash or token) is stripped before it
@@ -19,4 +18,4 @@ export const UserResponseSchema = z.object({
   updated_at: z.string(),
 });
 
-export class UserResponseDto extends createZodDto(UserResponseSchema) {}
+export type UserResponseDto = z.infer<typeof UserResponseSchema>;

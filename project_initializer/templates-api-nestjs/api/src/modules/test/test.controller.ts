@@ -8,18 +8,26 @@ import {
   Param,
   HttpCode,
   HttpStatus,
+  SerializeOptions,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { ZodSerializerDto } from 'nestjs-zod';
 import { TestService } from './test.service';
 import {
+  CreateItemSchema,
+  UpdateItemSchema,
+  ItemResponseSchema,
   CreateItemDto,
   UpdateItemDto,
   ItemResponseDto,
-  ItemListResponseDto,
 } from './dto/item.dto';
-import { EchoRequestDto, EchoResponseDto } from './dto/echo.dto';
+import {
+  EchoRequestSchema,
+  EchoResponseSchema,
+  EchoRequestDto,
+  EchoResponseDto,
+} from './dto/echo.dto';
 
+/** Demo CRUD and echo endpoints exercising native request validation and response serialization. */
 @ApiTags('Test')
 @Controller('test')
 export class TestController {
@@ -32,21 +40,25 @@ export class TestController {
   }
 
   @Get('echo/:message')
-  @ZodSerializerDto(EchoResponseDto)
+  @SerializeOptions({ schema: EchoResponseSchema })
   @ApiOperation({ summary: 'Echo a message (GET)' })
   echoGet(@Param('message') message: string): EchoResponseDto {
     return { message };
   }
 
   @Post('echo')
-  @ZodSerializerDto(EchoResponseDto)
+  @SerializeOptions({ schema: EchoResponseSchema })
   @ApiOperation({ summary: 'Echo a message (POST)' })
-  echoPost(@Body() body: EchoRequestDto): EchoResponseDto {
+  echoPost(
+    @Body({ schema: EchoRequestSchema }) body: EchoRequestDto,
+  ): EchoResponseDto {
     return { message: body.message };
   }
 
+  // findAll returns an array; StandardSchemaSerializerInterceptor applies the schema to
+  // each element, so pass the single-item ItemResponseSchema, not a z.array wrapper.
   @Get('items')
-  @ZodSerializerDto(ItemListResponseDto)
+  @SerializeOptions({ schema: ItemResponseSchema })
   @ApiOperation({ summary: 'List all items' })
   findAll(): ItemResponseDto[] {
     return this.testService.findAll();
@@ -54,26 +66,28 @@ export class TestController {
 
   @Post('items')
   @HttpCode(HttpStatus.CREATED)
-  @ZodSerializerDto(ItemResponseDto)
+  @SerializeOptions({ schema: ItemResponseSchema })
   @ApiOperation({ summary: 'Create an item' })
   @ApiResponse({ status: 201, description: 'Item created' })
-  create(@Body() createItemDto: CreateItemDto): ItemResponseDto {
+  create(
+    @Body({ schema: CreateItemSchema }) createItemDto: CreateItemDto,
+  ): ItemResponseDto {
     return this.testService.create(createItemDto);
   }
 
   @Get('items/:id')
-  @ZodSerializerDto(ItemResponseDto)
+  @SerializeOptions({ schema: ItemResponseSchema })
   @ApiOperation({ summary: 'Get an item by ID' })
   findOne(@Param('id') id: string): ItemResponseDto {
     return this.testService.findOne(id);
   }
 
   @Put('items/:id')
-  @ZodSerializerDto(ItemResponseDto)
+  @SerializeOptions({ schema: ItemResponseSchema })
   @ApiOperation({ summary: 'Update an item' })
   update(
     @Param('id') id: string,
-    @Body() updateItemDto: UpdateItemDto,
+    @Body({ schema: UpdateItemSchema }) updateItemDto: UpdateItemDto,
   ): ItemResponseDto {
     return this.testService.update(id, updateItemDto);
   }

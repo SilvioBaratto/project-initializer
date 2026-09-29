@@ -1,7 +1,14 @@
 """
-Issue #3 — NestJS Zod serialization / guard hardening: source-blind example tests.
+Issue #3 — NestJS validation / serialization hardening: source-blind example tests.
 
-All assertions are derived from issue #3 acceptance criteria and requirements.md §3-5.
+Updated for the NestJS 12 native-validation migration (T3): the template no longer
+depends on ``nestjs-zod``. Request validation now uses the framework-native
+``StandardSchemaValidationPipe`` (``APP_PIPE``) with per-parameter
+``@Body({ schema })``; response serialization uses
+``StandardSchemaSerializerInterceptor`` (``APP_INTERCEPTOR``) with
+``@SerializeOptions({ schema })``. The field-whitelisting guarantee is unchanged —
+only the mechanism moved from ``nestjs-zod`` to raw zod + the native pipe/interceptor.
+
 No NestJS implementation source is read here; template files are inspected as plain text.
 """
 
@@ -23,6 +30,7 @@ TPL = REPO_ROOT / "project_initializer"
 BASE_APP_MODULE = TPL / "templates-api-nestjs/api/src/app.module.ts"
 TOKEN_APP_MODULE = TPL / "templates-token-nestjs/api/src/app.module.ts"
 SUPABASE_APP_MODULE = TPL / "templates-supabase-nestjs/api/src/app.module.ts"
+ENTRA_APP_MODULE = TPL / "templates-entra-nestjs/api/src/app.module.ts"
 
 BASE_ENV_VALIDATION = TPL / "templates-api-nestjs/api/src/config/env.validation.ts"
 SUPABASE_ENV_VALIDATION = (
@@ -32,8 +40,9 @@ SUPABASE_ENV_VALIDATION = (
 NESTJS_API_SRC = TPL / "templates-api-nestjs/api/src"
 TOKEN_API_SRC = TPL / "templates-token-nestjs/api/src"
 SUPABASE_API_SRC = TPL / "templates-supabase-nestjs/api/src"
+ENTRA_API_SRC = TPL / "templates-entra-nestjs/api/src"
 
-_ALL_TEMPLATE_ROOTS = [NESTJS_API_SRC, TOKEN_API_SRC, SUPABASE_API_SRC]
+_ALL_TEMPLATE_ROOTS = [NESTJS_API_SRC, TOKEN_API_SRC, SUPABASE_API_SRC, ENTRA_API_SRC]
 
 
 # ── file-collection helpers ───────────────────────────────────────────────────
@@ -59,6 +68,10 @@ def _controller_files_under(root: Path) -> list[Path]:
     ]
 
 
+def _ts_files_under(root: Path) -> list[Path]:
+    return list(root.rglob("*.ts")) if root.exists() else []
+
+
 # ── detection predicates ──────────────────────────────────────────────────────
 # Each predicate is derived directly from the criterion text; no source peeked.
 
@@ -68,14 +81,14 @@ def _has_app_guard(text: str) -> bool:
     return "APP_GUARD" in text
 
 
-def _has_app_pipe_zod(text: str) -> bool:
-    """Criterion C: ZodValidationPipe wired as APP_PIPE."""
-    return "APP_PIPE" in text and "ZodValidationPipe" in text
+def _has_app_pipe_native(text: str) -> bool:
+    """Criterion C: StandardSchemaValidationPipe wired as APP_PIPE."""
+    return "APP_PIPE" in text and "StandardSchemaValidationPipe" in text
 
 
-def _has_app_interceptor_zod(text: str) -> bool:
-    """Criterion C: ZodSerializerInterceptor wired as APP_INTERCEPTOR."""
-    return "APP_INTERCEPTOR" in text and "ZodSerializerInterceptor" in text
+def _has_app_interceptor_native(text: str) -> bool:
+    """Criterion C: StandardSchemaSerializerInterceptor wired as APP_INTERCEPTOR."""
+    return "APP_INTERCEPTOR" in text and "StandardSchemaSerializerInterceptor" in text
 
 
 def _has_passthrough(text: str) -> bool:
@@ -83,9 +96,14 @@ def _has_passthrough(text: str) -> bool:
     return ".passthrough()" in text
 
 
-def _has_zod_serializer_dto_decorator(text: str) -> bool:
-    """Criterion E: handler annotated with @ZodSerializerDto to enforce response schema."""
-    return "@ZodSerializerDto" in text
+def _has_serialize_options_decorator(text: str) -> bool:
+    """Criterion E: handler annotated with @SerializeOptions to enforce response schema."""
+    return "@SerializeOptions" in text
+
+
+def _imports_nestjs_zod(text: str) -> bool:
+    """Criterion H: any residual dependency on the removed nestjs-zod package."""
+    return "nestjs-zod" in text
 
 
 def _has_http_data_handler(text: str) -> bool:
@@ -179,8 +197,9 @@ def test_when_supabase_env_validation_is_read_then_supabase_vars_are_required() 
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Criterion C — ZodValidationPipe (APP_PIPE) and ZodSerializerInterceptor (APP_INTERCEPTOR)
-#               registered globally in all three app.module.ts files
+# Criterion C — StandardSchemaValidationPipe (APP_PIPE) and
+#               StandardSchemaSerializerInterceptor (APP_INTERCEPTOR) registered
+#               globally in all four app.module.ts files (base + 3 auth overlays)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
@@ -190,20 +209,21 @@ def test_when_supabase_env_validation_is_read_then_supabase_vars_are_required() 
         (BASE_APP_MODULE, "base"),
         (TOKEN_APP_MODULE, "token"),
         (SUPABASE_APP_MODULE, "supabase"),
+        (ENTRA_APP_MODULE, "entra"),
     ],
 )
-def test_when_app_module_is_read_then_zod_validation_pipe_is_registered_as_app_pipe(
+def test_when_app_module_is_read_then_standard_schema_validation_pipe_is_registered_as_app_pipe(
     module_path: Path, label: str
 ) -> None:
     """
-    Every app.module.ts variant must provide ZodValidationPipe as APP_PIPE so all incoming
-    request bodies are validated and unknown properties are stripped globally.
-    Derived from: 'ZodValidationPipe (APP_PIPE) … registered globally in all three app.module.ts files'.
+    Every app.module.ts variant must provide StandardSchemaValidationPipe as APP_PIPE so all
+    incoming request bodies declaring a schema are validated and unknown properties stripped globally.
+    Derived from: 'StandardSchemaValidationPipe (APP_PIPE) … registered globally in all app.module.ts files'.
     """
     assert module_path.exists(), f"[{label}] app.module.ts not found: {module_path}"
-    assert _has_app_pipe_zod(_read(module_path)), (
-        f"[{label}] app.module.ts must provide ZodValidationPipe as APP_PIPE. "
-        "Without it, unknown request properties are not stripped globally."
+    assert _has_app_pipe_native(_read(module_path)), (
+        f"[{label}] app.module.ts must provide StandardSchemaValidationPipe as APP_PIPE. "
+        "Without it, request schemas attached via @Body({ schema }) are not validated globally."
     )
 
 
@@ -213,19 +233,20 @@ def test_when_app_module_is_read_then_zod_validation_pipe_is_registered_as_app_p
         (BASE_APP_MODULE, "base"),
         (TOKEN_APP_MODULE, "token"),
         (SUPABASE_APP_MODULE, "supabase"),
+        (ENTRA_APP_MODULE, "entra"),
     ],
 )
-def test_when_app_module_is_read_then_zod_serializer_interceptor_is_registered_as_app_interceptor(
+def test_when_app_module_is_read_then_standard_schema_serializer_interceptor_is_registered_as_app_interceptor(
     module_path: Path, label: str
 ) -> None:
     """
-    Every app.module.ts variant must provide ZodSerializerInterceptor as APP_INTERCEPTOR so
+    Every app.module.ts variant must provide StandardSchemaSerializerInterceptor as APP_INTERCEPTOR so
     response schemas are enforced globally and unlisted fields are stripped before serialization.
-    Derived from: 'ZodSerializerInterceptor (APP_INTERCEPTOR) … registered globally in all three app.module.ts files'.
+    Derived from: 'StandardSchemaSerializerInterceptor (APP_INTERCEPTOR) … registered globally in all app.module.ts files'.
     """
     assert module_path.exists(), f"[{label}] app.module.ts not found: {module_path}"
-    assert _has_app_interceptor_zod(_read(module_path)), (
-        f"[{label}] app.module.ts must provide ZodSerializerInterceptor as APP_INTERCEPTOR. "
+    assert _has_app_interceptor_native(_read(module_path)), (
+        f"[{label}] app.module.ts must provide StandardSchemaSerializerInterceptor as APP_INTERCEPTOR. "
         "Without it, response schemas are not enforced and Prisma rows can leak unlisted fields."
     )
 
@@ -239,7 +260,7 @@ def test_when_app_module_is_read_then_zod_serializer_interceptor_is_registered_a
 
 def test_when_all_dto_files_are_read_then_no_schema_calls_passthrough() -> None:
     """
-    Every DTO schema — request or response — across all three NestJS template trees must be
+    Every DTO schema — request or response — across all NestJS template trees must be
     a plain z.object() with no .passthrough() call.  .passthrough() lets Prisma rows emit
     unlisted fields (e.g. 'password') through the serializer unfiltered.
     Derived from: 'Every response schema is a plain z.object() (no .passthrough())' and
@@ -276,23 +297,23 @@ def test_when_source_text_contains_passthrough_then_detector_returns_true(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Criterion E — every data-returning handler is decorated with @ZodSerializerDto
+# Criterion E — every data-returning handler is decorated with @SerializeOptions
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def test_when_all_controller_files_are_read_then_data_handlers_carry_zod_serializer_dto() -> (
+def test_when_all_controller_files_are_read_then_data_handlers_carry_serialize_options() -> (
     None
 ):
     """
     Every controller file that declares at least one HTTP handler (GET/POST/PUT/PATCH/DELETE)
-    must contain at least one @ZodSerializerDto decorator so the Zod serializer enforces the
+    must contain at least one @SerializeOptions decorator so the native serializer enforces the
     response schema and strips unlisted fields per-handler.
 
     Assumption: a controller that declares standard HTTP-method handlers is considered to return
     entity/data.  SSE-only endpoints are not matched by the GET/POST/…/DELETE regex so they are
     implicitly excluded, consistent with the criterion text 'not a static literal or SSE stream'.
 
-    Derived from: 'Every handler returning entity/data … is decorated with @ZodSerializerDto(<ResponseDto>)'.
+    Derived from: 'Every handler returning entity/data … is decorated with @SerializeOptions({ schema })'.
     """
     all_ctrl_files = [
         f for root in _ALL_TEMPLATE_ROOTS for f in _controller_files_under(root)
@@ -305,12 +326,57 @@ def test_when_all_controller_files_are_read_then_data_handlers_carry_zod_seriali
         str(p)
         for p in all_ctrl_files
         if _has_http_data_handler(_read(p))
-        and not _has_zod_serializer_dto_decorator(_read(p))
+        and not _has_serialize_options_decorator(_read(p))
     ]
     assert not missing, (
-        "These controller files declare HTTP handlers but are missing @ZodSerializerDto:\n"
+        "These controller files declare HTTP handlers but are missing @SerializeOptions:\n"
         + "\n".join(f"  {m}" for m in missing)
-        + "\nEvery data-returning handler must be annotated with @ZodSerializerDto(<ResponseDto>)."
+        + "\nEvery data-returning handler must be annotated with @SerializeOptions({ schema })."
+    )
+
+
+def test_when_base_controllers_are_read_then_request_bodies_use_schema_validation() -> (
+    None
+):
+    """
+    The native migration replaces class DTOs with per-parameter schema attachment, so at least one
+    controller must attach a request schema via @Body({ schema: … }) for StandardSchemaValidationPipe
+    to validate against.
+    Derived from: 'request bodies validated via @Body({ schema }) under the native pipe'.
+    """
+    ctrl_files = _controller_files_under(NESTJS_API_SRC)
+    assert ctrl_files, "No controller files found under templates-api-nestjs/api/src/."
+    uses_schema_body = any(
+        re.search(r"@Body\(\s*\{\s*schema\s*:", _read(p)) for p in ctrl_files
+    )
+    assert uses_schema_body, (
+        "No base controller attaches a request schema via @Body({ schema: … }). "
+        "Native validation requires the schema to be bound to the parameter so "
+        "StandardSchemaValidationPipe can validate the incoming body."
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Criterion H — nestjs-zod is fully removed: no import remains in any overlay
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def test_when_all_source_files_are_read_then_no_nestjs_zod_import_remains() -> None:
+    """
+    The nestjs-zod package has no NestJS 12 peer and was removed from every manifest; no
+    source file under any NestJS overlay may still import it, or the image fails to build.
+    Derived from: 'No nestjs-zod import or dependency remains anywhere'.
+    """
+    offenders = [
+        str(p)
+        for root in _ALL_TEMPLATE_ROOTS
+        for p in _ts_files_under(root)
+        if _imports_nestjs_zod(_read(p))
+    ]
+    assert not offenders, (
+        "These source files still reference the removed nestjs-zod package:\n"
+        + "\n".join(f"  {o}" for o in offenders)
+        + "\nMigrate them to StandardSchemaValidationPipe / StandardSchemaSerializerInterceptor + raw zod."
     )
 
 
@@ -362,7 +428,7 @@ def test_when_serialization_spec_is_read_then_it_asserts_sse_handler_has_no_seri
 ):
     """
     serialization.spec.ts must reference the SSE handler and assert it carries no
-    @ZodSerializerDto metadata, so SSE streams bypass the response schema enforcer.
+    @SerializeOptions metadata, so SSE streams bypass the response schema enforcer.
     Derived from: 'SSE handler carries no serializer metadata' in the serialization.spec.ts criterion.
     """
     spec = _find_serialization_spec()
@@ -379,5 +445,5 @@ def test_when_serialization_spec_is_read_then_it_asserts_sse_handler_has_no_seri
     )
     assert has_sse_ref, (
         "serialization.spec.ts must reference the SSE handler (e.g. via 'sse', 'Sse', or "
-        "'text/event-stream') and assert it carries no @ZodSerializerDto metadata."
+        "'text/event-stream') and assert it carries no @SerializeOptions metadata."
     )

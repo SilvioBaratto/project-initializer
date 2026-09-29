@@ -1,7 +1,6 @@
 import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { Logger } from 'nestjs-pino';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { cleanupOpenApiDoc } from 'nestjs-zod';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -48,7 +47,7 @@ async function bootstrap() {
   // Global prefix
   app.setGlobalPrefix('api/v1');
 
-  // Global filters (ZodValidationPipe is registered in AppModule)
+  // Global filters (StandardSchemaValidationPipe is registered in AppModule)
   const { httpAdapter } = app.get(HttpAdapterHost);
   app.useGlobalFilters(
     new HttpExceptionFilter(),
@@ -66,7 +65,7 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, cleanupOpenApiDoc(document));
+  SwaggerModule.setup('docs', app, document);
 
   // Welcome endpoint at root (outside /api/v1 prefix)
   const expressApp = app.getHttpAdapter().getInstance();

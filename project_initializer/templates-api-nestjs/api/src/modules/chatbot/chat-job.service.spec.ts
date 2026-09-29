@@ -87,7 +87,7 @@ describe('ChatJobService', () => {
   });
 });
 
-// Serializer contract: ZodSerializerInterceptor runs ChatJobStatusSchema.parse() on the
+// Serializer contract: StandardSchemaSerializerInterceptor runs ChatJobStatusSchema over the
 // outgoing response body — a plain controller unit test bypasses this interceptor.
 // These tests exercise the schema directly to lock the fix in chat.dto.ts.
 describe('ChatJobStatusSchema (serializer contract)', () => {

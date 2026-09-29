@@ -1,16 +1,28 @@
-import { Controller, Post, Get, Body, Param, Res } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  Res,
+  SerializeOptions,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Response } from 'express';
-import { ZodSerializerDto } from 'nestjs-zod';
 import { ChatbotService } from './chatbot.service';
 import { ChatJobService } from './chat-job.service';
 import {
+  ChatRequestSchema,
+  ChatResponseSchema,
+  ChatJobAcceptedSchema,
+  ChatJobStatusSchema,
   ChatRequestDto,
   ChatResponseDto,
   ChatJobAcceptedDto,
   ChatJobStatusDto,
 } from './dto/chat.dto';
 
+/** Chatbot HTTP surface: synchronous chat, SSE streaming, and async job enqueue/poll. */
 @ApiTags('Chatbot')
 @Controller('chat')
 export class ChatbotController {
@@ -20,16 +32,20 @@ export class ChatbotController {
   ) {}
 
   @Post()
-  @ZodSerializerDto(ChatResponseDto)
+  @SerializeOptions({ schema: ChatResponseSchema })
   @ApiOperation({ summary: 'Send a chat message' })
-  async chat(@Body() chatRequest: ChatRequestDto): Promise<ChatResponseDto> {
+  async chat(
+    @Body({ schema: ChatRequestSchema }) chatRequest: ChatRequestDto,
+  ): Promise<ChatResponseDto> {
     return this.chatbotService.chat(chatRequest);
   }
 
+  // No @SerializeOptions: this handler writes an SSE stream via @Res() directly, so the
+  // serializer interceptor must not run its schema over the event stream.
   @Post('stream')
   @ApiOperation({ summary: 'Stream a chat response (SSE)' })
   async streamChat(
-    @Body() chatRequest: ChatRequestDto,
+    @Body({ schema: ChatRequestSchema }) chatRequest: ChatRequestDto,
     @Res() res: Response,
   ): Promise<void> {
     res.setHeader('Content-Type', 'text/event-stream');
@@ -51,15 +67,17 @@ export class ChatbotController {
   }
 
   @Post('jobs')
-  @ZodSerializerDto(ChatJobAcceptedDto)
+  @SerializeOptions({ schema: ChatJobAcceptedSchema })
   @ApiOperation({ summary: 'Enqueue a chat job (async)' })
-  async enqueueChat(@Body() chatRequest: ChatRequestDto): Promise<ChatJobAcceptedDto> {
+  async enqueueChat(
+    @Body({ schema: ChatRequestSchema }) chatRequest: ChatRequestDto,
+  ): Promise<ChatJobAcceptedDto> {
     const jobId = await this.chatJobService.enqueueChat(chatRequest);
     return { jobId };
   }
 
   @Get('jobs/:id')
-  @ZodSerializerDto(ChatJobStatusDto)
+  @SerializeOptions({ schema: ChatJobStatusSchema })
   @ApiOperation({ summary: 'Poll chat job status' })
   async getJobStatus(@Param('id') id: string): Promise<ChatJobStatusDto> {
     const { state, result } = await this.chatJobService.getJobStatus(id);

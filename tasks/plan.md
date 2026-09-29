@@ -110,16 +110,24 @@ imports the removed `nestjs-zod` — expected red until T3.)
 - DTOs (`createZodDto(X)` in test/auth/chatbot dto files): keep the zod schemas, export
   `type XDto = z.infer<typeof XSchema>`; drop the generated classes.
 - Controllers: `@Body() dto: XDto` → `@Body({ schema: XSchema }) dto: z.infer<...>`; replace
-  `@ZodSerializerDto(XDto)` with `@SerializeOptions({ schema: XSchema })` **and**
-  `@ApiOkResponse`/`@ApiCreatedResponse({ standardSchema: XSchema })` so response docs are retained.
+  `@ZodSerializerDto(XDto)` with `@SerializeOptions({ schema: XSchema })`. Array handlers pass the
+  **single-item** schema (the interceptor maps element-wise), not a `z.array(...)` wrapper.
+- **Response OpenAPI docs dropped (decision 2026-09-29, memory `nestjs12-native-validation-decision`).**
+  `@ApiOkResponse/@ApiCreatedResponse({ standardSchema })` prescribed here is NOT a real NestJS 12
+  API — `@nestjs/swagger` 12 auto-documents *requests* from `@Body({ schema })` but has no
+  Standard-Schema *response* option. Runtime response serialization is unchanged; only the generated
+  Swagger response body loses its typed schema.
 - `main.ts`: remove `cleanupOpenApiDoc` / any `patchNestjsSwagger` (swagger 12 auto-reads schemas).
 - Update `src/modules/test/serialization.spec.ts` and the pytest that asserts `nestjs-zod`
   (`tests/test_issue_003_zod_serialization.py`) to assert the native metadata instead.
 **Acceptance:** no `nestjs-zod` import anywhere under the NestJS overlays; global native pipe +
 interceptor wired in all 4 `app.module.ts`; every previously-serialized handler has an explicit
 response schema; TS compiles.
-**Verification (RED-first):** new test asserts zero `nestjs-zod` imports remain and that the built
-OpenAPI doc contains both request and response schemas; full nestjs unit suite green at T5.
+**Verification (RED-first):** `tests/test_issue_003_zod_serialization.py` (rewritten, 21 green)
+asserts zero `nestjs-zod` imports across all 4 overlays, native pipe+interceptor in all 4
+`app.module.ts`, and `@SerializeOptions` on every data handler. Response OpenAPI docs are dropped
+(see decision above); request docs still auto-generate. Full nestjs unit suite / `tsc` at T5.
+**Status:** ✅ DONE on `chore/nestjs-node24-deps-upgrade`.
 **Depends on:** T2. **Files:** ~15 `.ts` across the 4 overlays + 2 spec/test files. **Scope:** L
 
 #### Task 4 — bullmq 6 wiring + audit
@@ -136,8 +144,8 @@ BullMQ→ioredis→Redis path.
 build the API image; run the mandatory runtime smoke.
 **Acceptance:** `npm ci` succeeds in `docker compose build api` (base + entra); `docker compose up`
 → `GET /api/v1/health/readiness` = `database: up`; Bull-board reachable at `/api/v1/admin/queues`;
-`npm test` green (ESM v12 loads under Node ≥ 24.9); generated OpenAPI has request+response schemas;
-`@nestjs/bull-shared` 12.x resolves in the lock.
+`npm test` green (ESM v12 loads under Node ≥ 24.9); generated OpenAPI has request schemas (response
+docs dropped per T3 decision); `@nestjs/bull-shared` 12.x resolves in the lock.
 **Verification:** `docker run --rm -v "$PWD:/w" -w /w node:24-alpine npm install --package-lock-only
 --ignore-scripts` per api dir; `pytest tests/test_nestjs_lockfile_sync.py`; smoke curl + `npm test`.
 **Depends on:** T2, T3, T4. **Files:** the 3 `package-lock.json`. **Scope:** M
@@ -208,7 +216,7 @@ API). Record revert-to-6.0.3-to-ship vs tracked-red decision. Peer-bypass is **a
 | Risk | Impact | Mitigation |
 |------|--------|------------|
 | `nestjs-zod` blocks `npm ci` on NestJS 12 | High | Remove it; native pipe (T2/T3). |
-| Native migration regresses **response** OpenAPI docs | High | T3 adds explicit `@ApiOkResponse({ standardSchema })` per serialized handler; T5 asserts request+response schemas present. |
+| Native migration regresses **response** OpenAPI docs | Accepted | `@ApiOkResponse({ standardSchema })` is not a real NestJS 12 API; user chose to drop response OpenAPI docs (T3). Runtime serialization via `@SerializeOptions` is unchanged; request docs auto-generate. |
 | bullmq 6 drops bundled ioredis → runtime crash invisible to unit tests | High | Add ioredis 6.0.0 (T2); readiness smoke (T5). |
 | swagger 12 is core-12-only + ESM | Med | Bump atomically in Phase 1; Jest runs on Node ≥ 24.9. |
 | Jest + ESM v12 cycle error via CJS peer (`@nestjs/throttler` still CJS) | Med | Watch T5/T11 `npm test`; if `ERR_REQUIRE_CYCLE_MODULE`, apply a `moduleNameMapper` stub like T12. |

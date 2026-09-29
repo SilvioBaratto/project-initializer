@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { createZodDto } from 'nestjs-zod';
 
 export const UserInfoSchema = z.object({
   id: z.string().uuid(),
@@ -7,4 +6,4 @@ export const UserInfoSchema = z.object({
   role: z.string(),
 });
 
-export class UserInfoDto extends createZodDto(UserInfoSchema) {}
+export type UserInfoDto = z.infer<typeof UserInfoSchema>;

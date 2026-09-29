@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { createZodDto } from 'nestjs-zod';
 
 export const ChatRequestSchema = z.object({
   user_question: z.string().min(1, 'Question is required'),
@@ -27,8 +26,8 @@ export const ChatJobStatusSchema = z.object({
   result: ChatResponseSchema.nullish(),
 });
 
-export class ChatRequestDto extends createZodDto(ChatRequestSchema) {}
-export class ChatResponseDto extends createZodDto(ChatResponseSchema) {}
-export class StreamChunkDto extends createZodDto(StreamChunkSchema) {}
-export class ChatJobAcceptedDto extends createZodDto(ChatJobAcceptedSchema) {}
-export class ChatJobStatusDto extends createZodDto(ChatJobStatusSchema) {}
+export type ChatRequestDto = z.infer<typeof ChatRequestSchema>;
+export type ChatResponseDto = z.infer<typeof ChatResponseSchema>;
+export type StreamChunkDto = z.infer<typeof StreamChunkSchema>;
+export type ChatJobAcceptedDto = z.infer<typeof ChatJobAcceptedSchema>;
+export type ChatJobStatusDto = z.infer<typeof ChatJobStatusSchema>;

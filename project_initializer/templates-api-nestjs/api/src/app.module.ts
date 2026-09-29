@@ -1,4 +1,8 @@
-import { Module } from '@nestjs/common';
+import {
+  Module,
+  StandardSchemaValidationPipe,
+  StandardSchemaSerializerInterceptor,
+} from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { BullBoardModule } from '@bull-board/nestjs';
 import { ExpressAdapter } from '@bull-board/express';
@@ -6,7 +10,6 @@ import { ConfigModule } from '@nestjs/config';
 import { validate } from './config/env.validation';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD, APP_PIPE, APP_INTERCEPTOR } from '@nestjs/core';
-import { ZodValidationPipe, ZodSerializerInterceptor } from 'nestjs-zod';
 import { LoggerModule } from 'nestjs-pino';
 import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './modules/health/health.module';
@@ -61,11 +64,11 @@ import { loggerConfig } from './config/logger.config';
     },
     {
       provide: APP_PIPE,
-      useClass: ZodValidationPipe,
+      useClass: StandardSchemaValidationPipe,
     },
     {
       provide: APP_INTERCEPTOR,
-      useClass: ZodSerializerInterceptor,
+      useClass: StandardSchemaSerializerInterceptor,
     },
   ],
 })
