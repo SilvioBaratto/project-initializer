@@ -137,7 +137,12 @@ connection resolves through `ioredis`. No removed-API usage exists (verified), s
 expected — this task is the guard, not a rewrite.
 **Acceptance:** processor + queue code typechecks on bullmq 6; readiness smoke (T5) proves the
 BullMQ→ioredis→Redis path.
-**Depends on:** T2. **Files:** none expected (guard only). **Scope:** XS
+**Verification:** `tests/test_nestjs_bullmq6_audit.py` (8 green) — no removed bullmq-6 API
+(`Queue#client`, legacy repeatable jobs, `debounce`) in any overlay's queue code; supported worker
++ enqueue surface intact; `BullModule.forRoot` wires a `connection`. Detector proven non-vacuous by a
+completeness property + a probe RED check. `tsc`/runtime path at T5.
+**Status:** ✅ DONE on `chore/nestjs-node24-deps-upgrade` (no source change; guard test added).
+**Depends on:** T2. **Files:** none expected (guard only) — added a guard test. **Scope:** XS
 
 #### Task 5 — Regenerate locks + core verification (Phase-1 gate)
 **Description:** Regenerate the 3 `package-lock.json` on `node:24-alpine`; scaffold base + entra;
