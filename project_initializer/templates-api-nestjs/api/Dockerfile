@@ -1,5 +1,5 @@
 # ── Development stage (used by docker-compose for hot-reload) ──
-FROM node:22-alpine AS dev
+FROM node:24-alpine AS dev
 
 WORKDIR /app
 
@@ -31,7 +31,7 @@ FROM dev AS builder
 RUN npm run build
 
 # ── Production stage ──
-FROM node:22-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 
