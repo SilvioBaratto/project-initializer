@@ -251,9 +251,6 @@ Thumbs.db
 # Project Specific
 # ===================
 
-# BAML generated client (regenerate with baml-cli generate)
-baml_client/
-
 # macOS duplicate files
 *\ 2.py
 *\ 2.ts

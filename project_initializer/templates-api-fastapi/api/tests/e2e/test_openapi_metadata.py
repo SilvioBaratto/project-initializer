@@ -23,7 +23,6 @@ pytestmark = pytest.mark.e2e
 DEFAULT_SUCCESS_DESCRIPTION = "Successful Response"
 ERROR_ENVELOPE_REF = "/ErrorEnvelope"
 AUTHENTICATED_ERROR_STATUSES = {"401", "403", "503"}
-SSE_MEDIA_TYPE = "text/event-stream"
 HTTP_METHODS = ("get", "put", "post", "delete", "patch")
 ITEM_OPERATIONS = [
     pytest.param("get", "/items", "List items", id="list"),
@@ -36,8 +35,6 @@ PROTECTED_OPERATIONS = [
     pytest.param("post", "/items", id="items-create"),
     pytest.param("put", "/items/{item_id}", id="items-update"),
     pytest.param("delete", "/items/{item_id}", id="items-delete"),
-    pytest.param("post", "/chat/", id="chat"),
-    pytest.param("post", "/chat/stream", id="chat-stream"),
     pytest.param("get", "/auth/me", id="current-user"),
 ]
 PUBLIC_OPERATIONS = [
@@ -302,15 +299,3 @@ def test_when_the_document_is_read_then_delete_does_not_promise_a_conflict(
     operation = openapi_schema["paths"][f"{api_prefix}/items/{{item_id}}"]["delete"]
 
     assert "409" not in operation["responses"]
-
-
-def test_when_the_document_is_read_then_the_stream_route_publishes_server_sent_events(
-    openapi_schema, api_prefix
-):
-    """when OpenAPI is generated, the stream route answers 200 as text/event-stream.
-
-    Validates app.api.v1.endpoints.chatbot.chat_stream().
-    """
-    operation = openapi_schema["paths"][f"{api_prefix}/chat/stream"]["post"]
-
-    assert set(operation["responses"]["200"]["content"]) == {SSE_MEDIA_TYPE}

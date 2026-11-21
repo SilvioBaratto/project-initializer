@@ -133,26 +133,37 @@ def test_when_response_schema_files_are_read_then_password_is_not_a_whitelisted_
 
 
 # ---------------------------------------------------------------------------
-# AC: npm test — at least one service spec via Test.createTestingModule.
+# AC: npm test — at least one provider spec via Test.createTestingModule.
 # Oracle: [UNIT]
 # ---------------------------------------------------------------------------
 
 
-def test_when_src_tree_is_searched_then_at_least_one_service_spec_uses_TestingModule():
-    """
-    Criterion: at least one service unit spec using Test.createTestingModule exists.
-    Assumption: service specs follow NestJS naming convention *.service.spec.ts.
+_PROVIDER_SPEC_PATTERNS = (
+    "*.service.spec.ts",
+    "*.repository.spec.ts",
+    "*.health.spec.ts",
+)
 
-    Validates project_initializer/templates-api-nestjs/api/src/**/*.service.spec.ts.
+
+def test_when_src_tree_is_searched_then_at_least_one_provider_spec_uses_TestingModule():
+    """
+    Criterion: at least one provider (service, repository or health indicator) unit spec
+    using Test.createTestingModule exists, so the scaffold shows DI-wired provider testing.
+    Assumption: provider specs follow the NestJS naming convention *.service.spec.ts,
+    *.repository.spec.ts or *.health.spec.ts.
+
+    Validates project_initializer/templates-api-nestjs/api/src/**/*.{service,repository,health}.spec.ts.
     """
     src = _NESTJS_BASE / "src"
-    service_specs = [
+    provider_specs = [
         f
-        for f in src.rglob("*.service.spec.ts")
+        for pattern in _PROVIDER_SPEC_PATTERNS
+        for f in src.rglob(pattern)
         if "Test.createTestingModule" in f.read_text(encoding="utf-8")
     ]
-    assert service_specs, (
-        "base template must contain at least one *.service.spec.ts using Test.createTestingModule"
+    assert provider_specs, (
+        "base template must contain at least one provider spec "
+        f"({', '.join(_PROVIDER_SPEC_PATTERNS)}) using Test.createTestingModule"
     )
 
 

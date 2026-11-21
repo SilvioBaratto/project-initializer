@@ -3,18 +3,15 @@ import request from 'supertest';
 import { AUTH_GUARDS } from '../src/app.auth';
 import { ANONYMOUS_ACTOR_ID, AuditLogger } from '../src/common/audit/audit-logger';
 import { INSUFFICIENT_SCOPE_MESSAGE } from '../src/common/auth/auth-messages';
-import {
-  CHAT_UNAVAILABLE_MESSAGE,
-  MAX_CHAT_QUESTION_LENGTH,
-} from '../src/modules/chatbot/chat.constants';
+import { INTERNAL_ERROR_MESSAGE, ROUTE_NOT_FOUND_MESSAGE } from '../src/common/filters/error-body';
 import { ITEM_AUDIT_ACTIONS, ITEM_NOT_FOUND_MESSAGE } from '../src/modules/items/item.constants';
 import { createE2eApp, E2eApp, httpServerOf } from './support/create-e2e-app';
 import { RolesProbeController } from './support/roles-probe.controller';
-import { FAKE_CHAT_ANSWER, TEST_BEARER_TOKEN, TEST_USER } from './support/test-doubles';
+import { TEST_BEARER_TOKEN, TEST_USER } from './support/test-doubles';
 
 /**
  * Validates the HTTP surface that every auth variant shares: routing, validation, error bodies and
- * the chat and item flows, with a verifier that accepts `TEST_BEARER_TOKEN`.
+ * the item flow, with a verifier that accepts `TEST_BEARER_TOKEN`.
  */
 describe('API (e2e)', () => {
   let e2e: E2eApp;
@@ -36,10 +33,6 @@ describe('API (e2e)', () => {
   beforeAll(async () => {
     auditRecord = jest.spyOn(AuditLogger.prototype, 'record').mockImplementation();
     e2e = await createE2eApp({ controllers: [RolesProbeController] });
-  });
-
-  afterEach(() => {
-    e2e.chatCompletion.failWith = undefined;
   });
 
   afterAll(async () => {
@@ -116,81 +109,42 @@ describe('API (e2e)', () => {
     });
   });
 
-  describe('chat', () => {
-    it('when a question is posted, then the answer comes back with 200', async () => {
-      const response = await post('/api/v1/chat').send({ user_question: 'Hello' });
-
-      expect(response.status).toBe(200);
-      expect(response.body).toEqual({ answer: FAKE_CHAT_ANSWER });
-    });
-
-    it('when the completion provider fails, then 503 with a generic message and no internals', async () => {
-      e2e.chatCompletion.failWith = new Error('upstream rejected key sk-secret-123');
-
-      const response = await post('/api/v1/chat').send({ user_question: 'Hello' });
-
-      expect(response.status).toBe(503);
-      expect(response.body).toMatchObject({ statusCode: 503, message: CHAT_UNAVAILABLE_MESSAGE });
-      expect(response.body).not.toHaveProperty('stack');
-      expect(JSON.stringify(response.body)).not.toContain('sk-secret-123');
-    });
-
-    it('when the question exceeds the maximum length, then it answers 400', async () => {
-      const response = await post('/api/v1/chat').send({
-        user_question: 'x'.repeat(MAX_CHAT_QUESTION_LENGTH + 1),
-      });
-
-      expect(response.status).toBe(400);
-    });
-
-    it('when the question is blank, then it answers 400', async () => {
-      const response = await post('/api/v1/chat').send({ user_question: '   ' });
-
-      expect(response.status).toBe(400);
-    });
-  });
-
-  describe('chat jobs', () => {
-    it('when a job is enqueued, then 202 with an id whose status is waiting without a result', async () => {
-      const accepted = await post('/api/v1/chat/jobs').send({ user_question: 'Hello' });
-      expect(accepted.status).toBe(202);
-      const { jobId } = accepted.body as { jobId: string };
-
-      const status = await get(`/api/v1/chat/jobs/${jobId}`);
-
-      expect(status.status).toBe(200);
-      expect(status.body).toEqual({ jobId, state: 'waiting', result: null });
-    });
-
-    it('when the job has completed, then its status carries the answer', async () => {
-      const accepted = await post('/api/v1/chat/jobs').send({ user_question: 'Hello' });
-      const { jobId } = accepted.body as { jobId: string };
-      const job = e2e.chatQueue.jobs.get(jobId);
-      if (!job) {
-        throw new Error('the enqueued job is missing from the fake queue');
-      }
-      job.state = 'completed';
-      job.returnvalue = { answer: FAKE_CHAT_ANSWER };
-
-      const status = await get(`/api/v1/chat/jobs/${jobId}`);
-
-      expect(status.body).toEqual({
-        jobId,
-        state: 'completed',
-        result: { answer: FAKE_CHAT_ANSWER },
-      });
-    });
-
-    it('when the job id is unknown, then it answers 404', async () => {
-      const response = await get(`/api/v1/chat/jobs/${randomUUID()}`);
+  describe('error envelope', () => {
+    it('when no route matches, then 404 with the fixed message and the shared error shape', async () => {
+      const response = await get('/api/v1/missing?token=secret');
 
       expect(response.status).toBe(404);
+      expect(response.body).toMatchObject({
+        statusCode: 404,
+        error: 'Not Found',
+        message: ROUTE_NOT_FOUND_MESSAGE,
+        path: '/api/v1/missing',
+      });
+      expect(JSON.stringify(response.body)).not.toContain('secret');
     });
 
-    it('when the job id is not a UUID, then it answers 400', async () => {
-      const response = await get('/api/v1/chat/jobs/not-a-uuid');
+    it('when an item body is invalid, then 400 names the rejected field', async () => {
+      const response = await post('/api/v1/items').send({ name: '   ' });
 
       expect(response.status).toBe(400);
+      expect(response.body).toMatchObject({
+        statusCode: 400,
+        errors: [expect.objectContaining({ path: 'name' })],
+      });
+    });
+
+    it('when the repository fails unexpectedly, then 500 with a generic message and no internals', async () => {
+      const findAll = jest
+        .spyOn(e2e.items, 'findAll')
+        .mockRejectedValueOnce(new Error('connection to db.internal refused, key sk-secret-123'));
+
+      const response = await get('/api/v1/items');
+      findAll.mockRestore();
+
+      expect(response.status).toBe(500);
+      expect(response.body).toMatchObject({ statusCode: 500, message: INTERNAL_ERROR_MESSAGE });
+      expect(response.body).not.toHaveProperty('stack');
+      expect(JSON.stringify(response.body)).not.toContain('sk-secret-123');
     });
   });
 

@@ -57,7 +57,6 @@ def _controller_files_under(root: Path) -> list[Path]:
     if not root.exists():
         return []
     # health.controller.ts returns Terminus health-check results, not ORM entity data.
-    # It is excluded exactly like SSE handlers per the criterion 'not a static literal or SSE stream'.
     return [
         p
         for p in root.rglob("*.controller.ts")
@@ -272,7 +271,7 @@ def test_when_all_dto_files_are_read_then_no_schema_calls_passthrough() -> None:
     all_dto_files = [f for root in _ALL_TEMPLATE_ROOTS for f in _dto_files_under(root)]
     assert all_dto_files, (
         "No *.dto.ts files found under any NestJS template tree. "
-        "At minimum chat.dto.ts must exist under templates-api-nestjs/."
+        "At minimum item.dto.ts must exist under templates-api-nestjs/."
     )
     violations = [str(p) for p in all_dto_files if _has_passthrough(_read(p))]
     assert not violations, (
@@ -326,8 +325,7 @@ def test_when_all_controller_files_are_read_then_data_handlers_carry_zod_seriali
     response schema and strips unlisted fields per-handler.
 
     Assumption: a controller that declares standard HTTP-method handlers is considered to return
-    entity/data.  SSE-only endpoints are not matched by the GET/POST/…/DELETE regex so they are
-    implicitly excluded, consistent with the criterion text 'not a static literal or SSE stream'.
+    entity/data.
 
     Derived from: 'Every handler returning entity/data … is decorated with @ZodSerializerDto(<ResponseDto>)'.
 
@@ -336,7 +334,7 @@ def test_when_all_controller_files_are_read_then_data_handlers_carry_zod_seriali
     all_ctrl_files = _all_controller_files()
     assert all_ctrl_files, (
         "No controller files found under any NestJS template tree. "
-        "At minimum chatbot.controller.ts must exist under templates-api-nestjs/."
+        "At minimum items.controller.ts must exist under templates-api-nestjs/."
     )
     missing = _controllers_without_zod_serializer(all_ctrl_files)
     assert not missing, (
@@ -348,7 +346,7 @@ def test_when_all_controller_files_are_read_then_data_handlers_carry_zod_seriali
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Criterion F — existing serialization.spec.ts passes
-#               (password stripped; SSE handler carries no serializer metadata)
+#               (password stripped)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
@@ -362,7 +360,7 @@ def _find_serialization_spec() -> Optional[Path]:
 def test_when_serialization_spec_is_searched_then_it_exists() -> None:
     """
     serialization.spec.ts must exist somewhere under the NestJS API template source tree.
-    Its absence means neither the password-stripping nor the SSE-metadata assertion is covered.
+    Its absence means the password-stripping assertion is not covered.
     Derived from: 'Existing serialization.spec.ts passes'.
 
     Validates project_initializer/templates-api-nestjs/api/src/serialization.spec.ts.
@@ -370,8 +368,8 @@ def test_when_serialization_spec_is_searched_then_it_exists() -> None:
     spec = _find_serialization_spec()
     assert spec is not None and spec.exists(), (
         "serialization.spec.ts not found under templates-api-nestjs/api/src/. "
-        "This spec file is required by the criterion and must contain the password-stripping "
-        "and SSE-metadata assertions."
+        "This spec file is required by the criterion and must contain the "
+        "password-stripping assertion."
     )
 
 
@@ -390,32 +388,4 @@ def test_when_serialization_spec_is_read_then_it_asserts_password_is_stripped() 
     assert "password" in _read(spec), (
         "serialization.spec.ts must reference 'password' and assert its absence from the "
         "serialized output, confirming that Prisma rows cannot leak sensitive columns."
-    )
-
-
-def test_when_serialization_spec_is_read_then_it_asserts_sse_handler_has_no_serializer_metadata() -> (
-    None
-):
-    """
-    serialization.spec.ts must reference the SSE handler and assert it carries no
-    @ZodSerializerDto metadata, so SSE streams bypass the response schema enforcer.
-    Derived from: 'SSE handler carries no serializer metadata' in the serialization.spec.ts criterion.
-
-    Validates project_initializer/templates-api-nestjs/api/src/serialization.spec.ts.
-    """
-    spec = _find_serialization_spec()
-    assert spec is not None and spec.exists(), (
-        "serialization.spec.ts not found — cannot verify SSE-metadata assertion."
-    )
-    text = _read(spec)
-    has_sse_ref = (
-        "sse" in text.lower()
-        or "Sse" in text
-        or "SSE" in text
-        or "EventStream" in text
-        or "text/event-stream" in text
-    )
-    assert has_sse_ref, (
-        "serialization.spec.ts must reference the SSE handler (e.g. via 'sse', 'Sse', or "
-        "'text/event-stream') and assert it carries no @ZodSerializerDto metadata."
     )

@@ -26,7 +26,6 @@ COPY --from=builder /install /usr/local
 
 WORKDIR /app
 COPY . .
-RUN baml-cli generate
 
 # Strip any CR (defends against a CRLF checkout on Windows) and make the script
 # executable so the shebang resolves inside the container.

@@ -53,7 +53,7 @@ def test_when_both_packages_compared_only_supabase_js_differs():
     base_deps, supa_deps = set(base["dependencies"]), set(supa["dependencies"])
     # Symmetric check: supabase adds only @supabase/supabase-js, and drops nothing
     # the base carries (guards against an overlay omitting a base dependency such
-    # as @nestjs/bullmq, which the shared chatbot module imports).
+    # as @nestjs/terminus, which the shared health module imports).
     assert supa_deps - base_deps == {"@supabase/supabase-js"}
     assert base_deps - supa_deps == set()
     # Everything outside the dependencies block must be identical, including the jest

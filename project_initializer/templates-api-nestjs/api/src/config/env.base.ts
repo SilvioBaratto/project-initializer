@@ -7,9 +7,6 @@ export const NODE_ENVS = ['development', 'production', 'test'] as const;
 /** One of {@link NODE_ENVS}. */
 export type NodeEnv = (typeof NODE_ENVS)[number];
 
-/** Shortest queue dashboard password accepted; a shorter one is rejected at start-up. */
-export const MIN_QUEUE_MONITOR_PASSWORD_LENGTH = 16;
-
 const MIN_TCP_PORT = 1;
 const MAX_TCP_PORT = 65_535;
 const MIN_TRUST_PROXY_HOPS = 0;
@@ -18,10 +15,7 @@ const MAX_TRUST_PROXY_HOPS = 10;
 const ENV_DEFAULTS = {
   PORT: 3000,
   NODE_ENV: 'development',
-  REDIS_HOST: 'localhost',
-  REDIS_PORT: 6379,
   CORS_ORIGINS: 'http://localhost:4200',
-  QUEUE_MONITOR_USER: 'admin',
   DB_CONNECT_TIMEOUT_MS: 5_000,
   DB_QUERY_TIMEOUT_MS: 15_000,
   DB_POOL_MAX: 10,
@@ -99,7 +93,7 @@ const logLevelSchema = z
  * Keys every variant needs, as a plain shape so an overlay can spread it next to its own keys.
  *
  * - `DATABASE_URL`, `DIRECT_URL`: Postgres connection strings, required.
- * - `PORT`, `REDIS_PORT`: TCP ports, 1 to 65535.
+ * - `PORT`: TCP port, 1 to 65535.
  * - `CORS_ORIGINS`: comma-separated http(s) URLs in the file, an array of bare origins (scheme,
  *   host, port) once validated.
  * - `TRUST_PROXY_HOPS`: reverse proxies between the client and this process (0 to 10). The client
@@ -107,8 +101,6 @@ const logLevelSchema = z
  *   Use 0 when the API is exposed directly, otherwise a client can spoof the header.
  * - `API_DOCS_ENABLED`: publishes the OpenAPI UI at `/docs`; unset means on outside production.
  * - `LOG_LEVEL`: any casing of a pino level; validated lowercase.
- * - `QUEUE_MONITOR_USER`, `QUEUE_MONITOR_PASSWORD`: credentials of the queue dashboard. A blank or
- *   absent password leaves the dashboard closed.
  * - `DB_*`: client-side connect and query timeouts, the pool size and the circuit breaker
  *   thresholds.
  * - `DB_ALLOW_INSECURE_TRANSPORT`: opt-out of the production rule on `DATABASE_URL`, see
@@ -120,17 +112,10 @@ export const baseEnvShape = {
   DIRECT_URL: postgresUrlSchema,
   PORT: portSchema.default(ENV_DEFAULTS.PORT),
   NODE_ENV: z.enum(NODE_ENVS).default(ENV_DEFAULTS.NODE_ENV),
-  REDIS_HOST: z.string().min(1).default(ENV_DEFAULTS.REDIS_HOST),
-  REDIS_PORT: portSchema.default(ENV_DEFAULTS.REDIS_PORT),
   CORS_ORIGINS: corsOriginsSchema,
   LOG_LEVEL: logLevelSchema,
   TRUST_PROXY_HOPS: trustProxyHopsSchema.default(ENV_DEFAULTS.TRUST_PROXY_HOPS),
   API_DOCS_ENABLED: z.preprocess(blankToUndefined, z.stringbool().optional()),
-  QUEUE_MONITOR_USER: z.string().min(1).default(ENV_DEFAULTS.QUEUE_MONITOR_USER),
-  QUEUE_MONITOR_PASSWORD: z.preprocess(
-    blankToUndefined,
-    z.string().min(MIN_QUEUE_MONITOR_PASSWORD_LENGTH).optional(),
-  ),
   DB_CONNECT_TIMEOUT_MS: positiveIntegerSchema.default(ENV_DEFAULTS.DB_CONNECT_TIMEOUT_MS),
   DB_QUERY_TIMEOUT_MS: positiveIntegerSchema.default(ENV_DEFAULTS.DB_QUERY_TIMEOUT_MS),
   DB_POOL_MAX: positiveIntegerSchema.default(ENV_DEFAULTS.DB_POOL_MAX),

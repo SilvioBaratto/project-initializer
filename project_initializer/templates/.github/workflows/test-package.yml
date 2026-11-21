@@ -40,12 +40,6 @@ jobs:
         working-directory: /tmp/test-project/frontend
         run: npm run build
 
-      - name: Generate BAML client
-        working-directory: /tmp/test-project/api
-        run: |
-          pip install baml-py
-          baml-cli generate
-
       - name: Start Docker services
         working-directory: /tmp/test-project
         run: docker compose up -d --build

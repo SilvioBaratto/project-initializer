@@ -32,9 +32,6 @@ docs/
 coverage/
 .nyc_output/
 
-# BAML generated
-baml_client/
-
 # Logs
 logs/
 *.log

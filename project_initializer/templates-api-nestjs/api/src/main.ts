@@ -61,9 +61,9 @@ async function failStartup(app: NestExpressApplication, error: unknown): Promise
   app.flushLogs();
   Logger.fatal(error instanceof Error ? error : new Error(String(error)), BOOTSTRAP_LOG_CONTEXT);
   process.exitCode = 1;
-  // The database pool and the Redis connection are already open; closing them lets the process
-  // exit with the code set above. Closing can hang while Redis is unreachable, and a container
-  // that never exits is never restarted, so the exit is also forced after a delay.
+  // The database pool is already open; closing it lets the process exit with the code set above.
+  // Closing can hang while the database is unreachable, and a container that never exits is never
+  // restarted, so the exit is also forced after a delay.
   setTimeout(() => process.exit(1), FAILED_START_EXIT_DELAY_MS).unref();
   // A failure to close must not hide the start-up error that caused it.
   await app.close().catch((closeError: unknown) => {

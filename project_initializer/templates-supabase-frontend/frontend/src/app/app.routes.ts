@@ -43,11 +43,6 @@ export const routes: Routes = [
         title: 'Settings',
       },
       {
-        path: 'chat',
-        loadComponent: () => import('./pages/chatbot/chatbot').then((m) => m.ChatbotComponent),
-        title: 'Chat',
-      },
-      {
         path: 'components',
         loadComponent: () => import('./pages/components/components').then((m) => m.ComponentsComponent),
         title: 'Components',

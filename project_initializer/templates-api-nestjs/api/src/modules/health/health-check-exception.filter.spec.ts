@@ -27,8 +27,8 @@ describe('HealthCheckExceptionFilter', () => {
   it('when Terminus reports failing indicators, then the result is the body and each indicator is named in one warning', () => {
     const result = {
       status: 'error',
-      info: { memory_heap: { status: 'up' } },
-      error: { database: { status: 'down' }, queue: { status: 'down' } },
+      info: {},
+      error: { database: { status: 'down' }, memory_heap: { status: 'down' } },
     };
 
     const response = handle(new ServiceUnavailableException(result));
@@ -36,7 +36,9 @@ describe('HealthCheckExceptionFilter', () => {
     expect(response.status).toHaveBeenCalledWith(503);
     expect(response.json).toHaveBeenCalledWith(result);
     expect(warnLog).toHaveBeenCalledTimes(1);
-    expect(warnLog).toHaveBeenCalledWith(`${REQUEST_SUMMARY} reported unhealthy: database, queue`);
+    expect(warnLog).toHaveBeenCalledWith(
+      `${REQUEST_SUMMARY} reported unhealthy: database, memory_heap`,
+    );
   });
 
   it.each([

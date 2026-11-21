@@ -1,1 +1,1 @@
-"""Adapters that implement the domain ports: persistence, resilience, logging, LLM."""
+"""Adapters that implement the domain ports: persistence, resilience, logging."""

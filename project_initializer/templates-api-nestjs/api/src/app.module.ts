@@ -1,4 +1,3 @@
-import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
@@ -12,10 +11,8 @@ import { validate as validateEnv } from './config/env.validation';
 import { ENV_FILE_PATHS } from './config/env-files';
 import { buildLoggerParams } from './config/logger.config';
 import { THROTTLER_MODULE_OPTIONS } from './config/rate-limit';
-import { ChatbotModule } from './modules/chatbot/chatbot.module';
 import { HealthModule } from './modules/health/health.module';
 import { ItemsModule } from './modules/items/items.module';
-import { MonitoringModule } from './modules/monitoring/monitoring.module';
 import { TestModule } from './modules/test/test.module';
 
 /**
@@ -36,15 +33,6 @@ import { TestModule } from './modules/test/test.module';
       envFilePath: [...ENV_FILE_PATHS],
       validate: validateEnv,
     }),
-    BullModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService<BaseEnv, true>) => ({
-        connection: {
-          host: config.get('REDIS_HOST', { infer: true }),
-          port: config.get('REDIS_PORT', { infer: true }),
-        },
-      }),
-    }),
     LoggerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService<BaseEnv, true>) =>
@@ -57,8 +45,6 @@ import { TestModule } from './modules/test/test.module';
     HealthModule,
     TestModule,
     ItemsModule,
-    ChatbotModule,
-    MonitoringModule,
     ...AUTH_MODULES,
   ],
   providers: [

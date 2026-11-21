@@ -7,7 +7,7 @@ The NestJS Dockerfile runs `npm ci` when a package-lock.json is present, and
     npm error package-lock.json ... are in sync.
 
 So a drifted lock means the API image never builds — every NestJS variant broken
-in Docker, which is exactly what happened: the @bull-board deps were added to
+in Docker, which is exactly what happened: dependencies were added to
 package.json without regenerating the lock, `templates-token-nestjs` shipped an
 empty stub lock that overwrote the good base one, and `templates-entra-nestjs`
 added jsonwebtoken/jwks-rsa while shipping no lock at all.

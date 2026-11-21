@@ -5,7 +5,7 @@ This module is the auth seam: it replaces the base module and exports the same
 learn which variant is running. Two independent modes live side by side:
 
 - Static token: ``get_current_user`` accepts the shared ``AUTH_TOKEN`` as the
-  bearer token. It guards item writes, chat and ``/auth/me``.
+  bearer token. It guards item writes and ``/auth/me``.
 - JWT: ``get_current_jwt_user`` accepts the access token that ``/auth/token``
   issues after a login. It guards ``/auth/me/jwt``.
 

@@ -1,8 +1,8 @@
 """Doc-drift guard for the NestJS compliance rewrite.
 
 The generated NestJS docs must describe the templates as they are now: one shared root module
-with an ``app.auth.ts`` seam, a non-global ``PrismaModule``, a fail-closed queue dashboard, a
-``down.sql`` per migration with the one-command rollback, and the traceability convention.
+with an ``app.auth.ts`` seam, a non-global ``PrismaModule``, a ``down.sql`` per migration with
+the one-command rollback, and the traceability convention.
 Each assertion pins a statement that was wrong, or missing, before the rewrite.
 """
 
@@ -33,10 +33,6 @@ def test_when_api_claude_generated_then_removed_artifacts_are_not_described(auth
     """
     doc = _api_claude(auth)
     assert "TransformInterceptor" not in doc, "the interceptor was deleted as a no-op"
-    assert "StreamChat" not in doc, "the StreamChat BAML function was deleted"
-    assert "await import(" not in doc, (
-        "the BAML client is a static import in the adapter now"
-    )
     assert "SupabaseAuthGuard" not in doc and "EntraAuthGuard" not in doc
     assert "@Global() PrismaModule" not in doc
 
@@ -79,19 +75,6 @@ def test_when_api_claude_generated_then_guard_comes_from_the_auth_seam(auth):
 
 
 @pytest.mark.parametrize("auth", AUTHS)
-def test_when_api_claude_generated_then_queue_dashboard_fails_closed(auth):
-    """The queue dashboard section states the fail-closed rule and where its credentials live.
-
-    Validates project_initializer/docs_generator.py generate_api_claude().
-    """
-    doc = _api_claude(auth)
-    assert "fails closed" in doc
-    assert "QUEUE_MONITOR_PASSWORD" in doc and "QUEUE_MONITOR_USER" in doc
-    assert "404" in doc and "basic auth" in doc.lower()
-    assert "src/modules/monitoring/queue-dashboard-auth.ts" in doc
-
-
-@pytest.mark.parametrize("auth", AUTHS)
 def test_when_api_claude_generated_then_env_schema_lives_in_env_base(auth):
     """The shared env schema is documented at its new home, env.base.ts.
 
@@ -127,7 +110,7 @@ def test_when_api_claude_generated_then_traceability_convention_is_documented(au
     """
     doc = _api_claude(auth)
     assert "[REQ-<AREA>-<NNN>]" in doc
-    assert "Validates REQ-" in doc and "Validates ChatbotService.chat()" in doc
+    assert "Validates REQ-" in doc and "Validates ItemsService.remove()" in doc
     assert "ships none" in doc, "the templates carry no requirement ids"
 
 
@@ -142,21 +125,6 @@ def test_when_api_claude_generated_then_lint_format_and_coverage_gate_are_docume
     doc = _api_claude(auth)
     for needle in ("npm run lint", "npm run format:check", "npm run test:cov", "75%"):
         assert needle in doc, f"{needle} missing from the NestJS api CLAUDE.md"
-
-
-@pytest.mark.parametrize("auth", AUTHS)
-def test_when_api_claude_generated_then_chat_flow_matches_the_port_and_status_codes(
-    auth,
-):
-    """The chat call flow follows the port and adapter, with the 202 and 503 contract.
-
-    Validates project_initializer/docs_generator.py generate_api_claude().
-    """
-    doc = _api_claude(auth)
-    assert "b.stream.Chat" in doc and "CHAT_COMPLETION_PORT" in doc
-    assert "ChatProcessor.process(job)" in doc and "ChatbotService.chat(request)" in doc
-    assert "202" in doc and "503" in doc
-    assert "/chat/health` no longer exists" in doc
 
 
 def test_when_supabase_then_rls_and_init_rollback_replacement_are_documented():
@@ -211,7 +179,7 @@ def test_when_module_lists_generated_then_auth_appears_only_with_auth(auth):
     readme = generate_api_readme("nestjs", auth=auth)
     api = _api_claude(auth)
     for doc in (claude, readme, api):
-        match = re.search(r"health, items, test, chatbot, monitoring(, auth)?", doc)
+        match = re.search(r"health, items, test(, auth)?", doc)
         assert match, "module list missing or reordered"
         assert bool(match.group(1)) is (auth is not None), (
             f"auth={auth}: module list says {match.group(0)!r}"
@@ -233,16 +201,16 @@ def test_when_root_docs_generated_then_prisma_is_not_called_global(auth):
 
 
 @pytest.mark.parametrize("auth", AUTHS)
-def test_when_root_readme_generated_then_generated_secrets_are_explained(auth):
-    """The root README explains the generated secrets and where the queue dashboard lives.
+def test_when_root_readme_generated_then_generated_secret_is_explained_only_for_token(
+    auth,
+):
+    """The root README explains the generated AUTH_TOKEN only where token auth generates one.
 
     Validates project_initializer/docs_generator.py generate_root_readme().
     """
     doc = generate_root_readme("nestjs", auth)
-    assert "QUEUE_MONITOR_PASSWORD" in doc
-    assert ("AUTH_TOKEN" in doc) is (auth == "token")
-    assert "`.env.example` leaves them empty" in doc
-    assert "/api/v1/admin/queues" in doc
+    assert ("generated random `AUTH_TOKEN`" in doc) is (auth == "token")
+    assert ("`.env.example` leaves it empty" in doc) is (auth == "token")
 
 
 def test_when_fastapi_docs_generated_then_nestjs_only_passages_are_absent():
@@ -255,7 +223,6 @@ def test_when_fastapi_docs_generated_then_nestjs_only_passages_are_absent():
         generate_root_readme("fastapi", None),
         generate_api_claude("fastapi", None),
     ):
-        assert "QUEUE_MONITOR_PASSWORD" not in doc
         assert "app.auth.ts" not in doc
 
 
@@ -271,6 +238,6 @@ def test_when_nestjs_scaffolded_then_api_readme_lists_auth_module_only_with_auth
     copy_template(tmp_path, "app", auth=auth, framework="nestjs", scope="api")
 
     readme = (tmp_path / "api" / "README.md").read_text(encoding="utf-8")
-    match = re.search(r"health, items, test, chatbot, monitoring(, auth)?", readme)
+    match = re.search(r"health, items, test(, auth)?", readme)
     assert match, "module list missing from the scaffolded api/README.md"
     assert bool(match.group(1)) is (auth is not None)

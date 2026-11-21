@@ -153,15 +153,13 @@ Because the async overlay ships no `requirements.txt`, the requirements transfor
 
 ## `env_generator.py`
 
-Generates the root `.env` and `.env.example` at scaffold time (`cli._write_env_files()`), assembling per-variant sections. Non-secret values come from `env_defaults.env` (or the `source_env` dict a caller passes). The no-auth and token variants then run `docker compose up` with no edits, apart from an LLM key before chat can answer; supabase needs its project URLs and keys, and entra its app registration ids, because their defaults are placeholders. Secrets never have a default.
+Generates the root `.env` and `.env.example` at scaffold time (`cli._write_env_files()`), assembling per-variant sections. Non-secret values come from `env_defaults.env` (or the `source_env` dict a caller passes). The no-auth and token variants then run `docker compose up` with no edits; supabase needs its project URLs and keys, and entra its app registration ids, because their defaults are placeholders. Secrets never have a default.
 
-- **Secrets**: `GENERATED_SECRET_KEYS` (`AUTH_TOKEN`, `JWT_SECRET_KEY`, `QUEUE_MONITOR_PASSWORD`) get a fresh `secrets.token_urlsafe(32)` value (43 characters) in the `.env`. The `.env.example` leaves them blank, because it is the file a project commits (`use_placeholders=True`). Re-scaffolding over an existing `.env` keeps the secrets it already holds. A generated secret only fills a key that is blank or still the legacy `changeme`; any other value in the source wins.
+- **Secrets**: `GENERATED_SECRET_KEYS` (`AUTH_TOKEN`, `JWT_SECRET_KEY`) get a fresh `secrets.token_urlsafe(32)` value (43 characters) in the `.env`. The `.env.example` leaves them blank, because it is the file a project commits (`use_placeholders=True`). Re-scaffolding over an existing `.env` keeps the secrets it already holds. A generated secret only fills a key that is blank or still the legacy `changeme`; any other value in the source wins.
 - **Database**: local Docker PostgreSQL URL for non-supabase; Supabase connection strings for supabase variants (FastAPI adds `DATABASE_SSL_MODE=require` and `DATABASE_POOL_RECYCLE=300`; both default Supabase URLs already carry `sslmode=require`, so the generated Supabase `.env` meets the staging/production database TLS rule of the FastAPI template, and the NestJS pooler URL meets the production rule of the NestJS one. Neither generated file sets the opt-outs `DATABASE_ALLOW_INSECURE_TRANSPORT` and `DB_ALLOW_INSECURE_TRANSPORT`)
 - **Auth**: `AUTH_TOKEN` (+ `JWT_SECRET_KEY`, FastAPI only) for token variants; `SUPABASE_URL` + `SUPABASE_PUBLISHABLE_KEY` for supabase (no `SUPABASE_SECRET_KEY`: neither backend reads it); tenant/client/scope ids for entra
 - **Server**: `ENVIRONMENT`/`DEBUG=false` for FastAPI; `NODE_ENV=development` for NestJS. That value suits the compose `dev` target, which installs devDependencies (`pino-pretty` is one) and runs `start:dev`; the production image sets `NODE_ENV=production` itself and `.dockerignore` keeps `.env` out of it, so a comment in the file warns against passing it to that image. `tests/test_env_generator_runtime_defaults.py` pins the pairing
-- **Redis**: `REDIS_HOST` / `REDIS_PORT` (NestJS BullMQ)
 - **Compose topology**: `API_HOST_PORT`, `FRONTEND_HOST_PORT` (frontend scopes), `DB_HOST_PORT` + `ADMINER_HOST_PORT` (both omitted for supabase — no local `db`/`adminer` services). Read by `docker-compose.yml` as `${VAR:-default}`, not by the app; an unset var falls back to the same fixed port used before the vars existed. Every published host port belongs here — a literal one collides across projects.
-- **LLM**: Azure OpenAI + alternative provider keys (shared across all variants), and `BAML_LOG=off`. BAML prints the full prompt and reply at INFO, and at WARN on failures, so only `error` and `off` are silent. The Python adapter defaults it in code (`os.environ.setdefault`) and the TypeScript one calls `setLogLevel('OFF')`; the variable keeps code that calls the generated client directly quiet too
 
 Can be run standalone: `python -m project_initializer.env_generator fastapi --auth token --source .env --dest .env.new`. It generates a secret for every key the source leaves blank and keeps the ones it holds.
 
@@ -197,7 +195,7 @@ project-initializer/
 │   └── templates*/                 # 13 template overlay directories (see above)
 ├── .vscode/                        # VS Code debug configs for all 8 variants
 │   ├── launch.json                 # One-click debug for each variant
-│   ├── tasks.json                  # Pre-launch: scaffold + env + BAML generate
+│   ├── tasks.json                  # Pre-launch: scaffold + env (+ npm install for NestJS)
 │   ├── settings.json               # Editor settings
 │   └── extensions.json             # Recommended extensions
 ├── tests/                          # Pytest suite for the CLI itself
@@ -216,7 +214,7 @@ The `.vscode/` directory provides one-click debug for all 8 variants via `launch
 
 1. Scaffolds the test project (if not already present)
 2. Generates the root `.env` for the variant (`env_generator`)
-3. Runs `baml-cli generate` (FastAPI) or `npx baml-cli generate` (NestJS)
+3. Installs the API dependencies (NestJS only)
 
 This means contributors can press F5 and get a running API immediately.
 
@@ -227,17 +225,16 @@ This means contributors can press F5 and get a running API immediately.
 | Layer | Path | Purpose |
 |-------|------|---------|
 | **domain** | `app/domain/constants.py` | Business limits shared by schemas, ORM and services (migrations keep their own literals) |
-| | `app/domain/entities/` | Frozen dataclasses (`Item`, `AuthenticatedUser`, chat messages); invariants raise `DomainValidationError` |
-| | `app/domain/ports/` | `runtime_checkable` Protocols: `ItemRepositoryPort`, `UnitOfWorkPort`, `TokenVerifierPort`, `ChatModelPort` |
+| | `app/domain/entities/` | Frozen dataclasses (`Item`, `AuthenticatedUser`); invariants raise `DomainValidationError` |
+| | `app/domain/ports/` | `runtime_checkable` Protocols: `ItemRepositoryPort`, `UnitOfWorkPort`, `TokenVerifierPort` |
 | | `app/domain/exceptions.py` | `DomainError` hierarchy: `public_message` goes to the client, `log_context` to the log; no HTTP status |
 | | `app/domain/services/` | Pure domain services |
-| **application** | `app/application/services/` | `ItemService`, `ChatbotService`: orchestrate ports, commit after a successful write |
+| **application** | `app/application/services/` | `ItemService`: orchestrates ports, commits after a successful write |
 | | `app/application/commands/`, `dto/` | Commands in, DTOs out; entities never leave the layer |
 | **infrastructure** | `app/infrastructure/settings.py` | `Settings`: Literal-validated, `DEBUG` off by default and refused outside development |
 | | `app/infrastructure/auth_settings.py` | The auth-settings seam: empty in the base, replaced by each auth overlay |
 | | `app/infrastructure/database.py`, `circuit_breaker.py`, `errors.py`, `health.py` | Sync pooled engine behind a circuit breaker that counts connectivity failures only; driver errors translated to domain errors (deadlocks to `ConflictError`); readiness probe; the shutdown-hook and readiness-probe registries that optional components such as the async overlay use |
 | | `app/infrastructure/orm/`, `repositories/`, `unit_of_work.py` | SQLAlchemy records (mixins in `orm/base.py` supply string UUID keys and timestamps), port adapters, commit/rollback |
-| | `app/infrastructure/llm/` | `BamlChatModel`, the only importer of `baml_client` |
 | | `app/infrastructure/structured_logging.py`, `request_context.py` | JSON logs that carry the request id |
 | | `app/infrastructure/log_level.py` | `reload_log_level_on_sighup`: SIGHUP re-reads `LOG_LEVEL`; on a reload the `.env` file wins over the process environment |
 | | `app/infrastructure/migration_safety.py` | `preserve_and_drop_table` and `preserve_and_drop_column`: data-preserving downgrades, backups in the PostgreSQL schema `migration_backup` |
@@ -249,8 +246,6 @@ This means contributors can press F5 and get a running API immediately.
 | | `app/api/docs.py`, `health.py` | Swagger/ReDoc routes (only when docs are enabled); `/`, `/health`, `/health/ready` |
 | | `app/api/schemas/`, `middleware/`, `v1/` | Pydantic schemas (`<Entity>Create`, `<Entity>Update`, `<Entity>Response`, `NulFreeStr` for text); request logging, security headers, the catch-all that answers an unhandled exception with the generic 500 envelope, rate limiting; routes under `/api/v1` |
 | **schema** | `alembic/` | Alembic owns the schema (the app never calls `create_all`); every migration ships a data-preserving `downgrade()` |
-
-Outside the layering: `baml_src/` holds the LLM function definitions (regenerate the client with `baml-cli generate`; never edit `baml_client/`).
 
 ### Dependency rule (enforced by tests)
 
@@ -301,7 +296,7 @@ Every downgrade that drops a table goes through `preserve_and_drop_table`, and o
 
 ### Settings, async path and traceability
 
-`Settings` rejects a bad value at start-up without echoing it (`hide_input_in_errors`), defaults `DEBUG` to false and refuses it and `DATABASE_ECHO` outside development, refuses `CORS_ORIGINS=*` in staging and production (credentialed CORS is never allowed), serves the interactive docs except in production (`API_DOCS_ENABLED` overrides), and enables the in-memory rate limiter only in staging and production. That limiter keys on the client address, so it is correct only behind a proxy listed in `FORWARDED_ALLOW_IPS`; behind several replicas it needs a gateway or Redis. The generated api docs say so.
+`Settings` rejects a bad value at start-up without echoing it (`hide_input_in_errors`), defaults `DEBUG` to false and refuses it and `DATABASE_ECHO` outside development, refuses `CORS_ORIGINS=*` in staging and production (credentialed CORS is never allowed), serves the interactive docs except in production (`API_DOCS_ENABLED` overrides), and enables the in-memory rate limiter only in staging and production. That limiter keys on the client address, so it is correct only behind a proxy listed in `FORWARDED_ALLOW_IPS`; behind several replicas it needs a gateway or an external shared store. The generated api docs say so.
 
 The container waits for the database named in `DATABASE_URL`, bounded by `DB_WAIT_TIMEOUT_SECONDS` (default 60), runs as an unprivileged user over root-owned code, and starts uvicorn with `--no-access-log`; `main.py` and `structured_logging.configure_logging` route server errors through the JSON formatter and write the one `http.request` line per request (its `path` is the route template). `set_log_level()` changes the level of a running process and has no route. Audit events are `audit.action` on the logger `app.audit`, pinned to INFO whatever `LOG_LEVEL` is. `tests/test_docker_runtime_invariants.py` pins the Dockerfile, entrypoint and compose commands.
 
@@ -324,26 +319,25 @@ Modular architecture with **one root module for every variant**. What differs be
 | `src/app.setup.ts` | `configureApp()`: logger, shutdown hooks, `TRUST_PROXY_HOPS`, helmet, CORS, the 512 KiB JSON body limit (413 above it), `api/v1` prefix, global exception filters. `main.ts` and the e2e harness both call it |
 | `src/common/auth/` | Shared `AccessTokenGuard`, bearer parsing, the `ACCESS_TOKEN_VERIFIER` port, `GET /auth/me`, and `@Roles` with the global `RolesGuard`. It also ships in the no-auth variant, where nothing wires the access-token guard |
 | `src/common/audit/` | `AuditLogger` and `AuditModule`: the audit trail, written through a pino child pinned to `info` |
-| `src/modules/` | Feature modules: health, items, test, chatbot, monitoring. `auth` exists only in an overlay |
+| `src/modules/` | Feature modules: health, items, test. `auth` exists only in an overlay |
 | `src/config/` | `env.base.ts` (shared env schema, `createEnvValidator`, the production database TLS rule), `log-level-reload.ts` (SIGHUP reloads `LOG_LEVEL`). Each overlay replaces `env.validation.ts` with a schema that `extend`s the base one |
 | `src/prisma/`, `src/common/resilience/` | `PrismaModule` (not global), `PrismaService`, the database circuit breaker |
 | `prisma/` | Schema and migrations; every migration directory ships a `down.sql` |
 | `test/support/` | e2e harness (`create-e2e-app.ts`), test doubles, `test-env.ts`. Overlays replace `auth-test-env.ts` |
-| `baml_src/` | LLM function definitions (regenerate with `npx baml-cli generate`; never edit `baml_client/`) |
 
 Key commands:
 ```bash
 npm run start:dev                     # Dev server with hot reload
 npm run test                          # Unit tests
 npm run test:cov                      # Unit tests + 75% line/statement gate
-npm run test:e2e                      # e2e on in-memory fakes, no Postgres or Redis
+npm run test:e2e                      # e2e on in-memory fakes, no Postgres
 npm run lint                          # ESLint (type-checked), --max-warnings 0
 npm run format:check                  # Prettier; `npm run format` fixes
 npx prisma migrate dev                # Create + apply migration
 npx prisma generate                   # Regenerate Prisma client
 ```
 
-To verify a NestJS change, scaffold all four variants and run, in each `api/`: `npm ci`, `npx prisma generate`, `npx baml-cli generate`, `npx tsc --noEmit -p tsconfig.json`, `npm run lint`, `npm run format:check`, `npm run test:cov`, `npm run test:e2e`.
+To verify a NestJS change, scaffold all four variants and run, in each `api/`: `npm ci`, `npx prisma generate`, `npx tsc --noEmit -p tsconfig.json`, `npm run lint`, `npm run format:check`, `npm run test:cov`, `npm run test:e2e`.
 
 ### Overlay files replace by path; never copy a base file
 
@@ -353,7 +347,7 @@ Layers overwrite by path, so an overlay file that duplicates a base file forks i
 - **supabase**: the same seam files plus `package.json` and lock (adds `@supabase/supabase-js`), `prisma/schema.prisma` (`profiles`), its own init migration and the RLS migration, and its own `docker-compose.yml` and `entrypoint.sh` (no local `db`).
 - **entra**: the same seam files plus `package.json` and lock (adds `jsonwebtoken` and `jwks-rsa`). It uses the local Postgres, so it **inherits** the base `schema.prisma`, `docker-compose.yml` and `entrypoint.sh` (which waits for the db).
 
-An overlay must not ship `src/app.module.ts`, `tsconfig.json`, `test/jest-e2e.json` or a per-variant guard: `tests/test_entra_nestjs_overlay.py` and `tests/test_issue_10_bull_board.py` fail if one appears, because a copy of the root module would drop `MonitoringModule` and the global pipe and interceptor.
+An overlay must not ship `src/app.module.ts`, `tsconfig.json`, `test/jest-e2e.json` or a per-variant guard: `tests/test_entra_nestjs_overlay.py` fails if one appears, because a copy of the root module would drop the global pipe and interceptor.
 
 ### Prisma migrations — ship them, and mind the overlay
 
@@ -397,7 +391,7 @@ With `NODE_ENV=production` `baseEnvSchema` refuses a `DATABASE_URL` unless every
 
 ### Secrets and traceability
 
-The token variant needs `AUTH_TOKEN` of at least 32 characters, in the `token68` alphabet a bearer header carries. The CLI generates it, and `QUEUE_MONITOR_PASSWORD`, into the scaffolded `.env` and leaves them empty in `.env.example` (see `env_generator.py`). The queue dashboard fails closed: it answers 404 until a password is set.
+The token variant needs `AUTH_TOKEN` of at least 32 characters, in the `token68` alphabet a bearer header carries. The CLI generates it into the scaffolded `.env` and leaves it empty in `.env.example` (see `env_generator.py`).
 
 The templates ship no requirement IDs. The generated docs describe the `[REQ-<AREA>-<NNN>]` test-title convention and each generated project supplies its own IDs, so test traceability is a convention here, not something the templates enforce.
 

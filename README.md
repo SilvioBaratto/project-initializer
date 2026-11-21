@@ -25,7 +25,7 @@ pip install -e .
 ```bash
 project-initializer my-project
 cd my-project
-# .env is generated at the project root with random secrets — add your real LLM keys
+# .env is generated at the project root, with random secrets where the variant has any
 docker compose up -d --build
 ```
 
@@ -47,9 +47,8 @@ project-initializer my-app --nestjs     # NestJS backend
 |---------|---------|--------|
 | Language | Python 3.12 | TypeScript (Node 22) |
 | ORM | SQLAlchemy + Alembic | Prisma |
-| AI/LLM | BAML (Python) | BAML (TypeScript) |
 | API style | REST with Pydantic | REST with Zod (`nestjs-zod`) |
-| Architecture | Clean / hexagonal (domain/application/infrastructure/api) | Modular (feature modules; ports and adapters for the database, the LLM and token verification) |
+| Architecture | Clean / hexagonal (domain/application/infrastructure/api) | Modular (feature modules; ports and adapters for the database and token verification) |
 
 ## Authentication Modes
 
@@ -62,7 +61,7 @@ project-initializer my-app --auth entra       # Microsoft Entra ID (Azure AD) OI
 ```
 
 - **No auth** (default) — No authentication: every caller is a development principal. Good for prototyping, not for exposing the API.
-- **Token auth** (`--auth token`) — A shared bearer token (`AUTH_TOKEN`, generated per scaffold) guards item writes and chat. FastAPI adds JWT login (`/auth/register`, `/auth/token`). Frontend gets a login guard and an HTTP interceptor that attaches the token.
+- **Token auth** (`--auth token`) — A shared bearer token (`AUTH_TOKEN`, generated per scaffold) guards item writes. FastAPI adds JWT login (`/auth/register`, `/auth/token`). Frontend gets a login guard and an HTTP interceptor that attaches the token.
 - **Supabase auth** (`--auth supabase`) — Each bearer token is verified through Supabase Auth; when Supabase cannot answer, the API returns 503, not 401. Frontend integrates `@supabase/supabase-js` for login/signup. Docker Compose omits the local `db` service since Supabase hosts the database.
 - **Entra auth** (`--auth entra`) — Microsoft Entra ID (formerly Azure AD) OIDC. Both backends validate Entra v2 JWT bearer tokens in-process via RS256 + JWKS. The Angular frontend uses MSAL for login. Requires two Entra app registrations (API + SPA).
 
@@ -165,14 +164,13 @@ the one source of truth for both `docker compose` and the app. Docker Compose
 loads `.env` via `env_file`; the FastAPI backend walks up to it
 (`infrastructure/config.py`) so `cd api && uvicorn` resolves it too, and NestJS
 points `ConfigModule`/Prisma at it. Non-secret values are dev defaults: the no-auth
-and token variants run `docker compose up` with no edits (chat needs an LLM key),
+and token variants run `docker compose up` with no edits,
 while supabase needs its project URLs and keys and entra its app registration ids.
-Secrets (`AUTH_TOKEN`, `JWT_SECRET_KEY`,
-`QUEUE_MONITOR_PASSWORD`) are random values written into `.env` only; the
+Secrets (`AUTH_TOKEN`, `JWT_SECRET_KEY`) are random values written into `.env` only; the
 committed `.env.example` leaves them blank, and re-scaffolding keeps the secrets an
 existing `.env` already holds. Host ports are parametrized (`API_HOST_PORT`,
 `FRONTEND_HOST_PORT`, `DB_HOST_PORT`) with the previous fixed ports as defaults.
-`BAML_LOG=off` keeps BAML from printing prompts and replies. A NestJS `.env` sets
+A NestJS `.env` sets
 `NODE_ENV=development`, which matches the compose `dev` target; the production image
 sets `NODE_ENV=production` itself and must not be started with that file.
 
@@ -204,7 +202,7 @@ Interactive docs (`/docs`) are served in every environment except `production`
 (`API_DOCS_ENABLED` overrides). `/health` is the liveness probe and `/health/ready` the
 readiness probe. The rate limiter is in-memory and active only in `staging` and
 `production`: behind a reverse proxy, list the proxy in `FORWARDED_ALLOW_IPS`, and use a
-gateway or Redis once you run several replicas. With `--auth token`, `AUTH_TOKEN` and
+gateway or an external shared store once you run several replicas. With `--auth token`, `AUTH_TOKEN` and
 `JWT_SECRET_KEY` are generated into `.env`; a placeholder or a non-empty secret shorter than
 16 and 32 characters is refused at every stage, and an empty one outside development.
 Migration backups of a rollback go to the PostgreSQL schema `migration_backup`, and the
@@ -231,13 +229,12 @@ npm run start:dev                      # API on :8000
 npx prisma migrate dev                 # Run migrations
 npx prisma db execute --file prisma/migrations/<dir>/down.sql   # Roll one migration back, newest first
 npm run test                           # Unit tests
-npm run test:e2e                       # e2e tests on in-memory fakes (no Postgres or Redis)
+npm run test:e2e                       # e2e tests on in-memory fakes (no Postgres)
 npm run lint                           # ESLint, no warnings allowed
 ```
 
-The queue dashboard (Bull Board) answers 404 until `QUEUE_MONITOR_PASSWORD` is set; scaffolding
-writes a random one into `.env` and leaves it empty in `.env.example`. With `--auth token`,
-`AUTH_TOKEN` is generated the same way and must be at least 32 characters.
+With `--auth token`, scaffolding writes a random `AUTH_TOKEN` into `.env` and leaves it empty in
+`.env.example`; it must be at least 32 characters.
 `TRUST_PROXY_HOPS` (default 1, the bundled nginx) says how many proxies sit in front of the
 API for the rate limiter; use `0` when it is exposed directly. JSON bodies above 512 KiB answer
 413, and the container entrypoint waits for the database in `DATABASE_URL` for at most

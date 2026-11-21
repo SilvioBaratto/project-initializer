@@ -1,12 +1,12 @@
 """Per-client request rate limiting.
 
 State is a sliding window of request times held in this process's memory, so the
-limit applies per worker process, not across replicas; put a gateway or a shared
-store such as Redis in front when the service scales out. The client is identified
-by the peer address of the connection. Behind a reverse proxy that address is the
-proxy's, so every caller would share one bucket unless uvicorn is told which
-proxies to trust (``--forwarded-allow-ips`` or ``FORWARDED_ALLOW_IPS``), after
-which it rewrites the peer address from ``X-Forwarded-For``.
+limit applies per worker process, not across replicas; put a gateway or an
+external shared store in front when the service scales out. The client is
+identified by the peer address of the connection. Behind a reverse proxy that
+address is the proxy's, so every caller would share one bucket unless uvicorn is
+told which proxies to trust (``--forwarded-allow-ips`` or ``FORWARDED_ALLOW_IPS``),
+after which it rewrites the peer address from ``X-Forwarded-For``.
 """
 
 import ipaddress

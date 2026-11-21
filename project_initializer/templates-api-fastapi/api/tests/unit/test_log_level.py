@@ -22,7 +22,7 @@ from app.infrastructure.structured_logging import JsonLogFormatter
 
 pytestmark = pytest.mark.unit
 
-REJECTED_LEVEL = "chatty-level"
+REJECTED_LEVEL = "noisy-level"
 LOGGER_NAME = "app.infrastructure.log_level"
 UNRELATED_SETTING = "LOG_LEVEL_TEST_UNRELATED_SETTING"
 

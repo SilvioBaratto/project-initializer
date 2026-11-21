@@ -5,7 +5,6 @@
 - Python 3.10+
 - Node.js 20+
 - Docker and Docker Compose
-- [BAML CLI](https://docs.boundaryml.com/) (`pip install baml-py` for FastAPI, `npm install @boundaryml/baml` for NestJS)
 
 ## Development Setup
 
@@ -37,7 +36,7 @@ The repository includes `.vscode/launch.json` and `.vscode/tasks.json` with pre-
 
 1. Scaffold the test project (e.g., `test-fastapi/`) if it doesn't exist
 2. Generate the project's root `.env` via `env_generator.py`
-3. Run `baml-cli generate` to create the BAML client
+3. Install the API dependencies (NestJS only)
 
 This means you can start debugging any variant without manual setup.
 

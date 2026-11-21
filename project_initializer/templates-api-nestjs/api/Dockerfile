@@ -10,7 +10,6 @@ RUN if [ -f package-lock.json ]; then npm ci --ignore-scripts; else npm install 
 
 COPY . .
 RUN npx prisma generate
-RUN npx baml-cli generate
 
 # A CRLF checkout on Windows leaves a carriage return in the shebang line, which makes the kernel
 # look for an interpreter named "sh\r".
@@ -53,8 +52,6 @@ COPY --from=builder /app/prisma ./prisma
 # stops with "datasource.url property is required" without it.
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/baml_client ./baml_client
-COPY --from=builder /app/baml_src ./baml_src
 
 COPY entrypoint.sh /entrypoint.sh
 RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh

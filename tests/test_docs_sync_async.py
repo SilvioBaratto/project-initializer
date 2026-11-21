@@ -2,7 +2,7 @@
 
 Reads the real generated FastAPI ``api/.claude/CLAUDE.md`` and asserts the
 route-level concurrency rule is documented: sync ``def`` for DB endpoints
-(threadpool + sync ``Session``), ``async def`` only for BAML/LLM calls, with
+(threadpool + sync ``Session``), ``async def`` only for real async I/O, with
 canonical example citations and a note on the opt-in flag-gated async path.
 
 token/supabase overlays do NOT ship their own CLAUDE.md, so guarding the base
@@ -31,18 +31,22 @@ def test_when_api_claude_md_read_sync_def_db_threadpool_rule_documented():
     assert "sync `def`" in doc or "sync def" in doc
 
 
-def test_when_api_claude_md_read_async_reserved_for_baml_documented():
-    """when the doc is read, async def is reserved for BAML/LLM calls only."""
+def test_when_api_claude_md_read_async_reserved_for_real_async_io_documented():
+    """when the doc is read, async def is reserved for real async I/O only.
+
+    Validates project_initializer/docs_generator.py generate_api_claude().
+    """
     doc = _doc()
-    assert "`async def`" in doc or "async def" in doc
-    assert "BAML" in doc
+    assert "`async def`" in doc
+    assert "real async I/O" in doc
 
 
-def test_when_api_claude_md_read_canonical_examples_cited():
-    """when the doc is read, items.py (sync) and chatbot_service.py (async) are cited."""
-    doc = _doc()
-    assert "app/api/v1/endpoints/items.py" in doc
-    assert "app/application/services/chatbot_service.py" in doc
+def test_when_api_claude_md_read_canonical_sync_example_cited():
+    """when the doc is read, items.py is cited as the canonical sync DB route.
+
+    Validates project_initializer/docs_generator.py generate_api_claude().
+    """
+    assert "app/api/v1/endpoints/items.py" in _doc()
 
 
 def test_when_api_claude_md_read_optin_flag_gated_async_path_noted():

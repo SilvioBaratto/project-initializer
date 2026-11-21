@@ -15,7 +15,7 @@ Criteria covered (per oracle report):
   [UNIT] logger.config.ts has a companion spec (reversed: it used to forbid one)
 
 Criteria skipped (oracle: NOT VERIFIABLE):
-  Terminus health module, e2e scaffold, BullMQ offload, all-tests-pass gate,
+  Terminus health module, e2e scaffold, all-tests-pass gate,
   SOLID code-quality prose.
 """
 

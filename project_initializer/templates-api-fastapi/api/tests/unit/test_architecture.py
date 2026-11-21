@@ -298,8 +298,6 @@ THIRD_PARTY_PACKAGES = (
     "sqlalchemy",
     "pydantic",
     "pydantic_settings",
-    "baml_client",
-    "baml_py",
     "httpx",
     "jose",
     "jwt",

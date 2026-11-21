@@ -41,8 +41,6 @@ EXPECTED_ROUTES = [
     pytest.param("GET", f"{API_PREFIX}/items/{{item_id}}", id="items-get"),
     pytest.param("PUT", f"{API_PREFIX}/items/{{item_id}}", id="items-update"),
     pytest.param("DELETE", f"{API_PREFIX}/items/{{item_id}}", id="items-delete"),
-    pytest.param("POST", f"{API_PREFIX}/chat/", id="chat"),
-    pytest.param("POST", f"{API_PREFIX}/chat/stream", id="chat-stream"),
     pytest.param("GET", f"{API_PREFIX}/test/ping", id="ping"),
 ]
 # (environment, api_docs_enabled override, whether the docs are served)

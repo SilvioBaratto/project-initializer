@@ -5,7 +5,7 @@ must NOT appear in the base FastAPI template, so the default scaffold stays
 byte-identical. The overlay's own ``api/tests/unit/test_async_db.py`` exercises
 the async engine/session/repo against in-memory aiosqlite; this repo-level test
 merges the base API + overlay into a tmp dir and runs that test file in a
-subprocess (``--noconftest`` skips the heavy ``app.main``/BAML conftest), so the
+subprocess (``--noconftest`` skips the heavy ``app.main`` conftest), so the
 async CRUD contract is verified by the repo suite too.
 """
 

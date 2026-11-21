@@ -1,6 +1,5 @@
 /** Validates src/app.module.ts: the metadata AppModule declares, read without booting the app. */
 import 'reflect-metadata';
-import { BullModule } from '@nestjs/bullmq';
 import { DynamicModule, FactoryProvider, Provider, Type } from '@nestjs/common';
 import { MODULE_METADATA } from '@nestjs/common/constants';
 import { ConfigModule } from '@nestjs/config';
@@ -12,10 +11,8 @@ import { AUTH_GUARDS, AUTH_MODULES } from './app.auth';
 import { AppModule } from './app.module';
 import { RolesGuard } from './common/auth/roles.guard';
 import { THROTTLER_MODULE_OPTIONS } from './config/rate-limit';
-import { ChatbotModule } from './modules/chatbot/chatbot.module';
 import { HealthModule } from './modules/health/health.module';
 import { ItemsModule } from './modules/items/items.module';
-import { MonitoringModule } from './modules/monitoring/monitoring.module';
 import { TestModule } from './modules/test/test.module';
 
 function metadataOf(key: string): unknown[] {
@@ -81,14 +78,7 @@ describe('AppModule imports', () => {
     const imported = metadataOf(MODULE_METADATA.IMPORTS);
 
     expect(imported).toEqual(
-      expect.arrayContaining([
-        HealthModule,
-        TestModule,
-        ItemsModule,
-        ChatbotModule,
-        MonitoringModule,
-        ...AUTH_MODULES,
-      ]),
+      expect.arrayContaining([HealthModule, TestModule, ItemsModule, ...AUTH_MODULES]),
     );
   });
 
@@ -99,16 +89,6 @@ describe('AppModule imports', () => {
       provide: getOptionsToken(),
       useValue: THROTTLER_MODULE_OPTIONS,
     });
-  });
-});
-
-describe('AppModule Redis connection', () => {
-  it('when the queue module is configured, then host and port come from REDIS_HOST and REDIS_PORT', async () => {
-    const factory = factoryOf(await dynamicModuleOf(BullModule));
-
-    const options: unknown = await factory(configWith({ REDIS_HOST: 'redis', REDIS_PORT: 6380 }));
-
-    expect(options).toEqual({ connection: { host: 'redis', port: 6380 } });
   });
 });
 

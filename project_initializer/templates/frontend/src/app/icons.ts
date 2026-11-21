@@ -1,7 +1,6 @@
 import { LUCIDE_ICONS, LucideIconProvider } from 'lucide-angular';
 import {
   ArrowLeft,
-  ArrowUp,
   Bell,
   Check,
   ChevronDown,
@@ -26,7 +25,6 @@ import {
   LogOut,
   Mail,
   Menu,
-  MessageSquare,
   Minus,
   Monitor,
   Moon,
@@ -57,7 +55,6 @@ import {
 // [size]="18"; icon buttons size any inner svg to 24px on their own.
 const icons = {
   ArrowLeft,
-  ArrowUp,
   Bell,
   Check,
   CheckCircle: CircleCheckBig,
@@ -85,7 +82,6 @@ const icons = {
   LogOut,
   Mail,
   Menu,
-  MessageSquare,
   Minus,
   Monitor,
   Moon,

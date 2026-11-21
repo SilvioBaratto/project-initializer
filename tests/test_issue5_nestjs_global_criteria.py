@@ -8,6 +8,7 @@ Criteria under test:
   [UNIT] Auth guard registered as APP_GUARD in both token and supabase overlays.
   [UNIT] ConfigModule validates env and fails fast on missing secrets.
   [UNIT] Response schemas whitelist fields so Prisma rows cannot leak secret columns.
+  [UNIT] The /api/v1 global prefix is applied at bootstrap.
 """
 
 import pathlib
@@ -232,3 +233,23 @@ def test_when_any_response_schema_is_read_then_passthrough_is_never_used(schema_
     assert ".passthrough()" not in source, (
         f"{schema_path} uses .passthrough(), leaking Prisma columns through the serializer"
     )
+
+
+# ---------------------------------------------------------------------------
+# Criterion: every route is served under the /api/v1 global prefix
+# ---------------------------------------------------------------------------
+
+
+def test_when_app_setup_and_main_ts_are_read_then_global_prefix_api_v1_is_set():
+    """
+    app.setGlobalPrefix('api/v1') must be applied at bootstrap so every route is
+    reachable under /api/v1. The prefix is set in configureApp (src/app.setup.ts),
+    which main.ts calls before listening.
+
+    Validates project_initializer/templates-api-nestjs/api/src/app.setup.ts and project_initializer/templates-api-nestjs/api/src/main.ts.
+    """
+    src = PI / "templates-api-nestjs" / "api" / "src"
+    setup = read_text(src / "app.setup.ts")
+    assert "setGlobalPrefix" in setup
+    assert "api/v1" in setup
+    assert "configureApp(app)" in read_text(src / "main.ts")

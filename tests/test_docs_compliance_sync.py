@@ -4,9 +4,8 @@ The generated docs and the repo docs must describe the templates as they are: th
 FastAPI middleware order and catch-all, the database error classification, the
 migration safety net, the coverage gate, the container start-up and, per auth
 variant, the rules each overlay enforces, the database TLS rule, the SIGHUP log-level
-reload and the audit actions; and on the NestJS side the platform settings, the chat
-failure policy, the backup schema, roles (RBAC) and the audit trail. Three kinds of assertion
-live here:
+reload and the audit actions; and on the NestJS side the platform settings, the backup
+schema, roles (RBAC) and the audit trail. Three kinds of assertion live here:
 
 * statements the docs must make (``_FASTAPI_ALL``, ``_FASTAPI_BY_AUTH``, ...);
 * stale statements the docs must no longer make (``_STALE_FASTAPI``);
@@ -55,14 +54,13 @@ _FASTAPI_ALL = [
     "`--no-access-log`",
     "`set_log_level(",
     "`hide_input_in_errors`",
-    "`BAML_LOG=off`",
     "--rev-id",
     "preserve_and_drop_column",
     'config.attributes["embedded"]',
     "`migration_backup.<table>__rollback_<UTC YYYYmmddHHMMSSffffff>`",
     "`pytest.ini` enforces a coverage gate",
     "`--no-cov`",
-    "`error_code`",
+    "`ErrorEnvelope`",
     "Item ids are UUIDs",
     "`DB_WAIT_TIMEOUT_SECONDS`",
     "`FORWARDED_ALLOW_IPS`",
@@ -142,7 +140,6 @@ _STALE_FASTAPI = [
     "any outward import",
     "nothing wires the",
     "unwired",
-    "The logged traceback can quote the prompt",
     "call `await dispose_async_engine()` when the lifespan",
     "`<table>__rollback_<UTC YYYYmmddHHMMSS>`",
 ]
@@ -162,16 +159,6 @@ _NESTJS_ALL = [
     "`prisma.config.ts`",
     "`@ZodResponse`",
     "`Too many requests`",
-    "`setLogLevel('OFF')`",
-    "`BAML_LOG=off`",
-    "`AbortSignal`",
-    "3 x 3 provider calls",
-    "`QueueErrorReporter`",
-    "`QUEUE_ERROR_LOG_INTERVAL_MS`",
-    "`CHAT_JOB_BACKOFF_DELAY_MS`",
-    "`COMPLETED_CHAT_JOB_TTL_SECONDS`",
-    "`describeChatFailure`",
-    "`text/event-stream`",
     "`migration_backup.",
     "microsecond",
     "`NODE_ENV=development`",
@@ -257,7 +244,6 @@ _NESTJS_BY_AUTH = {
 _DOCUMENTED_SETTINGS = {
     (_FASTAPI_BASE, "entrypoint.sh"): ["DB_WAIT_TIMEOUT_SECONDS"],
     (_FASTAPI_BASE, "app/api/middleware/rate_limiting.py"): ["FORWARDED_ALLOW_IPS"],
-    (_FASTAPI_BASE, "app/infrastructure/llm/baml_chat_model.py"): ["BAML_LOG"],
     (_FASTAPI_BASE, "app/infrastructure/settings.py"): [
         "DATABASE_ECHO",
         "CORS_ORIGINS",
@@ -302,14 +288,6 @@ _DOCUMENTED_SETTINGS = {
         "item.create",
         "item.update",
         "item.delete",
-    ],
-    (_NESTJS_BASE, "src/modules/chatbot/baml-chat-completion.adapter.ts"): [
-        "setLogLevel('OFF')"
-    ],
-    (_NESTJS_BASE, "src/modules/chatbot/chat.constants.ts"): [
-        "QUEUE_ERROR_LOG_INTERVAL_MS",
-        "CHAT_JOB_BACKOFF_DELAY_MS",
-        "COMPLETED_CHAT_JOB_TTL_SECONDS",
     ],
 }
 
@@ -419,7 +397,7 @@ def test_when_the_fastapi_readmes_are_generated_then_the_gate_and_container_are_
 def test_when_nestjs_api_claude_is_generated_then_it_makes_the_statement(
     auth, statement
 ):
-    """Every NestJS variant documents the platform and chat behaviour of the base template.
+    """Every NestJS variant documents the platform behaviour of the base template.
 
     Validates project_initializer/docs_generator.py generate_api_claude().
     """
@@ -746,7 +724,6 @@ def test_when_the_changelog_is_read_then_the_breaking_changes_are_listed():
         "audit log line changed",
         "`additional_databases`",
         "item ids must be UUIDs",
-        "reads its first chunk before the response starts",
         "`email` comes from the `email` claim only",
         "Entra ids must be GUIDs in FastAPI too",
         "`anonymous`",
@@ -754,7 +731,6 @@ def test_when_the_changelog_is_read_then_the_breaking_changes_are_listed():
         "`TRUST_PROXY_HOPS` defaults to 1",
         "`--no-access-log`",
         "`DB_WAIT_TIMEOUT_SECONDS`",
-        "`BAML_LOG=off`",
         "`migration_backup`",
     ):
         assert keyword in unreleased, f"CHANGELOG [Unreleased] lacks {keyword!r}"

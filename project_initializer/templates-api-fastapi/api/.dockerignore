@@ -62,11 +62,6 @@ scripts/
 fly.toml
 !fly.toml.example
 
-# Redis data
-redis_data/
-*.rdb
-*.aof
-
 # Logs
 logs/
 *.log

@@ -1,7 +1,7 @@
 import { AUTH_TEST_ENV } from './auth-test-env';
 
 /**
- * Environment for unit and e2e runs, with no database or Redis behind it: every suite stubs them.
+ * Environment for unit and e2e runs, with no database behind it: every suite stubs it.
  *
  * `ConfigModule.forRoot` validates `process.env` while `AppModule` is still being imported, so a
  * spec cannot set these in its own body: by then the import has already thrown. Register this file
@@ -15,8 +15,6 @@ const CONNECTION_DEFAULTS: Readonly<Record<string, string>> = {
   NODE_ENV: 'test',
   DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/test',
   DIRECT_URL: 'postgresql://postgres:postgres@localhost:5432/test',
-  REDIS_HOST: 'localhost',
-  REDIS_PORT: '6379',
   LOG_LEVEL: 'silent',
 };
 

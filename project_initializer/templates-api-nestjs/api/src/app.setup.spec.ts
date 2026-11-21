@@ -243,8 +243,7 @@ describe('configureApp', () => {
 
   describe('request bodies', () => {
     const OVERSIZE_BYTES = MAX_REQUEST_BODY_BYTES + 1_024;
-    // The chat route accepts about 404,000 characters by its own bounds, far beyond Express's
-    // 100 kB default; this is a valid body of the size a real conversation reaches.
+    // A valid body far beyond Express's 100 kB default but under the raised limit.
     const LARGE_VALID_NAME_LENGTH = 160 * 1_024;
 
     it('when a valid body is well above the Express default, then it is accepted', async () => {

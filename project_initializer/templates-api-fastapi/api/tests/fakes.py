@@ -1,11 +1,10 @@
 """In-memory fakes of the domain ports, for tests that must not touch I/O."""
 
-from collections.abc import AsyncIterator, Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import replace
 from datetime import UTC, datetime
 
 from app.domain.entities.authenticated_user import AuthenticatedUser
-from app.domain.entities.chat import ChatMessage, ChatReplyChunk
 from app.domain.entities.item import Item, ItemChanges, NewItem
 
 FIXED_NOW = datetime(2026, 1, 15, 12, 0, tzinfo=UTC)
@@ -138,50 +137,3 @@ class FakeUnitOfWork:
 
     def rollback(self) -> None:
         """Do nothing: the port requires it, but no fake store stages writes."""
-
-
-class FakeChatModel:
-    """``ChatModelPort`` that replays canned text and records what it was asked."""
-
-    def __init__(
-        self,
-        *,
-        answer: str = "stub answer",
-        partials: Sequence[str] = ("stub",),
-        error: Exception | None = None,
-    ) -> None:
-        """Configure the replies.
-
-        Args:
-            answer: Reply of ``complete`` and the content of the final stream chunk.
-            partials: Contents of the non-final stream chunks, in order.
-            error: Raised instead of replying, by both ``complete`` and ``stream``.
-        """
-        self._answer = answer
-        self._partials = tuple(partials)
-        self._error = error
-        self.last_question: str | None = None
-        self.last_history: Sequence[ChatMessage] | None = None
-
-    async def complete(self, question: str, history: Sequence[ChatMessage]) -> str:
-        """Record the call, then return the canned answer or raise the error."""
-        self._record(question, history)
-        return self._answer
-
-    async def stream(
-        self, question: str, history: Sequence[ChatMessage]
-    ) -> AsyncIterator[ChatReplyChunk]:
-        """Record the call, then yield the partials and a final chunk.
-
-        The error, when set, is raised on the first iteration.
-        """
-        self._record(question, history)
-        for partial in self._partials:
-            yield ChatReplyChunk(content=partial, is_final=False)
-        yield ChatReplyChunk(content=self._answer, is_final=True)
-
-    def _record(self, question: str, history: Sequence[ChatMessage]) -> None:
-        self.last_question = question
-        self.last_history = history
-        if self._error is not None:
-            raise self._error

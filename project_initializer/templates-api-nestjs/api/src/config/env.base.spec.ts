@@ -5,7 +5,6 @@ import {
   blankToUndefined,
   createEnvValidator,
   ENCRYPTED_DATABASE_SSLMODES,
-  MIN_QUEUE_MONITOR_PASSWORD_LENGTH,
 } from './env.base';
 
 const validate = createEnvValidator(baseEnvSchema);
@@ -74,11 +73,8 @@ describe('validate (defaults and coercion)', () => {
     expect(validate(VALID_BASE)).toMatchObject({
       PORT: 3000,
       NODE_ENV: 'development',
-      REDIS_HOST: 'localhost',
-      REDIS_PORT: 6379,
       CORS_ORIGINS: ['http://localhost:4200'],
       LOG_LEVEL: 'info',
-      QUEUE_MONITOR_USER: 'admin',
       DB_CONNECT_TIMEOUT_MS: 5000,
       DB_QUERY_TIMEOUT_MS: 15000,
       DB_POOL_MAX: 10,
@@ -99,10 +95,6 @@ describe('validate (defaults and coercion)', () => {
     expect(validate({ ...VALID_BASE, PORT: '4000' }).PORT).toBe(4000);
   });
 
-  it('when REDIS_PORT is a numeric string, then it is coerced to a number', () => {
-    expect(validate({ ...VALID_BASE, REDIS_PORT: '6380' }).REDIS_PORT).toBe(6380);
-  });
-
   it('when unknown keys are present, then they are dropped from the result', () => {
     const validated = validate({ ...VALID_BASE, EXTRA_KEY: 'value' });
 
@@ -120,10 +112,6 @@ describe('validate (ports)', () => {
 
   it.each([['1'], [String(MAX_TCP_PORT)]])('when PORT is %j, then it is accepted', (port) => {
     expect(validate({ ...VALID_BASE, PORT: port }).PORT).toBe(Number(port));
-  });
-
-  it('when REDIS_PORT is out of range, then it throws naming REDIS_PORT', () => {
-    expect(() => validate({ ...VALID_BASE, REDIS_PORT: '70000' })).toThrow('REDIS_PORT');
   });
 });
 
@@ -225,34 +213,6 @@ describe('validate (CORS_ORIGINS)', () => {
 
   it('when the list is blank, then it throws because CORS would block every browser', () => {
     expect(() => validate({ ...VALID_BASE, CORS_ORIGINS: ' , ' })).toThrow('CORS_ORIGINS');
-  });
-});
-
-describe('validate (queue dashboard credentials)', () => {
-  it('when the password is blank, then it is treated as not set', () => {
-    expect(validate({ ...VALID_BASE, QUEUE_MONITOR_PASSWORD: '' }).QUEUE_MONITOR_PASSWORD).toBe(
-      undefined,
-    );
-  });
-
-  it('when the password is one character short of the minimum, then it throws', () => {
-    const tooShort = 'x'.repeat(MIN_QUEUE_MONITOR_PASSWORD_LENGTH - 1);
-
-    expect(() => validate({ ...VALID_BASE, QUEUE_MONITOR_PASSWORD: tooShort })).toThrow(
-      'QUEUE_MONITOR_PASSWORD',
-    );
-  });
-
-  it('when the password has exactly the minimum length, then it is accepted', () => {
-    const atMinimum = 'x'.repeat(MIN_QUEUE_MONITOR_PASSWORD_LENGTH);
-
-    expect(
-      validate({ ...VALID_BASE, QUEUE_MONITOR_PASSWORD: atMinimum }).QUEUE_MONITOR_PASSWORD,
-    ).toBe(atMinimum);
-  });
-
-  it('when the user is blank, then it throws naming QUEUE_MONITOR_USER', () => {
-    expect(() => validate({ ...VALID_BASE, QUEUE_MONITOR_USER: '' })).toThrow('QUEUE_MONITOR_USER');
   });
 });
 

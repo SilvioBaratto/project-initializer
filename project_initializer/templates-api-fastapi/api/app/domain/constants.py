@@ -23,10 +23,3 @@ PERSON_NAME_MAX_LENGTH = 100
 PASSWORD_MIN_LENGTH = 8
 # bcrypt silently ignores everything past 72 bytes, so longer passwords are refused.
 PASSWORD_MAX_BYTES = 72
-
-CHAT_QUESTION_MAX_LENGTH = 2000
-CHAT_HISTORY_MAX_MESSAGES = 20
-# History entries include the assistant's earlier answers, which run longer than
-# a question; a limit equal to the question limit would reject ordinary
-# conversations.
-CHAT_MESSAGE_MAX_LENGTH = 8000

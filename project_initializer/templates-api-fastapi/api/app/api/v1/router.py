@@ -4,7 +4,6 @@ from fastapi import APIRouter, status
 
 from app.api.errors import error_responses
 from app.api.v1.endpoints.auth import router as auth_router
-from app.api.v1.endpoints.chatbot import router as chatbot_router
 from app.api.v1.endpoints.items import router as items_router
 from app.api.v1.endpoints.test import router as test_router
 
@@ -13,5 +12,4 @@ from app.api.v1.endpoints.test import router as test_router
 api_router = APIRouter(responses=error_responses(status.HTTP_429_TOO_MANY_REQUESTS))
 api_router.include_router(auth_router)
 api_router.include_router(test_router)
-api_router.include_router(chatbot_router)
 api_router.include_router(items_router)

@@ -125,23 +125,6 @@ describe('Supabase authentication (e2e)', () => {
       expect(response.body).toEqual({ id: 'user-b', email: null, roles: [] });
     });
   });
-
-  describe('chat job ownership', () => {
-    it('when user B asks for a job created by user A, then the response is 404', async () => {
-      const created = await request(httpServerOf(app))
-        .post(route('/chat/jobs'))
-        .set('Authorization', `Bearer ${TOKEN_USER_A}`)
-        .send({ user_question: 'Hello' });
-      const { jobId } = created.body as { jobId: string };
-
-      const asOwner = await get(`/chat/jobs/${jobId}`, TOKEN_USER_A);
-      const asOtherUser = await get(`/chat/jobs/${jobId}`, TOKEN_USER_B);
-
-      expect(created.status).toBe(202);
-      expect(asOwner.status).toBe(200);
-      expect(asOtherUser.status).toBe(404);
-    });
-  });
 });
 
 /** Validates src/modules/auth/auth.module.ts wiring of the real verifier behind the guard. */

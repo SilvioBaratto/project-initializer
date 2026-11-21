@@ -92,9 +92,12 @@ def test_when_frontend_only_steps_are_gated_against_api_scope():
 
 
 def test_when_api_only_steps_are_gated_against_frontend_scope():
+    """The API dependency install is skipped on the frontend-only matrix entry.
+
+    Validates .github/workflows/test-package.yml "Install API dependencies" step guard.
+    """
     guards = _step_guards()
-    for step in ("Install API dependencies", "Generate BAML client"):
-        assert guards.get(step) == "matrix.scope != 'frontend'", step
+    assert guards.get("Install API dependencies") == "matrix.scope != 'frontend'"
 
 
 def test_when_verify_steps_are_split_and_gated_per_half():

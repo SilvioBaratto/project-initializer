@@ -464,13 +464,13 @@ describe('Responsive shell (integration)', () => {
 
     it('when the window crosses 600px with focus on a destination, focus follows it between the rail and the navigation bar', async () => {
       await render('medium');
-      destination(rail(), '/chat')!.focus();
+      destination(rail(), '/dashboard')!.focus();
 
       await resize('compact');
-      expect(document.activeElement).toBe(destination(host.querySelector('app-bottom-tab-bar'), '/chat'));
+      expect(document.activeElement).toBe(destination(host.querySelector('app-bottom-tab-bar'), '/dashboard'));
 
       await resize('medium');
-      expect(document.activeElement).toBe(destination(rail(), '/chat'));
+      expect(document.activeElement).toBe(destination(rail(), '/dashboard'));
     });
 
     it('when the window crosses 600px with focus on a rail action, focus moves to the top app bar button that opens the actions, and back', async () => {

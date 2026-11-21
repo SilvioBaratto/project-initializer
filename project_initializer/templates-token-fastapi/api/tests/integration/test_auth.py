@@ -1,9 +1,9 @@
 """Integration tests of the static-token authentication of the token variant.
 
 They use the real ``get_current_user`` and the real static-token verifier, with
-the secret pinned in ``tests/auth_test_env.py``. The shared item and chat tests
-replace ``get_current_user`` instead, so this file is where the credential
-checks themselves are covered.
+the secret pinned in ``tests/auth_test_env.py``. The shared item tests replace
+``get_current_user`` instead, so this file is where the credential checks
+themselves are covered.
 """
 
 import logging
@@ -14,7 +14,6 @@ from pydantic import SecretStr
 
 from app.api.auth_deps import get_token_verifier
 from app.api.bearer import MAX_BEARER_TOKEN_LENGTH
-from app.api.deps import get_chat_model
 from app.infrastructure.auth.static_token import (
     STATIC_TOKEN_AUTH_METHOD,
     STATIC_TOKEN_USER_ID,
@@ -23,7 +22,6 @@ from app.infrastructure.auth.static_token import (
 from app.main import app
 from tests.auth_assertions import assert_authentication_failure
 from tests.auth_test_env import TEST_AUTH_TOKEN
-from tests.fakes import FakeChatModel
 
 pytestmark = pytest.mark.integration
 
@@ -31,8 +29,6 @@ AUDIT_LOGGER = "app.audit"
 VALID_AUTHORIZATION = {"Authorization": f"Bearer {TEST_AUTH_TOKEN}"}
 ITEM_BODY = {"name": "Widget", "price": 1.0}
 UNKNOWN_ITEM_ID = "00000000-0000-4000-8000-000000000000"
-CHAT_BODY = {"user_question": "What can this API do?"}
-CHAT_ROUTES = ["/chat/", "/chat/stream"]
 
 NON_MATCHING_PROBE_TOKENS = [
     pytest.param("wrong-token-value", id="wrong"),
@@ -285,38 +281,6 @@ def test_when_no_credentials_are_sent_then_item_reads_stay_public(client, items_
     assert client.get(f"{items_url}/{UNKNOWN_ITEM_ID}").status_code == (
         HTTPStatus.NOT_FOUND
     )
-
-
-@pytest.mark.parametrize("route", CHAT_ROUTES)
-def test_when_a_chat_route_has_no_credentials_then_it_answers_401(
-    client, api_prefix, route
-):
-    """when no token is sent, the chat routes refuse the request before any LLM call.
-
-    Validates app.api.v1.endpoints.chatbot.chat().
-    """
-    app.dependency_overrides[get_chat_model] = lambda: FakeChatModel()
-
-    response = client.post(f"{api_prefix}{route}", json=CHAT_BODY)
-
-    assert_authentication_failure(response)
-
-
-def test_when_a_chat_route_gets_the_configured_token_then_it_answers(
-    client, api_prefix
-):
-    """when the configured token is sent, the chat route answers from the model.
-
-    Validates app.api.v1.endpoints.chatbot.chat().
-    """
-    app.dependency_overrides[get_chat_model] = lambda: FakeChatModel(answer="hello")
-
-    response = client.post(
-        f"{api_prefix}/chat/", json=CHAT_BODY, headers=VALID_AUTHORIZATION
-    )
-
-    assert response.status_code == HTTPStatus.OK
-    assert response.json() == {"answer": "hello"}
 
 
 def test_when_authentication_fails_then_the_token_is_not_logged(client, me_url, caplog):

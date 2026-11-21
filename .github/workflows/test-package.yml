@@ -13,39 +13,31 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # NOTE: the baml-py pin in install_cmd must match the `version` in the
-        # templates' baml_src/generators.baml — BAML enforces a major/minor match.
         include:
           - variant: "fastapi"
             flags: "--fastapi"
             scope: "fullstack"
-            install_cmd: "pip install baml-py==0.223.0"
-            baml_cmd: "baml-cli generate"
+            install_cmd: "pip install -r /tmp/test-project/api/requirements.txt"
           - variant: "nestjs"
             flags: "--nestjs"
             scope: "fullstack"
             install_cmd: "npm install --prefix /tmp/test-project/api"
-            baml_cmd: "npx baml-cli generate"
           - variant: "fastapi-entra"
             flags: "--fastapi --auth entra"
             scope: "fullstack"
-            install_cmd: "pip install baml-py==0.223.0"
-            baml_cmd: "baml-cli generate"
+            install_cmd: "pip install -r /tmp/test-project/api/requirements.txt"
           - variant: "nestjs-entra"
             flags: "--nestjs --auth entra"
             scope: "fullstack"
             install_cmd: "npm install --prefix /tmp/test-project/api"
-            baml_cmd: "npx baml-cli generate"
           - variant: "fastapi-api"
             flags: "--fastapi --scope api"
             scope: "api"
-            install_cmd: "pip install baml-py==0.223.0"
-            baml_cmd: "baml-cli generate"
+            install_cmd: "pip install -r /tmp/test-project/api/requirements.txt"
           - variant: "nestjs-api"
             flags: "--nestjs --scope api"
             scope: "api"
             install_cmd: "npm install --prefix /tmp/test-project/api"
-            baml_cmd: "npx baml-cli generate"
           - variant: "frontend"
             flags: "--scope frontend"
             scope: "frontend"
@@ -87,11 +79,6 @@ jobs:
       - name: Install API dependencies
         if: matrix.scope != 'frontend'
         run: ${{ matrix.install_cmd }}
-
-      - name: Generate BAML client
-        if: matrix.scope != 'frontend'
-        working-directory: /tmp/test-project/api
-        run: ${{ matrix.baml_cmd }}
 
       - name: Start Docker services
         working-directory: /tmp/test-project

@@ -65,13 +65,6 @@
       "command": "alembic revision --autogenerate -m \"${input:migrationName}\"",
       "options": { "cwd": "${workspaceFolder}/api" },
       "problemMatcher": []
-    },
-    {
-      "label": "API: BAML Generate",
-      "type": "shell",
-      "command": "baml-cli generate",
-      "options": { "cwd": "${workspaceFolder}/api" },
-      "problemMatcher": []
     }
   ],
   "inputs": [

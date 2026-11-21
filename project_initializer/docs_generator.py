@@ -53,7 +53,7 @@ _NESTJS_READINESS_CHECKLIST = """\
 
 - ✅ `@Module()` with providers/controllers/imports/exports — feature modules under `src/modules/*`
 - ✅ `PrismaModule` is **not** `@Global()`: a module that needs the database imports it (it exports `PrismaService`, `DATABASE_CIRCUIT_BREAKER` and `DATABASE_HEALTH_PORT`); never re-register `PrismaService` in another `providers:` array
-- ✅ Services depend on port tokens (`ITEM_REPOSITORY`, `CHAT_COMPLETION_PORT`, `DATABASE_HEALTH_PORT`, `ACCESS_TOKEN_VERIFIER`) that a module binds with `{ provide, useClass }`; tests swap in fakes
+- ✅ Services depend on port tokens (`ITEM_REPOSITORY`, `DATABASE_HEALTH_PORT`, `ACCESS_TOKEN_VERIFIER`) that a module binds with `{ provide, useClass }`; tests swap in fakes
 - ✅ Type-based constructor injection; default singleton scope (use REQUEST only when strictly needed)
 - Citations: `/modules`, `/providers`, `/fundamentals/injection-scopes`
 
@@ -112,8 +112,7 @@ _NESTJS_READINESS_CHECKLIST = """\
 
 - ✅ Helmet (`app.use(helmet())`) — `configureApp` in `src/app.setup.ts`
 - ✅ CORS restricted to `CORS_ORIGINS` env (not `*`), credentials/methods/headers configured — `configureApp`
-- ✅ Rate limiting: `ThrottlerModule` 100 req/60s + global `ThrottlerGuard` listed before the auth guard, so failed credentials still count; LLM routes carry a stricter `@Throttle`; the client address honours `TRUST_PROXY_HOPS` (default 1) — `app.module.ts`, `src/config/rate-limit.ts`
-- ✅ Queue dashboard fails closed: Bull Board answers 404 unless `QUEUE_MONITOR_PASSWORD` is set, then demands HTTP basic auth — `src/modules/monitoring/queue-dashboard-auth.ts`
+- ✅ Rate limiting: `ThrottlerModule` 100 req/60s + global `ThrottlerGuard` listed before the auth guard, so failed credentials still count; the client address honours `TRUST_PROXY_HOPS` (default 1) — `app.module.ts`, `src/config/rate-limit.ts`
 - ✅ Secrets via `@nestjs/config` with `ConfigModule.forRoot({ isGlobal: true })`; generated secrets are written to the root `.env` only
 - ❌ CSRF — non-goal (bearer-token APIs are largely CSRF-immune; add `csurf` only if cookie auth is introduced)
 - Citations: `/security/helmet`, `/security/rate-limiting`, `/security/csrf`
@@ -143,8 +142,8 @@ _NESTJS_READINESS_CHECKLIST = """\
 ### 9. Testing
 
 - ✅ Jest configured; `npm test` and `npm run test:e2e` scripts present; `npm run test:cov` enforces a 75% line and statement threshold
-- ✅ Service/controller unit specs next to their sources: `chatbot.service.spec.ts`, `chat-job.service.spec.ts`, `health.controller.spec.ts`, `src/serialization.spec.ts`
-- ✅ e2e scaffold: `test/app.e2e-spec.ts` (supertest, plus `test/auth.e2e-spec.ts` in auth variants) + `test/jest-e2e.json`, built on `test/support/create-e2e-app.ts`, which swaps Prisma, the queue, the LLM adapter and the token verifier for in-memory fakes (no Postgres, Redis or LLM key needed)
+- ✅ Service/controller unit specs next to their sources: `items.service.spec.ts`, `health.controller.spec.ts`, `src/serialization.spec.ts`
+- ✅ e2e scaffold: `test/app.e2e-spec.ts` (supertest, plus `test/auth.e2e-spec.ts` in auth variants) + `test/jest-e2e.json`, built on `test/support/create-e2e-app.ts`, which swaps Prisma and the token verifier for in-memory fakes (no Postgres needed)
 - ✅ Lint (`npm run lint`, type-checked ESLint, no warnings allowed) and Prettier (`npm run format:check`)
 - Citations: `/fundamentals/testing`
 
@@ -156,8 +155,7 @@ _NESTJS_READINESS_CHECKLIST = """\
 | 2 | `ConfigModule` validates env and fails fast on missing secrets (`DATABASE_URL`, `SUPABASE_*`) | ✅ | `src/config/env.base.ts` — `createEnvValidator()` throws; wired via `ConfigModule.forRoot({ validate })` |
 | 3 | Response schemas whitelist fields — Prisma rows cannot leak secret columns through the serializer | ✅ | `src/serialization.spec.ts` — `ItemResponseSchema.parse({ password: 'leak' })` strips `password` |
 | 4 | Terminus health module: liveness/readiness probes (DB, disk, memory) | ✅ | `src/modules/health/health.controller.ts` — `@nestjs/terminus` |
-| 5 | e2e test scaffold + service unit specs | ✅ | `test/app.e2e-spec.ts`, `test/jest-e2e.json`, `test/support/create-e2e-app.ts`; `chatbot.service.spec.ts` |
-| 6 | (Optional) Blocking BAML/LLM calls offloaded to BullMQ background jobs | ✅ | `src/modules/chatbot/chat-job.service.ts` + `chat.processor.ts`; `POST /chat/jobs` (202) / `GET /chat/jobs/:id` |
+| 5 | e2e test scaffold + service unit specs | ✅ | `test/app.e2e-spec.ts`, `test/jest-e2e.json`, `test/support/create-e2e-app.ts`; `items.service.spec.ts` |
 """
 
 # The --legacy-peer-deps rationale is shared verbatim by every README that has a
@@ -196,12 +194,10 @@ def _stack_line(framework: str, auth: str | None, *, frontend: bool) -> str:
 
 
 def _docker_services_table(framework: str, auth: str | None, *, frontend: bool) -> str:
-    """Compose services table — omits db/adminer for supabase, adds redis for NestJS."""
+    """Compose services table — omits db/adminer for supabase."""
     rows = ["| Service | Port | Description |", "|---------|------|-------------|"]
     if auth != "supabase":
         rows.append("| `db` | 5433:5432 | PostgreSQL 16 |")
-    if framework == "nestjs":
-        rows.append("| `redis` | internal | Redis (BullMQ) |")
     rows.append(
         f"| `api` | 8000:8000 | {_framework_label(framework)} with hot reload |"
     )
@@ -229,9 +225,6 @@ def _backend_dev_block(framework: str) -> list[str]:
             "",
             "# Tests",
             "pytest",
-            "",
-            "# BAML (AI/LLM)",
-            "baml-cli generate",
             "```",
         ]
     return [
@@ -249,11 +242,8 @@ def _backend_dev_block(framework: str) -> list[str]:
         "",
         "# Tests and checks",
         "npm test",
-        "npm run test:e2e                       # No Postgres or Redis needed",
+        "npm run test:e2e                       # No Postgres needed",
         "npm run lint",
-        "",
-        "# BAML (AI/LLM)",
-        "npx baml-cli generate",
         "```",
     ]
 
@@ -312,16 +302,15 @@ def _services_url_list(*, frontend: bool, auth: str | None) -> list[str]:
 
 
 def _nestjs_root_readme_notes(auth: str | None) -> list[str]:
-    """Secrets, queue-dashboard, proxy, database-TLS and log-level notes for the NestJS root README."""
-    secrets = "`QUEUE_MONITOR_PASSWORD`" + (" and `AUTH_TOKEN`" if auth == "token" else "")
-    return [
-        f"The scaffolded `.env` holds generated random secrets ({secrets}). "
-        "`.env.example` leaves them empty because it is the file you commit; never commit `.env`.",
-        "",
-        "The BullMQ queue dashboard is at http://localhost:8000/api/v1/admin/queues. "
-        "It answers 404 until `QUEUE_MONITOR_PASSWORD` is set (16+ characters), then asks for "
-        "HTTP basic auth as `QUEUE_MONITOR_USER` (default `admin`).",
-        "",
+    """Secrets, proxy, database-TLS and log-level notes for the NestJS root README."""
+    lines: list[str] = []
+    if auth == "token":
+        lines += [
+            "The scaffolded `.env` holds a generated random `AUTH_TOKEN`. "
+            "`.env.example` leaves it empty because it is the file you commit; never commit `.env`.",
+            "",
+        ]
+    lines += [
         "The rate limiter keys on the client address that `X-Forwarded-For` names. `TRUST_PROXY_HOPS` "
         "(default 1, the bundled nginx) is the number of proxies in front of the API; set it to `0` "
         "when the API is exposed directly, or a client can spoof the header and dodge the limit. "
@@ -340,13 +329,14 @@ def _nestjs_root_readme_notes(auth: str | None) -> list[str]:
         "<container>` in Docker) reloads `LOG_LEVEL` from the `.env` file; a container reads no `.env` "
         "file (compose passes the variables), so there a reload re-applies the start-up value.",
     ]
+    return lines
 
 
-def _edit_env_comment(framework: str, auth: str | None) -> str:
-    """The README hint on editing ``.env``; it mentions generated secrets only when there are some."""
-    if framework == "nestjs" or auth == "token":
-        return "# Edit .env with your real keys (generated secrets are already filled in)"
-    return "# Edit .env with your real keys"
+def _edit_env_comment(auth: str | None) -> str:
+    """The README hint on reviewing ``.env``; it mentions generated secrets only when there are some."""
+    if auth == "token":
+        return "# Review .env (generated secrets are already filled in)"
+    return "# Review .env (scaffolding already wrote it)"
 
 
 def _fastapi_root_readme_notes(auth: str | None) -> list[str]:
@@ -468,7 +458,7 @@ def generate_root_readme(
             f"#   {database_keys}, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY",
         ]
     else:
-        sections.append(_edit_env_comment(framework, auth))
+        sections.append(_edit_env_comment(auth))
     sections += ["docker compose up -d --build", "```", ""]
     sections += ["Services will be available at:"] + _services_url_list(
         frontend=frontend, auth=auth
@@ -506,18 +496,17 @@ def _fastapi_root_claude(auth: str | None) -> list[str]:
         "",
         "| Layer | Purpose |",
         "|-------|---------|",
-        "| `app/domain/` | Pure core: `entities/` (frozen dataclasses), `ports/` (`ItemRepositoryPort`, `UnitOfWorkPort`, `TokenVerifierPort`, `ChatModelPort`), `services/`, `constants.py` (shared limits), `exceptions.py` (`DomainError` hierarchy, no HTTP) — no framework/ORM imports |",
+        "| `app/domain/` | Pure core: `entities/` (frozen dataclasses), `ports/` (`ItemRepositoryPort`, `UnitOfWorkPort`, `TokenVerifierPort`), `services/`, `constants.py` (shared limits), `exceptions.py` (`DomainError` hierarchy, no HTTP) — no framework/ORM imports |",
         "| `app/application/` | Use-case orchestration: `services/` (depend on domain ports, own the commit), `commands/` (inputs), `dto/` (outputs) — imports domain only |",
-        "| `app/infrastructure/` | The only tech layer: `settings.py` + `auth_settings.py`, `config.py` (walk-up `.env` loader), `database.py` (pooling + circuit breaker), `orm/` (SQLAlchemy), `repositories/` (port adapters), `unit_of_work.py`, `llm/` (BAML adapter), `structured_logging.py`, `log_level.py` (SIGHUP reloads `LOG_LEVEL`), `migration_safety.py`, `audit.py` |",
+        "| `app/infrastructure/` | The only tech layer: `settings.py` + `auth_settings.py`, `config.py` (walk-up `.env` loader), `database.py` (pooling + circuit breaker), `orm/` (SQLAlchemy), `repositories/` (port adapters), `unit_of_work.py`, `structured_logging.py`, `log_level.py` (SIGHUP reloads `LOG_LEVEL`), `migration_safety.py`, `audit.py` |",
         "| `app/api/` | HTTP surface: `deps.py` (composition root, the only place that names concrete adapters), `auth_deps.py` (the auth seam), `bearer.py`, `authorization.py`, `pagination.py`, `errors.py` + `handlers.py` (one error envelope), `docs.py`, `health.py`, `schemas/` (Pydantic), `middleware/`, `v1/router.py` + `v1/endpoints/` |",
         "| `alembic/` | Schema migrations: Alembic owns the schema, every migration has a data-preserving `downgrade()` |",
-        "| `baml_src/` | LLM function definitions (regenerate client with `baml-cli generate`) |",
         "",
         "Dependencies point strictly inward: `api → application → domain`, `infrastructure → domain`. An AST fitness test (`api/tests/unit/test_architecture.py`) enforces it with an allowlist: `domain` imports the standard library and `app.domain` only, `application` adds `app.application`, neither calls `importlib.import_module` or `__import__`, `infrastructure` never imports `app.api` or `app.main`, and `app/api` imports no repository, ORM model or `get_db` except in the composition roots `deps.py` and `auth_deps.py`.",
         "",
         "**Auth seam**: a variant changes who the caller is by replacing two files, `app/api/auth_deps.py` and `app/infrastructure/auth_settings.py`. `deps.py` is never replaced, so a fix there reaches every variant. Routes depend on `CurrentUser` only.",
         "",
-        "**Sync vs async**: DB endpoints are sync `def` (offloaded to a threadpool with the sync `Session`); `async def` is reserved for BAML/LLM calls. See `api/.claude/CLAUDE.md` for the full rule.",
+        "**Sync vs async**: DB endpoints are sync `def` (offloaded to a threadpool with the sync `Session`); `async def` is reserved for real async I/O. See `api/.claude/CLAUDE.md` for the full rule.",
         "",
         "**Request pipeline** (outermost first): CORS, request logging (assigns `X-Request-ID`), security headers, the catch-all that answers an unhandled exception with the generic 500 envelope, rate limiting (only when `ENVIRONMENT` is `staging` or `production`). Every error response is one JSON envelope, `{\"error\": {\"code\", \"message\", \"timestamp\", \"request_id\"}}`.",
         "",
@@ -532,16 +521,16 @@ def _fastapi_root_claude(auth: str | None) -> list[str]:
             "",
             "## Token auth (`--auth token`)",
             "",
-            "`POST /auth/validate` is a validity **probe**: it returns **HTTP 200 with `authenticated=false`** for an invalid token, because both outcomes are successful *answers* to \"is this token valid?\". **401 is reserved for guarded endpoints that refuse access** (`/auth/me`, item writes, chat), never for the probe. The supabase variant has **no** `/auth/validate` endpoint; token validity is resolved server-side through Supabase Auth (`get_user()` on the bearer JWT) instead.",
+            "`POST /auth/validate` is a validity **probe**: it returns **HTTP 200 with `authenticated=false`** for an invalid token, because both outcomes are successful *answers* to \"is this token valid?\". **401 is reserved for guarded endpoints that refuse access** (`/auth/me`, item writes), never for the probe. The supabase variant has **no** `/auth/validate` endpoint; token validity is resolved server-side through Supabase Auth (`get_user()` on the bearer JWT) instead.",
             "",
-            "Two modes live side by side. The shared `AUTH_TOKEN` guards item writes, chat and `GET /auth/me`. JWT login (`POST /auth/register`, `POST /auth/token`, `GET /auth/me/jwt`) identifies individual users. Scaffolding generates `AUTH_TOKEN` and `JWT_SECRET_KEY` into `.env` and leaves them empty in `.env.example`; at every stage the API refuses a placeholder or a non-empty secret shorter than 16 and 32 characters, and outside development it refuses an empty one too. `POST /auth/token` and `GET /auth/me/jwt` answer 503 while `JWT_SECRET_KEY` is empty. A successful registration and a successful login write the audit actions `user.register` and `user.login`, which name the account by id and never by email or username.",
+            "Two modes live side by side. The shared `AUTH_TOKEN` guards item writes and `GET /auth/me`. JWT login (`POST /auth/register`, `POST /auth/token`, `GET /auth/me/jwt`) identifies individual users. Scaffolding generates `AUTH_TOKEN` and `JWT_SECRET_KEY` into `.env` and leaves them empty in `.env.example`; at every stage the API refuses a placeholder or a non-empty secret shorter than 16 and 32 characters, and outside development it refuses an empty one too. `POST /auth/token` and `GET /auth/me/jwt` answer 503 while `JWT_SECRET_KEY` is empty. A successful registration and a successful login write the audit actions `user.register` and `user.login`, which name the account by id and never by email or username.",
         ]
     return sections
 
 
 def _nestjs_modules(auth: str | None) -> str:
     """Feature modules under ``src/modules/``; ``auth`` exists only in an auth variant."""
-    modules = "health, items, test, chatbot, monitoring"
+    modules = "health, items, test"
     return f"{modules}, auth" if auth else modules
 
 
@@ -558,11 +547,10 @@ def _nestjs_root_claude(auth: str | None) -> list[str]:
         "| `src/prisma/` | PrismaModule (not global), PrismaService, database circuit breaker |",
         "| `src/common/` | Shared auth (guard, verifier port, `@Roles` and `RolesGuard`), audit (`AuditLogger`), decorators, filters, resilience (circuit breaker) |",
         "| `prisma/schema.prisma` | Database models; every migration under `prisma/migrations/` ships a `down.sql` |",
-        "| `baml_src/` | LLM function definitions (regenerate client with `npx baml-cli generate`) |",
         "",
         "Roll a migration back with `npx prisma db execute --file prisma/migrations/<dir>/down.sql`, newest first. Do not use `prisma migrate resolve --rolled-back`: it rejects an applied migration.",
         "",
-        "See `api/.claude/CLAUDE.md` for the full BAML call flow and production-readiness checklist.",
+        "See `api/.claude/CLAUDE.md` for the production-readiness checklist.",
     ]
 
 
@@ -640,7 +628,7 @@ def _nestjs_src_tree(auth: str | None) -> list[str]:
         "src/",
         "├── main.ts               # bootstrap(): create app, configureApp, OpenAPI, listen",
         "├── app.setup.ts          # configureApp(): logger, Helmet, CORS, api/v1 prefix, exception filters",
-        "├── app.module.ts         # Root module, identical in every variant (Config, Bull, pino, Throttler, features)",
+        "├── app.module.ts         # Root module, identical in every variant (Config, pino, Throttler, features)",
         "├── app.auth.ts           # AUTH_MODULES / AUTH_GUARDS seam: empty here, replaced by an auth overlay",
         "├── prisma/               # PrismaModule (not global), PrismaService, circuit breaker, DB health port",
         "├── common/               # auth/ (guard, roles, verifier port, /auth/me), audit/ (AuditLogger), decorators, dto/, filters/, resilience/",
@@ -664,15 +652,13 @@ def generate_api_readme(
         tree = [
             "app/",
             "├── main.py                     # App factory: load .env → logging → error handlers → middleware → routers",
-            "├── domain/                     # Pure core (entities, constants, exceptions, ports: ItemRepositoryPort, UnitOfWorkPort, TokenVerifierPort, ChatModelPort) — no framework imports",
+            "├── domain/                     # Pure core (entities, constants, exceptions, ports: ItemRepositoryPort, UnitOfWorkPort, TokenVerifierPort) — no framework imports",
             "├── application/                # Use-case orchestration (services, commands, dto) — domain-only deps",
-            "├── infrastructure/             # Tech layer: settings, auth_settings, database + circuit breaker, orm/, repositories/, llm/, log_level (SIGHUP reloads LOG_LEVEL)",
+            "├── infrastructure/             # Tech layer: settings, auth_settings, database + circuit breaker, orm/, repositories/, log_level (SIGHUP reloads LOG_LEVEL)",
             "└── api/                        # HTTP: deps.py (composition root), auth_deps.py (auth seam), bearer.py, authorization.py, pagination.py, errors.py, handlers.py, docs.py, health.py, schemas/, middleware/ (request id, security headers, catch-all 500, rate limiting), v1/",
             "",
             "alembic/                        # Schema migrations: upgrade head, downgrade -1",
             "tests/                          # unit / integration / e2e on in-memory SQLite (no Docker needed)",
-            "baml_src/                       # BAML LLM function definitions",
-            "baml_client/                    # Auto-generated BAML client (don't edit)",
         ]
         return "\n".join(
             [
@@ -693,7 +679,6 @@ def generate_api_readme(
                 "alembic upgrade head                              # Apply migrations",
                 "alembic downgrade -1                              # Roll the newest migration back (rows are kept)",
                 'alembic revision --autogenerate --rev-id 0003_add_widget -m "add widget"  # Create migration',
-                "baml-cli generate                                 # Regenerate BAML client",
                 "```",
                 "",
                 "## Architecture (four-layer hexagonal)",
@@ -722,7 +707,7 @@ def generate_api_readme(
             "```bash",
             "npm test                          # Run unit tests",
             "npm run test:cov                  # Unit tests + 75% coverage gate",
-            "npm run test:e2e                  # e2e tests (in-memory fakes, no Postgres/Redis)",
+            "npm run test:e2e                  # e2e tests (in-memory fakes, no Postgres)",
             "npm run lint                      # ESLint, fails on warnings",
             "npm run format:check              # Prettier check (npm run format to fix)",
             "npx prisma migrate dev            # Create + apply migration",
@@ -730,7 +715,6 @@ def generate_api_readme(
             "npx prisma db execute --file prisma/migrations/<dir>/down.sql  # Roll a migration back",
             "npx prisma generate               # Regenerate Prisma client",
             "npx prisma studio                 # Visual DB editor",
-            "npx baml-cli generate             # Regenerate BAML client",
             "```",
             "",
             "## Architecture",
@@ -740,8 +724,6 @@ def generate_api_readme(
             "",
             "prisma/schema.prisma       # Database models",
             "prisma/migrations/         # One directory per migration: migration.sql + down.sql",
-            "baml_src/                  # BAML LLM function definitions",
-            "baml_client/               # Auto-generated BAML client (don't edit)",
             "```",
             "",
         ]
@@ -756,14 +738,14 @@ _FASTAPI_TREE = [
     "├── main.py                     # App factory: load .env → logging → error handlers → middleware → routers; lifespan",
     "├── domain/                     # Pure core — NO framework/ORM imports",
     "│   ├── constants.py            # Business limits shared by every layer",
-    "│   ├── entities/               # Frozen dataclasses (Item, AuthenticatedUser, chat messages)",
-    "│   ├── ports/                  # Protocols: ItemRepositoryPort, UnitOfWorkPort, TokenVerifierPort, ChatModelPort",
+    "│   ├── entities/               # Frozen dataclasses (Item, AuthenticatedUser)",
+    "│   ├── ports/                  # Protocols: ItemRepositoryPort, UnitOfWorkPort, TokenVerifierPort",
     "│   ├── services/               # Pure domain logic",
     "│   └── exceptions.py           # DomainError hierarchy (public message + log context, no HTTP status)",
     "├── application/                # Use-case orchestration — depends on domain only",
-    "│   ├── services/               # ItemService, ChatbotService (depend on ports, commit after a write)",
+    "│   ├── services/               # ItemService (depends on ports, commits after a write)",
     "│   ├── commands/               # Inputs (CreateItemCommand, UpdateItemCommand)",
-    "│   └── dto/                    # Outputs (ItemDTO, ItemPageDTO, chat DTOs)",
+    "│   └── dto/                    # Outputs (ItemDTO, ItemPageDTO)",
     "├── infrastructure/             # The ONLY tech layer",
     "│   ├── config.py               # Walk-up .env loader (load_configuration)",
     "│   ├── settings.py             # Settings (pydantic-settings, Literal-validated)",
@@ -775,7 +757,6 @@ _FASTAPI_TREE = [
     "│   ├── unit_of_work.py         # SqlAlchemyUnitOfWork (commit, rollback)",
     "│   ├── orm/                    # SQLAlchemy models (Base in base.py)",
     "│   ├── repositories/           # Port adapters (SqlAlchemyItemRepository) + item_mapping.py",
-    "│   ├── llm/                    # BamlChatModel, the only importer of baml_client",
     "│   ├── auth/                   # TokenVerifierPort adapters of the auth variant",
     "│   ├── structured_logging.py   # JSON / text log formatters that carry the request id",
     "│   ├── request_context.py      # Request id in a ContextVar",
@@ -798,8 +779,6 @@ _FASTAPI_TREE = [
     "",
     "alembic/                        # Migrations: env.py reads the settings, versions/ holds the chain",
     "tests/                          # unit / integration / e2e, fakes.py, conftest.py (in-memory SQLite)",
-    "baml_src/                       # BAML definitions for LLM functions",
-    "baml_client/                    # Auto-generated BAML Python client (don't edit)",
 ]
 
 _FASTAPI_ROUTES_SECTION = [
@@ -812,7 +791,6 @@ _FASTAPI_ROUTES_SECTION = [
     "| `GET /api/v1/items` | public | `skip` 0..10000 and `limit` 1..100 (default 100); answers `items` and `total` |",
     "| `POST /api/v1/items` | `CurrentUser` | 201; `PUT` and `DELETE /api/v1/items/{id}` also need `CurrentUser`; `GET /api/v1/items/{id}` is public. Item ids are UUIDs: any other id is a 422, not a 404 |",
     "| `GET /api/v1/auth/me` | `CurrentUser` | `{id, email, username, roles, auth_method}` in every variant |",
-    "| `POST /api/v1/chat/`, `POST /api/v1/chat/stream` | `CurrentUser` | BAML chat; the stream is server-sent events |",
     "| `GET /api/v1/test/ping`, `/test/echo/{message}`, `POST /api/v1/test/echo` | public | Demo routes |",
     "| `GET /`, `GET /health`, `GET /health/ready` | public | Liveness and readiness probes, exempt from rate limiting |",
     "",
@@ -898,7 +876,7 @@ def _fastapi_test_database_section(auth: str | None) -> list[str]:
         "- `test_engine` (session scope) builds the schema once from the ORM metadata, on one shared connection (`StaticPool`) because the `TestClient` runs sync routes in a worker thread.",
         "- `db_session` wraps each test in an outer transaction and a SAVEPOINT, then rolls back. A `commit()` inside the code under test releases the savepoint only, so every test starts from an empty database and none leaks into the next.",
         "- `conftest.py` pins `ENVIRONMENT=test`, `DEBUG=false` and `LOG_LEVEL=warning` before it imports the app, so a developer's `.env` cannot change a result. The `client` fixture does not run the lifespan, so nothing touches a real database.",
-        "- External services are stubbed, never called: `tests/fakes.py` has an in-memory item repository, unit of work, chat model and token verifier, and each auth variant stubs its identity provider.",
+        "- External services are stubbed, never called: `tests/fakes.py` has an in-memory item repository, unit of work and token verifier, and each auth variant stubs its identity provider.",
         "- Levels are pytest markers (`unit`, `integration`, `e2e`). `pytest.ini` enforces a coverage gate: line and branch coverage of `app/` over the whole suite must stay at or above 75% (`--cov-fail-under=75`), or the run fails. A subset cannot reach it, so run one level or one file with `--no-cov`: `pytest -m unit --no-cov`. Add tests; do not lower the threshold.",
         "- SQLite cannot prove PostgreSQL-only behaviour. `tests/integration/test_migrations.py` compares the migrated schema with the ORM models, but run `alembic upgrade head` against " + real_database + " before you deploy.",
     ]
@@ -915,26 +893,6 @@ _FASTAPI_TEST_TRACEABILITY_SECTION = [
     "The requirement IDs come from your project's own requirements source. The template ships none, because it has no requirements of its own, and you should not invent them. List the tests that carry a requirement with `pytest --collect-only -q -m requirement`, and a requirement's tests with `grep -rn 'requirement(\"<id>\")' tests`.",
 ]
 
-_FASTAPI_BAML_SECTION = [
-    "## BAML integration",
-    "",
-    "LLM functions are defined in `baml_src/*.baml`. Regenerate the Python client with `baml-cli generate` after any `.baml` change, and never edit `baml_client/`; its version must equal the `baml-py` pin in `requirements.txt`.",
-    "",
-    "```",
-    "POST /api/v1/chat/         → ChatbotService.answer(query)         → ChatModelPort.complete(question, history)",
-    "POST /api/v1/chat/stream   → ChatbotService.stream_answer(query)  → ChatModelPort.stream(question, history)  [SSE]",
-    "                                                     └─ BamlChatModel (infrastructure/llm) → b.Chat / b.stream.Chat",
-    "```",
-    "",
-    "`ChatbotService` depends on `ChatModelPort`; `BamlChatModel` is the only module that imports `baml_client`. `get_chat_model()` in `api/deps.py` builds it once, and tests replace it through `app.dependency_overrides` or call the service with `FakeChatModel`, so no test calls a model.",
-    "",
-    "- A failing model call becomes an `ExternalServiceError` whose log context holds only the operation, the error class and, when present, the client name, HTTP status and finish reason: BAML's own error text embeds the prompt and the provider's raw reply, so neither it nor the chained traceback is logged. `POST /chat` answers **503** with the generic message. `POST /chat/stream` reads its first chunk before the response starts, so a failure that precedes any output (an outage, a refused history) is a real 503 or 422 and not a 200 with an error in the body. A failure after the stream has started ends it with one final event, `{\"content\": \"<generic message>\", \"done\": true, \"error_code\": \"<code>\"}`; clients tell it from a normal last event by `error_code`.",
-    "- BAML prints the full prompt and the reply in its own logs at INFO, and at WARN on failures, which is user content. `BamlChatModel` therefore sets `BAML_LOG=off` before the first call unless the operator already chose a value, and the generated `.env` and `.env.example` carry `BAML_LOG=off`. Only `error` and `off` keep BAML silent.",
-    "- Conversation history reaches the model as real `user` and `assistant` messages after the system block, never inside the system prompt, so a forged earlier turn carries no system authority.",
-    "- Limits: the question is at most 2000 characters; `conversation_history` holds at most 20 entries of at most 8000 characters, each written `\"user: text\"` or `\"assistant: text\"` (an entry without a prefix counts as the user's). Larger requests answer 422.",
-]
-
-
 def _fastapi_auth_section(auth: str | None) -> list[str]:
     """The authentication section of the FastAPI api CLAUDE.md for one auth mode."""
     seam = (
@@ -943,7 +901,7 @@ def _fastapi_auth_section(auth: str | None) -> list[str]:
         "exactly those two files (plus `tests/auth_test_env.py` and `tests/integration/test_auth.py`) and adds "
         "its verifier under `app/infrastructure/auth/`. Routes and the `require_roles` guard depend on "
         "`CurrentUser` only, and verifiers implement `TokenVerifierPort`, so nothing else changes between variants. "
-        "Item reads are public; item writes and chat require `CurrentUser`."
+        "Item reads are public; item writes require `CurrentUser`."
     )
     if auth == "token":
         return [
@@ -953,7 +911,7 @@ def _fastapi_auth_section(auth: str | None) -> list[str]:
             "",
             "Two modes live side by side and never accept each other's tokens.",
             "",
-            "- **Static token.** Callers send `Authorization: Bearer <AUTH_TOKEN>`. It guards item writes, chat and `GET /auth/me`. The check compares SHA-256 digests in constant time, and an empty `AUTH_TOKEN` matches nothing. Every holder is the same principal (`token-user`), so this mode suits service-to-service calls. `POST /auth/validate` is a public probe: it answers **200 with `authenticated: false`** for a wrong token, and 401 is reserved for the guarded routes. Each rejection is logged as `auth.validate_rejected` with its reason and without the token, so a burst of guesses is visible.",
+            "- **Static token.** Callers send `Authorization: Bearer <AUTH_TOKEN>`. It guards item writes and `GET /auth/me`. The check compares SHA-256 digests in constant time, and an empty `AUTH_TOKEN` matches nothing. Every holder is the same principal (`token-user`), so this mode suits service-to-service calls. `POST /auth/validate` is a public probe: it answers **200 with `authenticated: false`** for a wrong token, and 401 is reserved for the guarded routes. Each rejection is logged as `auth.validate_rejected` with its reason and without the token, so a burst of guesses is visible.",
             "- **JWT login.** `POST /auth/register` creates an account (201); a duplicate email or username answers a generic 409 that does not say which one matched. `POST /auth/token` (OAuth2 form, `username` is the email) returns a signed access token with `Cache-Control: no-store`; an unknown email, a wrong password and an inactive account all answer the same 401. `GET /auth/me/jwt` returns the same current-user shape as `/auth/me`; the account is re-read on every call, so a deactivated account loses access at once (401). Login input is length-bounded (422), and a password needs 8+ characters and at most 72 bytes, because bcrypt ignores the rest.",
             "- **Accounts.** Emails are stored and matched in lower case, so `Jane@Example.com` and `jane@example.com` are one account. A blank `username` means none, so a form that submits an empty optional field does not claim the empty handle. `RegistrationService` (`app/application/services/registration.py`) creates accounts and needs no token issuer; `AuthService` handles login and resolves access tokens.",
             "- **Audit.** A successful `POST /auth/register` writes the audit action `user.register` and a successful `POST /auth/token` writes `user.login`, each queued as a background task so the response is not delayed. Both name the account by its id (`resource_id` and `actor_id` are the user id) and carry no email or username; a failed login is only warn-logged by the exception handler. `AuthService.authenticate` returns an `AccessTokenDTO` that gained `user_id` for this purpose. It stays internal: `TokenResponse` does not expose it, so clients still receive only `access_token` and `token_type`.",
@@ -1063,8 +1021,7 @@ def _fastapi_settings_section() -> list[str]:
         "- **Database TLS.** With `ENVIRONMENT=staging` or `production` the app refuses to start unless the database connection is TLS-protected. It checks `DATABASE_URL` and, when set, `DIRECT_DATABASE_URL`, and a URL passes when its effective mode is `require`, `verify-ca` or `verify-full`. The effective mode is `DATABASE_SSL_MODE` when that is set, which wins over the URL (so `DATABASE_SSL_MODE=disable` is refused even beside `sslmode=require`), and otherwise the `sslmode` parameter of the URL; `prefer`, `allow`, `disable` and a repeated `sslmode` parameter do not pass. `development` and `test` are exempt, and so is a SQLite URL. For a database on the same host or on a private network that serves no TLS, `DATABASE_ALLOW_INSECURE_TRANSPORT=true` (default `false`) is the explicit opt-out for both URLs. The bundled compose `db` serves no TLS, so `ENVIRONMENT=production docker compose up` needs that opt-out, or a database that does serve TLS with `DATABASE_SSL_MODE`. The error names the variable and the settings that fix it, never the URL, which holds the password.",
         "- `CORS_ORIGINS` is a comma-separated list and defaults to `http://localhost:4200`; the generated `.env` lists the local frontend origins. The wildcard `*` is refused in `staging` and `production`, and credentialed cross-origin requests are never allowed.",
         "- A rejected value never appears in the start-up error (`hide_input_in_errors`), because it would print the raw environment, secrets included, to the logs.",
-        "- `BAML_LOG` defaults to `off` (see BAML integration); set `error` or lower to debug a prompt on purpose.",
-        "- Rate limiting is active only when `ENVIRONMENT` is `staging` or `production`: `RATE_LIMIT_REQUESTS` (100) per `RATE_LIMIT_WINDOW` seconds (60) per client, with the health routes exempt. The counters are in this process's memory, so each replica counts separately, and the limiter keys on the connection's peer address. It is therefore correct only behind a proxy that you list in `FORWARDED_ALLOW_IPS` (uvicorn reads it and rewrites the client address from `X-Forwarded-For`); otherwise every caller shares the proxy's bucket. For a scaled-out deployment, rate-limit at a gateway or back the counters with Redis.",
+        "- Rate limiting is active only when `ENVIRONMENT` is `staging` or `production`: `RATE_LIMIT_REQUESTS` (100) per `RATE_LIMIT_WINDOW` seconds (60) per client, with the health routes exempt. The counters are in this process's memory, so each replica counts separately, and the limiter keys on the connection's peer address. It is therefore correct only behind a proxy that you list in `FORWARDED_ALLOW_IPS` (uvicorn reads it and rewrites the client address from `X-Forwarded-For`); otherwise every caller shares the proxy's bucket. For a scaled-out deployment, rate-limit at a gateway or back the counters with an external shared store.",
     ]
 
 
@@ -1104,7 +1061,6 @@ def _fastapi_api_claude(auth: str | None, async_db: bool) -> str:
         "alembic upgrade head                     # Apply migrations",
         "alembic downgrade -1                     # Roll the newest migration back (rows are kept)",
         'alembic revision --autogenerate --rev-id 0003_add_widget -m "add widget"',
-        "baml-cli generate                        # Regenerate BAML client",
         "```",
         "",
         "## Architecture: clean / hexagonal — four layers",
@@ -1132,13 +1088,13 @@ def _fastapi_api_claude(auth: str | None, async_db: bool) -> str:
         "",
         "## Key Patterns",
         "",
-        "**Sync vs async**: DB-backed endpoints are sync `def` handlers; BAML/LLM endpoints are `async def`. Pick the keyword from the I/O, not by convention.",
+        "**Sync vs async**: DB-backed endpoints are sync `def` handlers. Pick the keyword from the I/O, not by convention.",
         "",
         "- Sync `def` path operations are offloaded to an `anyio` threadpool, so a blocking sync SQLAlchemy `Session` runs in a worker thread and never blocks the event loop. This is the **default and correct** path for DB routes — see `app/api/v1/endpoints/items.py`.",
-        "- `async def` runs directly on the event loop; reserve it for real async I/O — BAML/LLM `await` calls — see `app/application/services/chatbot_service.py`. Never mix a sync `Session` into an `async def` handler."
+        "- `async def` runs directly on the event loop; reserve it for real async I/O, such as an `await` on an HTTP client or an async driver. Never mix a sync `Session` into an `async def` handler."
         + _fastapi_async_note(async_db),
         "",
-        "**Composition root**: `app/api/deps.py` is the only API module that names concrete adapters. Routes ask for `ItemServiceDep` or `ChatbotServiceDep`, so they stay thin and tests swap any adapter with `app.dependency_overrides`.",
+        "**Composition root**: `app/api/deps.py` is the only API module that names concrete adapters. Routes ask for `ItemServiceDep`, so they stay thin and tests swap any adapter with `app.dependency_overrides`.",
         "",
     ]
     lines += _FASTAPI_ROUTES_SECTION + [""]
@@ -1149,7 +1105,6 @@ def _fastapi_api_claude(auth: str | None, async_db: bool) -> str:
     lines += _fastapi_migrations_section(auth) + [""]
     lines += _fastapi_settings_section() + [""]
     lines += _FASTAPI_CONTAINER_SECTION + [""]
-    lines += _FASTAPI_BAML_SECTION + [""]
     lines += _fastapi_test_database_section(auth) + [""]
     lines += _FASTAPI_TEST_TRACEABILITY_SECTION + [""]
     return "\n".join(lines)
@@ -1185,15 +1140,17 @@ _NESTJS_AUTH_SECTIONS = {
     ],
 }
 
-_NESTJS_CONFIG_SECTION = [
+_NESTJS_CONFIG_INTRO = [
     "## Configuration",
     "",
-    "`src/config/env.base.ts` declares every key all variants share (database URLs, `PORT`, `NODE_ENV`, Redis, `CORS_ORIGINS`, `LOG_LEVEL`, `TRUST_PROXY_HOPS`, `API_DOCS_ENABLED`, the queue dashboard credentials, the `DB_*` timeouts, pool size and breaker thresholds, the `HEALTH_HEAP_*_MB` limits) and `createEnvValidator()`. Each variant's `src/config/env.validation.ts` extends `baseEnvSchema` with its own keys and exports `validate`, which `AppModule` hands to `ConfigModule.forRoot`.",
+    "`src/config/env.base.ts` declares every key all variants share (database URLs, `PORT`, `NODE_ENV`, `CORS_ORIGINS`, `LOG_LEVEL`, `TRUST_PROXY_HOPS`, `API_DOCS_ENABLED`, the `DB_*` timeouts, pool size and breaker thresholds, the `HEALTH_HEAP_*_MB` limits) and `createEnvValidator()`. Each variant's `src/config/env.validation.ts` extends `baseEnvSchema` with its own keys and exports `validate`, which `AppModule` hands to `ConfigModule.forRoot`.",
     "",
     "- A bad or missing value stops start-up with `Invalid environment variables: KEY: reason`. The message names the key, never its value.",
     "- Read configuration through `ConfigService<BaseEnv, true>` with `get(key, { infer: true })`. Nothing else reads `process.env`, apart from `prisma.config.ts` and `test/support/test-env.ts`.",
     "- The project `.env` sits at the repository root; `envFilePath` is `['../.env', '.env']`. In Docker no file is read, compose passes the variables.",
-    "- Scaffolding writes random secrets into `.env` (`QUEUE_MONITOR_PASSWORD`, and `AUTH_TOKEN` with token auth). `.env.example` leaves them empty so no working credential is ever committed.",
+]
+
+_NESTJS_CONFIG_DETAILS = [
     "- `TRUST_PROXY_HOPS` (0 to 10, default 1) is the number of reverse proxies between the client and the API. The client address the rate limiter keys on is read that many entries from the right of `X-Forwarded-For`: 1 suits the bundled nginx, 0 an API exposed directly (otherwise a client can spoof the header and dodge the limit).",
     "- `API_DOCS_ENABLED` publishes Swagger UI at `/docs`; unset means on everywhere except `NODE_ENV=production`.",
     "- `DB_POOL_MAX` (default 10) is the only connection pool size: the `pg` driver adapter ignores Prisma's `connection_limit` URL parameter. `DB_CONNECT_TIMEOUT_MS` and `DB_QUERY_TIMEOUT_MS` bound how long a request waits on the database.",
@@ -1201,31 +1158,36 @@ _NESTJS_CONFIG_SECTION = [
     "- **Log level reload.** `SIGHUP` reloads `LOG_LEVEL` without a restart (`src/config/log-level-reload.ts`, installed by `main.ts` once the server listens and removed when it closes): edit the file or export a new value, then `kill -HUP <pid>` (`docker kill --signal=HUP <container>` in Docker). The handler reads `../.env` and then `.env` with dotenv's parser, without touching `process.env`, and the first file that sets the key wins. A value you exported that differs from what the file held at start-up wins; otherwise the edited file wins, because `ConfigModule` copied the file value into `process.env` at start-up and that copy must not shadow your edit. A key set nowhere means the default level. A value that is not a level is ignored, with one warning that names only the accepted set, never the value. Both pino root loggers move together, requests already in flight keep the level they started with, and the audit logger is not touched. Nothing is installed on Windows. Two caveats: a terminal hang-up also sends `SIGHUP`, so a server started from a terminal that closes keeps running instead of exiting; and without a `.env` file, as in Docker where compose passes the variables, the environment cannot change, so a reload re-applies the start-up value.",
     "- The generated `.env` sets `NODE_ENV=development`, which matches the compose `dev` target: it installs devDependencies and runs `npm run start:dev`, and `pino-pretty`, the development log transport, is a devDependency. The production image sets `NODE_ENV=production` itself and `.dockerignore` keeps `.env` out of it, so never hand that image the generated file.",
     "- `entrypoint.sh` reads the database host and port from `DATABASE_URL`, waits for it at most `DB_WAIT_TIMEOUT_SECONDS` (default 60) and exits with status 1 when it never answers, then runs `prisma migrate deploy`. The production image copies `prisma.config.ts` for that command, which takes its datasource URL from it.",
-    "- `BAML_LOG=off` is in the generated `.env` as well as the `setLogLevel('OFF')` call in code: BAML prints the full prompt and the reply otherwise.",
 ]
+
+
+def _nestjs_config_section(auth: str | None) -> list[str]:
+    """The configuration section of the NestJS api CLAUDE.md.
+
+    Args:
+        auth: Auth mode. Only the token variant has a generated secret to describe.
+    """
+    secret_note = (
+        [
+            "- Scaffolding writes a random `AUTH_TOKEN` into `.env`. `.env.example` leaves it empty so no working credential is ever committed."
+        ]
+        if auth == "token"
+        else []
+    )
+    return _NESTJS_CONFIG_INTRO + secret_note + _NESTJS_CONFIG_DETAILS
+
 
 _NESTJS_PLATFORM_SECTION = [
     "## Request handling and errors",
     "",
-    "- **Body limit.** `configureApp` registers the JSON body parser with a 512 KiB limit (`src/config/http-limits.ts`), above Express's 100 kB default because the chat route's own bounds allow about 404,000 characters. A larger body answers **413** with the standard reason phrase and the CORS headers, so a browser can read it. Raise the limit together with the chat bounds in `chat.constants.ts`, never alone.",
+    "- **Body limit.** `configureApp` registers the JSON body parser with a 512 KiB limit (`src/config/http-limits.ts`), above Express's 100 kB default so routes can take larger documents, yet small enough that a client cannot make the process buffer megabytes per request. A larger body answers **413** with the standard reason phrase and the CORS headers, so a browser can read it. Raise the limit together with the bounds the routes validate, never alone.",
     "- **Body-parser errors.** A body that is not valid JSON answers 400 `Malformed JSON request body`, because the parser's own text quotes the input. Any other 4xx raised by Express middleware about the request itself keeps its status under the standard reason phrase, never the library text.",
     "- **Health probes.** `HealthCheckExceptionFilter`, applied to the health controller only, answers an unhealthy probe with the Terminus result itself (each indicator, its details and the circuit state) at 503, so an operator sees which dependency is down. It writes the one `warn` line a failed probe produces; Terminus' own logging is off.",
     "- **Prisma errors.** `P2002` answers 409, `P2003` 400 and `P2025` 404, each with a fixed message that names no column. An error that means the database cannot take the work (unreachable, timed out, no connection slot: `P2024` and `P2037`, and a raw-query failure `P2010` whose driver error kind is a connection problem) answers 503 like an open circuit and does not count as a query mistake. Any other code is a 500 with a fixed message, logged with its stack.",
     "- **Logging.** The pino request serializer keeps the request `id`, `method` and `path` without the query string; headers, route parameters and the client address are not logged. A 5xx response is a `warn` access line, because the exception filter has already logged the cause once at `error`. `x-request-id` is kept when it matches a safe pattern, otherwise a UUID is generated.",
-    "- **Rate limits.** 100 requests per minute and client on every route, 10 on the LLM routes and 5 on `POST /auth/validate`; the 429 message is `Too many requests`. The counters are in this process's memory, so each replica counts on its own.",
+    "- **Rate limits.** 100 requests per minute and client on every route and 5 on `POST /auth/validate`; the 429 message is `Too many requests`. The counters are in this process's memory, so each replica counts on its own.",
     "- **Database TLS.** `deriveSslOption` decides TLS from `sslmode` and the host (loopback and single-label hosts such as the compose `db` stay plaintext), and `stripSslParameters` removes `sslmode`, `sslrootcert`, `sslcert`, `sslkey` and `uselibpqcompat` from the URL that reaches the pool, because `node-postgres` would otherwise build its own `ssl` object from them and discard that decision. A private CA goes through `NODE_EXTRA_CA_CERTS`. Whether production may connect without TLS at all is a separate, earlier check (see Configuration).",
     "- **Responses.** Every handler declares its response with `@ZodResponse`, including the demo routes under `/test` (status 200), so the OpenAPI document and the serializer agree.",
-]
-
-_NESTJS_QUEUE_DASHBOARD_SECTION = [
-    "## Queue dashboard credentials",
-    "",
-    "Bull Board is mounted by `MonitoringModule` at `/admin/queues` under the global prefix, so it lives at `/api/v1/admin/queues`. It is Express middleware: `APP_GUARD` never sees it, and its only gate is `src/modules/monitoring/queue-dashboard-auth.ts`, which fails closed.",
-    "",
-    "- No `QUEUE_MONITOR_PASSWORD`: every request gets 404, as if the dashboard did not exist.",
-    "- Password set (16 characters or more): HTTP basic auth with `QUEUE_MONITOR_USER` (default `admin`) and that password.",
-    "",
-    "The dashboard shows job payloads, which are user conversations, and can retry or delete jobs. Serve it over TLS, keep it off the public internet, and rotate the password by changing `.env` and restarting. A scaffolded `.env` already holds a generated password.",
 ]
 
 _NESTJS_ROLE_SOURCES = {
@@ -1283,10 +1245,10 @@ _NESTJS_TEST_TRACEABILITY_SECTION = [
     "",
     "Each test names the requirement it verifies and the code it validates, so a reviewer can walk from a requirement to its tests and on to the code, and back:",
     "",
-    "- **Requirement**: a title prefix, `it('[REQ-CHAT-012] when the assistant fails, then the API answers 503', ...)` or `describe('[REQ-AUTH-003] ...')`. Where a prefix does not fit, put a TSDoc line `Validates REQ-CHAT-012.` above the spec.",
-    "- **Code**: a TSDoc line above the spec, `Validates ChatbotService.chat().`",
+    "- **Requirement**: a title prefix, `it('[REQ-ITEMS-012] when the item does not exist, then the API answers 404', ...)` or `describe('[REQ-AUTH-003] ...')`. Where a prefix does not fit, put a TSDoc line `Validates REQ-ITEMS-012.` above the spec.",
+    "- **Code**: a TSDoc line above the spec, `Validates ItemsService.remove().`",
     "",
-    "The requirement format is `[REQ-<AREA>-<NNN>]`: the feature area (`CHAT`, `AUTH`, `ITEMS`) and a three-digit number. The IDs come from your project's own requirements source. The template ships none, because it has no requirements of its own, and you should not invent them. Find a requirement's tests with `grep -rn \"REQ-CHAT-012\" src test`.",
+    "The requirement format is `[REQ-<AREA>-<NNN>]`: the feature area (`AUTH`, `ITEMS`) and a three-digit number. The IDs come from your project's own requirements source. The template ships none, because it has no requirements of its own, and you should not invent them. Find a requirement's tests with `grep -rn \"REQ-ITEMS-012\" src test`.",
 ]
 
 
@@ -1320,54 +1282,6 @@ def _nestjs_migrations_section(auth: str | None) -> list[str]:
     return lines
 
 
-def _nestjs_baml_flow_section() -> list[str]:
-    return [
-        "## BAML Integration",
-        "",
-        "LLM functions are defined in `baml_src/*.baml`. The BAML compiler emits a generated TypeScript client into `baml_client/`. The generated client must not be hand-edited — always regenerate it after any `.baml` change:",
-        "",
-        "```bash",
-        "npx baml-cli generate",
-        "```",
-        "",
-        "### Generator configuration (`baml_src/generators.baml`)",
-        "",
-        "The generator targets TypeScript with async default client mode (`default_client_mode async`), so every `b.FunctionName()` call returns a `Promise`. The output directory is `baml_client/` (one level above `baml_src/`). Its `version` must equal the `@boundaryml/baml` pin in `package.json`.",
-        "",
-        "### Chatbot call flow",
-        "",
-        "```",
-        "ChatbotController",
-        "├── POST /chat          → ChatbotService.chat(request)                      → 200 { answer }",
-        "│                          └─ CHAT_COMPLETION_PORT.complete(prompt)",
-        "│                             └─ BamlChatCompletionAdapter → b.Chat(user_question, conversation_history)",
-        "├── POST /chat/stream   → ChatbotService.streamChat(request, signal)  [SSE, 200 text/event-stream]",
-        "│                          └─ CHAT_COMPLETION_PORT.streamAnswer(prompt)",
-        "│                             └─ BamlChatCompletionAdapter → b.stream.Chat(user_question, conversation_history)",
-        "├── POST /chat/jobs     → ChatJobService.enqueue(request, ownerId)          → 202 { jobId }",
-        "└── GET  /chat/jobs/:id → ChatJobService.getStatus(id, ownerId)             → { jobId, state, result }",
-        "                             ChatProcessor.process(job)  [BullMQ worker]",
-        "                                └─ ChatbotService.chat(request)",
-        "```",
-        "",
-        "`ChatbotService` depends on the `CHAT_COMPLETION_PORT` interface; `BamlChatCompletionAdapter` is the only file that imports `baml_client`, so specs swap in a fake and never call a model. `ChatbotService.chat` and `ChatbotService.streamChat` run on the request path. The `ChatProcessor` worker answers queued jobs off the request path via BullMQ.",
-        "",
-        "Error policy, in one place (`ChatbotService`): a failing assistant surfaces as a `ServiceUnavailableException` with a generic message and the original error as its `cause`. The service does not log it: the component that ends the request logs the cause once, with the stack of the `cause` (`describeChatFailure`), which is the exception filter for `POST /chat`, the stream controller for the stream and `ChatProcessor` for a job. `POST /chat` therefore answers **503**, never a 200 with an apology.",
-        "",
-        "`POST /chat/stream` answers **200** with `text/event-stream`, and the OpenAPI document declares that response. The status is committed before the first chunk, so a failure cannot change it: the stream ends with exactly one terminal event, `{ content: '', done: true }` or `{ error, done: true }`. When the client disconnects, the provider call is aborted through an `AbortSignal`, so an abandoned stream stops costing tokens, and nothing more is written or logged.",
-        "",
-        "A queued job is attempted 3 times with exponential backoff from 1 second (`CHAT_JOB_BACKOFF_DELAY_MS`), and every attempt runs the BAML client's own retry policy (`Exponential`, one call plus two retries, in `baml_src/clients.baml`), so a job that keeps failing costs up to 3 x 3 provider calls. A completed job stays readable for 1 hour (`COMPLETED_CHAT_JOB_TTL_SECONDS`, at most 1,000 kept) and a failed one for 24 hours, all in `chat.constants.ts`.",
-        "",
-        "`QueueErrorReporter` listens to the errors the queue and the worker emit on their own, such as a lost Redis connection, and writes one `warn` line per distinct error code at most every 30 seconds (`QUEUE_ERROR_LOG_INTERVAL_MS`), without the message, so a connection string inside it cannot leak. Without it BullMQ prints the raw stack once per reconnect attempt.",
-        "",
-        "`BamlChatCompletionAdapter` calls `setLogLevel('OFF')` when it is loaded, because BAML otherwise prints the full prompt and the reply. The limits are in `chat.constants.ts`: a question of at most 4,000 characters and a history of at most 50 entries of 8,000 characters each; larger requests answer 400.",
-        "",
-        "- `POST /chat/jobs` answers **202** with a random UUID job id; `GET /chat/jobs/:id` answers 404 for an unknown or expired job and for a job that belongs to another caller (the owner comes from `@CurrentUser()`; it is `null` in the no-auth variant).",
-        "- `GET /chat/health` no longer exists; use `GET /health/readiness`.",
-        "- Conversation history goes to the model as a quoted transcript in the user turn, not in the system prompt, so a forged earlier message carries no system authority.",
-    ]
-
-
 def _nestjs_api_claude(auth: str | None, async_db: bool) -> str:
     lines = [
         "# CLAUDE.md",
@@ -1382,19 +1296,18 @@ def _nestjs_api_claude(auth: str | None, async_db: bool) -> str:
         "npm run build                 # Build for production",
         "npm test                      # Run unit tests",
         "npm run test:cov              # Unit tests + 75% coverage gate",
-        "npm run test:e2e              # e2e tests (in-memory fakes, no Postgres/Redis)",
+        "npm run test:e2e              # e2e tests (in-memory fakes, no Postgres)",
         "npm run lint                  # ESLint, fails on warnings",
         "npm run format:check          # Prettier check (npm run format to fix)",
         "npx prisma migrate dev        # Create and apply migration (dev)",
         "npx prisma migrate deploy     # Apply migrations (production)",
         "npx prisma db execute --file prisma/migrations/<dir>/down.sql  # Roll one migration back",
         "npx prisma generate           # Regenerate Prisma client",
-        "npx baml-cli generate         # Regenerate BAML client",
         "```",
         "",
         "## Architecture Overview",
         "",
-        "This is a NestJS application with BAML-powered AI chatbot functionality.",
+        "This is a NestJS application with a modular architecture on Prisma and PostgreSQL.",
         "",
         "### Core Structure",
         "",
@@ -1403,8 +1316,6 @@ def _nestjs_api_claude(auth: str | None, async_db: bool) -> str:
         "",
         "prisma/schema.prisma       # Database models",
         "prisma/migrations/         # One directory per migration: migration.sql + down.sql",
-        "baml_src/                  # BAML definitions for LLM functions",
-        "baml_client/               # Auto-generated BAML TypeScript client (don't edit)",
         "test/                      # e2e specs; support/ holds the harness and the in-memory fakes",
         "```",
         "",
@@ -1412,7 +1323,7 @@ def _nestjs_api_claude(auth: str | None, async_db: bool) -> str:
         "",
         "**Database Access**: `PrismaService` is injected via DI. `PrismaModule` is not global: a module that needs the database imports it, and it exports `PrismaService`, `DATABASE_CIRCUIT_BREAKER` and `DATABASE_HEALTH_PORT`.",
         "",
-        "**Ports and adapters**: services depend on a port token (`ITEM_REPOSITORY`, `CHAT_COMPLETION_PORT`, `DATABASE_HEALTH_PORT`, `ACCESS_TOKEN_VERIFIER`) and a module binds the adapter with `{ provide, useClass }`. Specs bind fakes instead.",
+        "**Ports and adapters**: services depend on a port token (`ITEM_REPOSITORY`, `DATABASE_HEALTH_PORT`, `ACCESS_TOKEN_VERIFIER`) and a module binds the adapter with `{ provide, useClass }`. Specs bind fakes instead.",
         "",
         "**Models**: Defined in `prisma/schema.prisma`. Regenerate client with `npx prisma generate`.",
         "",
@@ -1421,17 +1332,15 @@ def _nestjs_api_claude(auth: str | None, async_db: bool) -> str:
         "**DTO Naming**: `Create<Entity>Dto`, `Update<Entity>Dto`, `<Entity>ResponseDto` pattern (Zod-based via nestjs-zod). Handlers declare the response schema with `@ZodResponse`.",
         "",
     ]
-    lines += _NESTJS_CONFIG_SECTION + [""]
+    lines += _nestjs_config_section(auth) + [""]
     lines += _NESTJS_PLATFORM_SECTION + [""]
     if auth in _NESTJS_AUTH_SECTIONS:
         lines += _NESTJS_AUTH_SECTIONS[auth] + [""]
     lines += _nestjs_roles_section(auth) + [""]
     lines += _NESTJS_AUDIT_SECTION + [""]
     lines += _nestjs_migrations_section(auth) + [""]
-    lines += _NESTJS_QUEUE_DASHBOARD_SECTION + [""]
     lines += _NESTJS_LINT_SECTION + [""]
     lines += _NESTJS_TEST_TRACEABILITY_SECTION + [""]
-    lines += _nestjs_baml_flow_section() + [""]
     lines.append(_NESTJS_READINESS_CHECKLIST)
     return "\n".join(lines)
 

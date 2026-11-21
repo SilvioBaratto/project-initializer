@@ -5,7 +5,7 @@ Two modes live side by side and guard different routes.
 Static shared secret
     Set ``AUTH_TOKEN``. Clients send ``Authorization: Bearer <AUTH_TOKEN>``.
     ``POST /auth/validate`` tells whether a token is the configured one, and the
-    static guard protects ``GET /auth/me``, item writes and chat. It suits
+    static guard protects ``GET /auth/me`` and item writes. It suits
     service-to-service calls, where one shared secret is enough.
 
 JWT login

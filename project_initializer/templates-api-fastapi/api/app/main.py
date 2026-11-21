@@ -69,7 +69,7 @@ CORS_EXPOSED_HEADERS = [
 ]
 CORS_PREFLIGHT_MAX_AGE_SECONDS = 600
 
-API_SUMMARY = "Layered API scaffold with BAML LLM integration."
+API_SUMMARY = "Layered API scaffold."
 # Identity metadata is fixed when the project is scaffolded, not per deployment,
 # so it lives here instead of in Settings. Replace it with your own.
 CONTACT_INFO = {"name": "API Support", "email": "support@example.com"}
@@ -86,10 +86,6 @@ TAGS_METADATA = [
         "name": "Auth",
         "description": "Who the caller is, plus token validation and JWT "
         "register and login in the token variant.",
-    },
-    {
-        "name": "Chatbot",
-        "description": "BAML-powered LLM chat: complete and streaming replies.",
     },
     {
         "name": "Test",

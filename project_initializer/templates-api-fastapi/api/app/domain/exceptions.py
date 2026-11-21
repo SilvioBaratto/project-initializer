@@ -101,7 +101,7 @@ class AuthorizationError(DomainError):
 
 
 class ExternalServiceError(DomainError):
-    """A dependency outside the application, such as the database or an LLM, failed.
+    """A dependency outside the application, such as the database or an identity provider, failed.
 
     The public message never names the dependency; put its name in ``log_context``.
     """

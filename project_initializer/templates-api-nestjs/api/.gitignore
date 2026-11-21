@@ -6,7 +6,6 @@ dist/
 
 # Generated
 generated/
-baml_client/
 
 # Environment
 .env

@@ -2,8 +2,7 @@
 
 The generator is composed of small per-section builders (``_database_section``,
 ``_supabase_section``, ``_entra_section``, ``_token_section``, ``_server_section``,
-``_redis_section``, ``_queue_dashboard_section``, ``_topology_section``,
-``_llm_section``). Each returns a
+``_topology_section``). Each returns a
 ``list[str]`` of ``KEY=VALUE`` / comment lines and is selected by the
 framework/auth flags in :func:`generate_env`. Splitting the flat body into
 sections keeps every variant's output explicit and testable.
@@ -34,13 +33,11 @@ _Lookup = Callable[..., str]
 _DEFAULTS_PATH = Path(__file__).parent / "env_defaults.env"
 
 # Keys whose value is a credential. They are generated per scaffold and are
-# blank in every example file: AUTH_TOKEN (token auth, both frameworks),
-# JWT_SECRET_KEY (FastAPI token auth) and QUEUE_MONITOR_PASSWORD (NestJS queue
-# dashboard, every auth mode).
+# blank in every example file: AUTH_TOKEN (token auth, both frameworks) and
+# JWT_SECRET_KEY (FastAPI token auth).
 GENERATED_SECRET_KEYS: tuple[str, ...] = (
     "AUTH_TOKEN",
     "JWT_SECRET_KEY",
-    "QUEUE_MONITOR_PASSWORD",
 )
 
 # The value earlier releases shipped for AUTH_TOKEN and JWT_SECRET_KEY. It is
@@ -171,31 +168,6 @@ def _server_section(val: _Lookup, *, is_fastapi: bool) -> list[str]:
     return lines
 
 
-def _redis_section(val: _Lookup) -> list[str]:
-    """Emit the ``# Redis`` block (app config, NestJS/BullMQ only)."""
-    return [
-        "",
-        "# Redis",
-        f"REDIS_HOST={val('REDIS_HOST', 'localhost')}",
-        f"REDIS_PORT={val('REDIS_PORT', '6379')}",
-    ]
-
-
-def _queue_dashboard_section(val: _Lookup) -> list[str]:
-    """Emit the ``# Queue dashboard`` block (app config, NestJS/BullMQ only).
-
-    The dashboard is closed (answers 404) while the password is blank, so the
-    example file ships it blank and the generated ``.env`` carries a random one.
-    """
-    return [
-        "",
-        "# Queue dashboard",
-        "# A blank password keeps the dashboard closed (404); 16+ characters when set.",
-        f"QUEUE_MONITOR_USER={val('QUEUE_MONITOR_USER', 'admin')}",
-        f"QUEUE_MONITOR_PASSWORD={val('QUEUE_MONITOR_PASSWORD')}",
-    ]
-
-
 def _topology_section(val: _Lookup, *, is_supabase: bool, frontend: bool) -> list[str]:
     """Emit the compose-topology block (read by docker-compose, not the app).
 
@@ -217,33 +189,6 @@ def _topology_section(val: _Lookup, *, is_supabase: bool, frontend: bool) -> lis
         lines.append(f"DB_HOST_PORT={val('DB_HOST_PORT', '5433')}")
         lines.append(f"ADMINER_HOST_PORT={val('ADMINER_HOST_PORT', '8080')}")
     return lines
-
-
-def _llm_section(val: _Lookup) -> list[str]:
-    """Emit the Azure OpenAI + alternative-provider blocks (BAML, all variants).
-
-    ``BAML_LOG`` is pinned to ``off`` because BAML prints the full prompt and the
-    reply at INFO, and at WARN on failures, which is user content in the logs.
-    Both adapters already silence it in code; the variable keeps it silent for
-    code that calls the generated BAML client directly. Only ``error`` and
-    ``off`` keep BAML quiet.
-    """
-    return [
-        "",
-        "# Azure OpenAI (BAML)",
-        f"AZURE_OPENAI_BASE_URL={val('AZURE_OPENAI_BASE_URL')}",
-        f"AZURE_OPENAI_API_VERSION={val('AZURE_OPENAI_API_VERSION')}",
-        f"AZURE_OPENAI_API_KEY={val('AZURE_OPENAI_API_KEY')}",
-        "",
-        "# Alternative LLM Providers (BAML)",
-        f"ANTHROPIC_API_KEY={val('ANTHROPIC_API_KEY')}",
-        f"OPENAI_API_KEY={val('OPENAI_API_KEY')}",
-        f"GOOGLE_API_KEY={val('GOOGLE_API_KEY')}",
-        f"OLLAMA_BASE_URL={val('OLLAMA_BASE_URL', 'http://localhost:11434/v1')}",
-        "",
-        "# BAML logs prompts and replies unless this is off or error",
-        f"BAML_LOG={val('BAML_LOG', 'off')}",
-    ]
 
 
 def _fill_secret(current: str, generated: str | None) -> str:
@@ -295,11 +240,7 @@ def _assemble_lines(
     if auth == "token":
         lines += _token_section(val, is_fastapi=is_fastapi)
     lines += _server_section(val, is_fastapi=is_fastapi)
-    if not is_fastapi:
-        lines += _redis_section(val)
-        lines += _queue_dashboard_section(val)
     lines += _topology_section(val, is_supabase=is_supabase, frontend=frontend)
-    lines += _llm_section(val)
     return lines
 
 

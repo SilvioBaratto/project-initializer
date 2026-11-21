@@ -41,8 +41,6 @@ def _expected_secret_keys(framework: str, auth: str | None) -> set[str]:
         keys.add("AUTH_TOKEN")
         if framework == "fastapi":
             keys.add("JWT_SECRET_KEY")
-    if framework == "nestjs":
-        keys.add("QUEUE_MONITOR_PASSWORD")
     return keys
 
 
@@ -73,11 +71,7 @@ def test_when_secret_keys_listed_then_credential_keys_are_covered():
 
     Validates project_initializer/env_generator.py GENERATED_SECRET_KEYS.
     """
-    assert set(GENERATED_SECRET_KEYS) == {
-        "AUTH_TOKEN",
-        "JWT_SECRET_KEY",
-        "QUEUE_MONITOR_PASSWORD",
-    }
+    assert set(GENERATED_SECRET_KEYS) == {"AUTH_TOKEN", "JWT_SECRET_KEY"}
 
 
 @pytest.mark.unit
@@ -274,46 +268,6 @@ def test_when_variant_is_not_supabase_fastapi_then_ssl_and_pool_keys_are_absent(
 
     assert "DATABASE_SSL_MODE" not in env
     assert "DATABASE_POOL_RECYCLE" not in env
-
-
-# --- generate_env: queue dashboard ------------------------------------------
-
-
-@pytest.mark.unit
-@pytest.mark.parametrize("auth", AUTH_MODES)
-def test_when_nestjs_env_generated_then_queue_dashboard_block_is_present(auth):
-    """Every NestJS variant mounts the dashboard, so every one declares its credentials.
-
-    Validates project_initializer/env_generator.py generate_env().
-    """
-    text = generate_env("nestjs", auth, {})
-    env = parse_env_text(text)
-
-    assert "# Queue dashboard" in text
-    assert env["QUEUE_MONITOR_USER"] == "admin"
-    assert env["QUEUE_MONITOR_PASSWORD"] == ""
-
-
-@pytest.mark.unit
-def test_when_source_sets_queue_user_then_it_overrides_the_default():
-    """QUEUE_MONITOR_USER follows the source env; only the password is generated.
-
-    Validates project_initializer/env_generator.py generate_env().
-    """
-    env = parse_env_text(generate_env("nestjs", None, {"QUEUE_MONITOR_USER": "ops"}))
-
-    assert env["QUEUE_MONITOR_USER"] == "ops"
-
-
-@pytest.mark.unit
-def test_when_fastapi_env_generated_then_queue_dashboard_is_absent():
-    """The dashboard is a NestJS/BullMQ feature, so FastAPI never gets its keys.
-
-    Validates project_initializer/env_generator.py generate_env().
-    """
-    text = generate_env("fastapi", "token", {}, secrets=new_generated_secrets())
-
-    assert "QUEUE_MONITOR" not in text
 
 
 # --- env_defaults.env -------------------------------------------------------

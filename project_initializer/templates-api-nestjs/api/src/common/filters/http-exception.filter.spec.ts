@@ -100,9 +100,9 @@ describe('HttpExceptionFilter', () => {
     });
 
     it('then a 5xx without a cause is one warning line, since nothing unexpected happened', () => {
-      const response = handle(new ServiceUnavailableException('Chat is down'));
+      const response = handle(new ServiceUnavailableException('Service is down'));
 
-      expect(sentErrorBody(response).message).toBe('Chat is down');
+      expect(sentErrorBody(response).message).toBe('Service is down');
       expect(warnLog).toHaveBeenCalledTimes(1);
       expect(warnLog).toHaveBeenCalledWith(`${REQUEST_SUMMARY} failed with 503`);
       expect(errorLog).not.toHaveBeenCalled();
@@ -111,7 +111,7 @@ describe('HttpExceptionFilter', () => {
     it('then a 5xx with a cause logs that cause once at error level and nothing else', () => {
       const cause = new Error('upstream refused');
 
-      handle(new InternalServerErrorException('Chat failed', { cause }));
+      handle(new InternalServerErrorException('Operation failed', { cause }));
 
       expect(errorLog).toHaveBeenCalledTimes(1);
       expect(errorLog).toHaveBeenCalledWith({ err: cause }, `${REQUEST_SUMMARY} failed with 500`);

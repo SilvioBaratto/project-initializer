@@ -1,5 +1,4 @@
 import type { Server } from 'node:http';
-import { getQueueToken } from '@nestjs/bullmq';
 import { INestApplication, Type } from '@nestjs/common';
 import { Test, TestingModuleBuilder } from '@nestjs/testing';
 import { AppModule } from '../../src/app.module';
@@ -8,20 +7,10 @@ import {
   ACCESS_TOKEN_VERIFIER,
   AccessTokenVerifier,
 } from '../../src/common/auth/access-token-verifier';
-import { CHAT_COMPLETION_PORT } from '../../src/modules/chatbot/chat-completion.port';
-import { CHAT_QUEUE_NAME } from '../../src/modules/chatbot/chat.constants';
-import { ChatProcessor } from '../../src/modules/chatbot/chat.processor';
 import { DATABASE_HEALTH_PORT } from '../../src/modules/health/database-health.port';
 import { ITEM_REPOSITORY } from '../../src/modules/items/item.repository';
 import { PrismaService } from '../../src/prisma/prisma.service';
-import {
-  acceptAllVerifier,
-  createFakeChatQueue,
-  FakeChatCompletion,
-  FakeChatQueue,
-  InMemoryItemRepository,
-  upDatabaseHealth,
-} from './test-doubles';
+import { acceptAllVerifier, InMemoryItemRepository, upDatabaseHealth } from './test-doubles';
 
 /** Options for {@link createE2eApp}. */
 export interface E2eAppOptions {
@@ -39,8 +28,6 @@ export interface E2eAppOptions {
 /** A running application plus the doubles behind it, so a test can inspect or steer them. */
 export interface E2eApp {
   app: INestApplication;
-  chatQueue: FakeChatQueue;
-  chatCompletion: FakeChatCompletion;
   items: InMemoryItemRepository;
 }
 
@@ -60,19 +47,16 @@ const prismaServiceStub = {
 };
 
 /**
- * Boots the whole `AppModule` over in-memory doubles, so e2e runs need neither Postgres nor Redis.
+ * Boots the whole `AppModule` over in-memory doubles, so e2e runs need no Postgres.
  *
  * The app is configured through the same `configureApp` as `main.ts`, so prefix, filters and CORS
- * match production. `ChatProcessor` is replaced by an empty object because constructing the real
- * BullMQ worker opens a Redis connection.
+ * match production.
  *
  * @param options - See {@link E2eAppOptions}.
  * @returns The initialised application; the caller closes it in `afterAll`.
  */
 export async function createE2eApp(options: E2eAppOptions = {}): Promise<E2eApp> {
   const doubles = {
-    chatQueue: createFakeChatQueue(),
-    chatCompletion: new FakeChatCompletion(),
     items: new InMemoryItemRepository(),
   };
   const verifier = options.verifier === undefined ? acceptAllVerifier : options.verifier;
@@ -96,7 +80,7 @@ export async function createE2eApp(options: E2eAppOptions = {}): Promise<E2eApp>
   return { app, ...doubles };
 }
 
-/** Replaces every provider that would reach Postgres, Redis or the LLM with its in-memory double. */
+/** Replaces every provider that would reach Postgres with its in-memory double. */
 function overrideInfrastructure(
   builder: TestingModuleBuilder,
   doubles: Omit<E2eApp, 'app'>,
@@ -107,11 +91,5 @@ function overrideInfrastructure(
     .overrideProvider(DATABASE_HEALTH_PORT)
     .useValue(upDatabaseHealth)
     .overrideProvider(ITEM_REPOSITORY)
-    .useValue(doubles.items)
-    .overrideProvider(getQueueToken(CHAT_QUEUE_NAME))
-    .useValue(doubles.chatQueue)
-    .overrideProvider(ChatProcessor)
-    .useValue({})
-    .overrideProvider(CHAT_COMPLETION_PORT)
-    .useValue(doubles.chatCompletion);
+    .useValue(doubles.items);
 }

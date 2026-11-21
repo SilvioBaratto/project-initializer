@@ -11,7 +11,6 @@ they fail until the implementation satisfies the spec.
 Criteria skipped (oracle: NOT VERIFIABLE):
   - Terminus health module replacing the ad-hoc health check (structural prose)
   - e2e test scaffold existence (suite-level gate)
-  - BullMQ job offloading (optional)
   - "All tests pass" (suite gate, no per-criterion assertion)
   - SOLID / clean code (subjective prose)
 """

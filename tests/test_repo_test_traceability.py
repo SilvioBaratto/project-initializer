@@ -36,6 +36,7 @@ NEW_MODULES = (
     "test_fastapi_requirements.py",
     "test_nestjs_auth_seam.py",
     "test_nestjs_migrations.py",
+    "test_no_ai_framework_in_templates.py",
     "test_template_packaging_complete.py",
     "test_repo_test_traceability.py",
 )
@@ -45,6 +46,11 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
         {
             "test_when_scaffolded_with_async_db_async_files_exist",
             "test_when_async_db_false_scaffold_is_byte_identical_to_default",
+        }
+    ),
+    "test_ci_workflow_scope.py": frozenset(
+        {
+            "test_when_api_only_steps_are_gated_against_frontend_scope",
         }
     ),
     "test_docker_runtime_invariants.py": frozenset(
@@ -57,6 +63,12 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_nestjs_production_image_ships_the_prisma_config_the_entrypoint_needs",
             "test_no_compose_file_hardcodes_container_names",
             "test_every_published_host_port_is_parametrized",
+        }
+    ),
+    "test_docs_sync_async.py": frozenset(
+        {
+            "test_when_api_claude_md_read_async_reserved_for_real_async_io_documented",
+            "test_when_api_claude_md_read_canonical_sync_example_cited",
         }
     ),
     "test_entra_nestjs_overlay.py": frozenset(
@@ -87,6 +99,7 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_when_app_module_is_read_then_database_url_is_required_in_env_validation",
             "test_when_supabase_env_validation_is_read_then_supabase_secrets_are_required",
             "test_when_app_module_is_read_then_config_module_uses_validate_option",
+            "test_when_app_setup_and_main_ts_are_read_then_global_prefix_api_v1_is_set",
         }
     ),
     "test_issue_003_zod_serialization.py": frozenset(
@@ -100,30 +113,12 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_when_all_dto_files_are_read_then_no_schema_calls_passthrough",
             "test_when_serialization_spec_is_searched_then_it_exists",
             "test_when_serialization_spec_is_read_then_it_asserts_password_is_stripped",
-            "test_when_serialization_spec_is_read_then_it_asserts_sse_handler_has_no_serializer_metadata",
-        }
-    ),
-    "test_issue_10_bull_board.py": frozenset(
-        {
-            "test_when_base_app_module_is_read_then_monitoring_module_is_imported",
-            "test_when_overlay_is_listed_then_it_does_not_replace_the_shared_app_module",
-            "test_when_app_setup_and_main_ts_are_read_then_global_prefix_api_v1_is_set",
-            "test_when_auth_overlay_app_auth_is_read_then_app_guard_is_registered",
-            "test_when_nestjs_src_is_scanned_then_database_url_appears_in_validation_schema",
-            "test_when_response_schemas_are_scanned_then_password_field_is_absent_from_all",
         }
     ),
     "test_issue_11_packaging.py": frozenset(
         {
             "test_when_fastapi_entra_overlay_checked_then_auth_seam_and_verifier_exist",
             "test_when_entra_env_example_generated_then_no_client_secret_is_present",
-        }
-    ),
-    "test_issue_12_chat_job_status.py": frozenset(
-        {
-            "test_when_token_overlay_app_auth_is_read_then_access_token_guard_is_registered_as_app_guard",
-            "test_when_supabase_overlay_app_auth_is_read_then_access_token_guard_is_registered_as_app_guard",
-            "test_when_dto_files_are_scanned_then_no_dto_exposes_a_password_field",
         }
     ),
     "test_issue_12_global_criteria.py": frozenset(
@@ -167,6 +162,7 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_when_base_env_validation_is_read_then_database_url_is_a_required_field",
             "test_when_supabase_env_validation_is_read_then_supabase_url_is_a_required_field",
             "test_when_serialization_spec_is_read_then_it_asserts_secret_field_is_absent_from_response",
+            "test_when_claude_md_is_read_then_it_references_all_five_global_acceptance_criteria",
         }
     ),
     "test_issue_13_no_client_secret.py": frozenset(
@@ -179,7 +175,6 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
         {
             "test_when_token_app_auth_is_read_then_app_guard_is_registered",
             "test_when_supabase_app_auth_is_read_then_app_guard_is_registered",
-            "test_when_claude_md_is_read_then_baml_call_flow_is_documented",
             "test_when_config_module_setup_is_read_then_validate_option_is_present",
             "test_when_env_validation_schema_is_read_then_required_secrets_are_declared",
             "test_when_user_response_schema_is_read_then_password_field_is_not_exposed",
@@ -194,6 +189,11 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_when_response_schema_exists_then_password_field_is_absent",
             "test_when_token_overlay_app_module_is_read_then_app_guard_is_imported",
             "test_when_supabase_overlay_app_module_is_read_then_app_guard_is_imported",
+        }
+    ),
+    "test_issue_15_ci_matrix_entra.py": frozenset(
+        {
+            "test_when_fastapi_entra_row_install_cmd_is_pip_install_requirements",
         }
     ),
     "test_issue_15_entra_global_criteria.py": frozenset(
@@ -271,6 +271,7 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
         {
             "test_when_token_app_auth_is_inspected_auth_guard_is_registered_as_app_guard",
             "test_when_supabase_app_auth_is_inspected_auth_guard_is_registered_as_app_guard",
+            "test_when_item_dto_is_inspected_response_schema_does_not_include_sensitive_field_names",
         }
     ),
     "test_issue_9_no_client_secret.py": frozenset(
@@ -295,24 +296,12 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_when_supabase_overlay_app_auth_is_read_then_APP_GUARD_is_registered",
             "test_when_config_validation_is_read_then_DATABASE_URL_is_a_required_key",
             "test_when_response_schema_files_are_read_then_password_is_not_a_whitelisted_field",
-            "test_when_src_tree_is_searched_then_at_least_one_service_spec_uses_TestingModule",
+            "test_when_src_tree_is_searched_then_at_least_one_provider_spec_uses_TestingModule",
         }
     ),
     "test_nestjs_lockfile_sync.py": frozenset(
         {
             "test_nestjs_layer_owns_a_lock_exactly_when_it_ships_a_package_json",
-        }
-    ),
-    "test_nestjs_redis_bullmq.py": frozenset(
-        {
-            "test_when_token_overlay_app_auth_is_read_then_access_token_guard_is_registered_as_app_guard",
-            "test_when_supabase_overlay_app_auth_is_read_then_access_token_guard_is_registered_as_app_guard",
-            "test_when_base_env_validation_file_is_read_then_database_url_is_a_required_field",
-            "test_when_auth_overlay_is_listed_then_bull_module_comes_from_the_shared_app_module",
-            "test_when_env_validation_is_evaluated_then_redis_host_defaults_to_localhost",
-            "test_when_env_validation_is_evaluated_then_redis_port_defaults_to_6379",
-            "test_when_base_app_module_is_read_then_queue_monitor_module_is_registered",
-            "test_when_response_dtos_are_scanned_then_no_password_field_is_exposed",
         }
     ),
     "test_scope_scaffold.py": frozenset(

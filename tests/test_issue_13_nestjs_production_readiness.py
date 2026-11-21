@@ -13,7 +13,7 @@ Verifiable criteria covered (per oracle report):
   [UNIT] NestJS template test scaffold exists (e2e spec + config present)
 
 NOT VERIFIABLE criteria (skipped per oracle):
-  Terminus health module, e2e scaffold existence as a suite-gate, BullMQ offload,
+  Terminus health module, e2e scaffold existence as a suite-gate,
   end-to-end verified status table, gap-filing prose, all-tests-pass boilerplate,
   SOLID / line-count subjective rules.
 """
@@ -182,7 +182,7 @@ def test_when_serialization_spec_is_read_then_it_asserts_secret_field_is_absent_
 
 # ---------------------------------------------------------------------------
 # Criterion: CLAUDE.md carries the full concerns checklist with legend,
-#            nine sections, six Global acceptance criteria, citations, provenance
+#            nine sections, five Global acceptance criteria, citations, provenance
 # ---------------------------------------------------------------------------
 
 _NINE_SECTION_KEYWORDS = [
@@ -205,7 +205,6 @@ _GLOBAL_CRITERIA_KEYWORDS = [
     "whitelist",
     "Terminus",
     "e2e",
-    "BullMQ",
 ]
 
 
@@ -226,7 +225,11 @@ def test_when_claude_md_is_read_then_it_covers_all_nine_concern_sections():
         )
 
 
-def test_when_claude_md_is_read_then_it_references_all_six_global_acceptance_criteria():
+def test_when_claude_md_is_read_then_it_references_all_five_global_acceptance_criteria():
+    """The generated checklist names the keyword of each of the five global criteria.
+
+    Validates project_initializer/docs_generator.py generate_api_claude() global acceptance criteria table.
+    """
     content = CLAUDE_MD.read_text(encoding="utf-8")
     for keyword in _GLOBAL_CRITERIA_KEYWORDS:
         assert keyword in content, (

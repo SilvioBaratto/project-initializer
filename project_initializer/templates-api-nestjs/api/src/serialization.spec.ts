@@ -2,7 +2,6 @@ import 'reflect-metadata';
 import { ZodSerializerDto } from 'nestjs-zod';
 import { EchoResponseDto, PingResponseDto } from './modules/test/dto/echo.dto';
 import { ItemResponseDto, ItemResponseSchema } from './modules/items/dto/item.dto';
-import { ChatbotController } from './modules/chatbot/chatbot.controller';
 import { ItemsController } from './modules/items/items.controller';
 import { TestController } from './modules/test/test.controller';
 
@@ -68,10 +67,5 @@ describe('Response serialization', () => {
     ['echoPost', TestController.prototype.echoPost, EchoResponseDto],
   ])('when the %s handler is inspected, then it has a serializer DTO', (_name, handler, dto) => {
     expect(serializerDtoOf(handler)).toBe(dto);
-  });
-
-  it('when the streamChat handler is inspected, then no serializer DTO is attached', () => {
-    // The SSE handler writes to the raw response, so a serializer would parse a stream it never sees.
-    expect(serializerDtoOf(ChatbotController.prototype.streamChat)).toBeUndefined();
   });
 });

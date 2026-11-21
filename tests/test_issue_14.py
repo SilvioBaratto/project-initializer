@@ -1,18 +1,15 @@
 """
-Source-blind example tests for issue #14: NestJS BAML chatbot docs + template hardening.
+Source-blind example tests for issue #14: NestJS template hardening.
 
 Tests derived exclusively from the issue #14 acceptance criteria and
 .code-generator/requirements.md. Criteria classified [NOT VERIFIABLE] by the oracle
-(Terminus health, e2e scaffold, BullMQ offload, all-tests-pass, SOLID quality) are
+(Terminus health, e2e scaffold, all-tests-pass, SOLID quality) are
 intentionally skipped.
 
 Verifiable criteria covered here:
   [UNIT-1] APP_GUARD registered in both the token and supabase overlays
   [UNIT-2] ConfigModule validates env and fails fast on missing secrets
   [UNIT-3] Response schemas whitelist fields (no secret column leaks)
-  [UNIT-4] CLAUDE.md documents the BAML call flow (controller → service → worker)
-  [UNIT-5] CLAUDE.md states baml_src/*.baml location and regeneration command
-  [UNIT-6] CLAUDE.md notes TypeScript target with async default client mode
 """
 
 import re
@@ -28,23 +25,6 @@ PI = REPO_ROOT / "project_initializer"
 NESTJS_BASE_API = PI / "templates-api-nestjs" / "api"
 NESTJS_TOKEN_API = PI / "templates-token-nestjs" / "api"
 NESTJS_SUPABASE_API = PI / "templates-supabase-nestjs" / "api"
-
-# api/.claude/CLAUDE.md is generated per-flag (docs_generator), not shipped
-# static. A tiny path-like shim exposes the generated NestJS api CLAUDE.md text
-# through the same ``.read_text()`` call the criterion tests use.
-
-
-class _GeneratedDoc:
-    def exists(self) -> bool:
-        return True
-
-    def read_text(self, encoding: str = "utf-8") -> str:
-        from project_initializer.docs_generator import generate_api_claude
-
-        return generate_api_claude("nestjs", None)
-
-
-CLAUDE_MD_PATH = _GeneratedDoc()
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -251,114 +231,3 @@ else:
             "No response schema/DTO files discovered in NestJS templates; "
             "implement the response schemas so this property can be verified"
         )
-
-
-# ── [UNIT-4] CLAUDE.md: BAML call flow documentation ─────────────────────────
-
-
-_BAML_CALL_FLOW_TERMS = (
-    (
-        "ChatbotService",
-        "ChatbotService",
-        "the doc must document controller → ChatbotService.chat / streamChat",
-    ),
-    (
-        "streamChat",
-        r"\bstreamChat\b",
-        "the call flow must document both chat and streamChat methods",
-    ),
-    (
-        "ChatProcessor",
-        "ChatProcessor",
-        "the BAML call flow must include the ChatProcessor worker",
-    ),
-    (
-        "baml_client",
-        "baml_client",
-        "the doc must state that the adapter calls the generated baml_client",
-    ),
-    ("b.Chat", r"b\.Chat", "the call flow must document the b.Chat entry point"),
-    (
-        "b.stream.Chat",
-        r"b\.stream\.Chat\b",
-        "the call flow must document the streaming b.stream.Chat entry point",
-    ),
-)
-
-
-def test_when_claude_md_is_read_then_baml_call_flow_is_documented():
-    """
-    Criterion: templates-api-nestjs/api/.claude/CLAUDE.md documents the BAML call
-    flow: controller → ChatbotService.chat / streamChat and the ChatProcessor worker,
-    reaching baml_client through the chat-completion port and calling b.Chat / b.stream.Chat.
-
-    Validates project_initializer/docs_generator.py generate_api_claude().
-    """
-    content = _read(CLAUDE_MD_PATH)
-
-    for label, pattern, why in _BAML_CALL_FLOW_TERMS:
-        assert re.search(pattern, content), f"CLAUDE.md does not mention {label}; {why}"
-    assert "StreamChat" not in content, (
-        "CLAUDE.md still references the removed StreamChat BAML function"
-    )
-
-
-# ── [UNIT-5] CLAUDE.md: baml_src location + regeneration command ─────────────
-
-
-def test_when_claude_md_is_read_then_baml_src_location_and_regen_command_are_stated():
-    """
-    Criterion: the doc states where LLM functions are defined (baml_src/*.baml),
-    how to regenerate the client (npx baml-cli generate), and that baml_client/
-    is generated and must not be hand-edited.
-    """
-    content = _read(CLAUDE_MD_PATH)
-
-    assert "baml_src" in content, (
-        "CLAUDE.md does not mention baml_src; "
-        "the doc must state that LLM functions are defined in baml_src/*.baml"
-    )
-    assert ".baml" in content, (
-        "CLAUDE.md does not reference .baml files; "
-        "the doc must indicate LLM functions live in baml_src/*.baml"
-    )
-    assert "npx baml-cli generate" in content, (
-        "CLAUDE.md does not include 'npx baml-cli generate'; "
-        "the doc must state the regeneration command"
-    )
-    assert re.search(
-        r"must not.*hand.edit|do not.*hand.edit|not.*edit.*by hand|generated.*must not|hand.edited",
-        content,
-        re.IGNORECASE,
-    ), (
-        "CLAUDE.md does not warn that baml_client/ must not be hand-edited; "
-        "the doc must note that baml_client/ is generated output"
-    )
-
-
-# ── [UNIT-6] CLAUDE.md: TypeScript target + async default client mode ─────────
-
-
-def test_when_claude_md_is_read_then_typescript_target_and_async_client_mode_are_noted():
-    """
-    Criterion: the doc notes the generator targets TypeScript with async default
-    client mode (baml_src/generators.baml).
-    """
-    content = _read(CLAUDE_MD_PATH)
-
-    assert "generators.baml" in content, (
-        "CLAUDE.md does not mention generators.baml; "
-        "the doc must reference baml_src/generators.baml"
-    )
-    assert re.search(r"TypeScript|typescript", content), (
-        "CLAUDE.md does not mention the TypeScript target; "
-        "the doc must note that the BAML generator targets TypeScript"
-    )
-    assert re.search(
-        r"async.*default.*client|default.*client.*async|async.*client.*mode",
-        content,
-        re.IGNORECASE,
-    ), (
-        "CLAUDE.md does not mention async default client mode; "
-        "the doc must note that generators.baml configures async default client mode"
-    )
