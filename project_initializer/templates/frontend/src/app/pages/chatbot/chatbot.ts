@@ -22,6 +22,12 @@ import { ChatMessage } from '../../models/chat';
 const ERROR_MESSAGE = "Couldn't get a response. Send your message again.";
 
 /**
+ * Most recent messages sent as conversation history. The API refuses longer histories (the smallest
+ * backend limit is 20), so a long conversation keeps working with only its latest turns as context.
+ */
+const MAX_HISTORY_MESSAGES = 20;
+
+/**
  * Chat view. A message log that scrolls on its own above an outlined Material
  * composer; the composer stays at the bottom of the view, so it sits directly
  * above the shell's compact navigation bar (which the shell renders outside main).
@@ -82,7 +88,9 @@ export class ChatbotComponent {
     afterNextRender(() => this.autosize()?.resizeToFitContent(true), { injector: this.injector });
     this.scrollToBottom();
 
-    const history = this.messages().map((m) => `${m.role}: ${m.content}`);
+    const history = this.messages()
+      .slice(-MAX_HISTORY_MESSAGES)
+      .map((m) => `${m.role}: ${m.content}`);
 
     this.chatService
       .sendMessage(question, history)
