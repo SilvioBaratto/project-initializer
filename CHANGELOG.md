@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-21
+
 Python projects now keep their dependencies and their version in `pyproject.toml` and nowhere else. The first three changes below alter what a **newly scaffolded** FastAPI project contains; a project scaffolded earlier is not touched.
 
 ### Breaking changes for newly scaffolded projects
@@ -261,7 +263,8 @@ Every NestJS variant is now usable in Docker. Three chained bugs each hid the ne
 ### Added
 - Initial public release of the `project-initializer` CLI.
 
-[Unreleased]: https://github.com/SilvioBaratto/project-initializer/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/SilvioBaratto/project-initializer/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/SilvioBaratto/project-initializer/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/SilvioBaratto/project-initializer/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/SilvioBaratto/project-initializer/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/SilvioBaratto/project-initializer/compare/v0.3.9...v0.4.0
