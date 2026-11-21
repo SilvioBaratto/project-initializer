@@ -7,7 +7,7 @@ The NestJS Dockerfile runs `npm ci` when a package-lock.json is present, and
     npm error package-lock.json ... are in sync.
 
 So a drifted lock means the API image never builds — every NestJS variant broken
-in Docker, which is exactly what happened: the @bull-board deps were added to
+in Docker, which is exactly what happened: dependencies were added to
 package.json without regenerating the lock, `templates-token-nestjs` shipped an
 empty stub lock that overwrote the good base one, and `templates-entra-nestjs`
 added jsonwebtoken/jwks-rsa while shipping no lock at all.
@@ -19,10 +19,13 @@ shows whether the pair actually agrees.
 """
 
 import json
+from pathlib import Path
 
 import pytest
 
 from project_initializer.cli import copy_template
+
+_TEMPLATES = Path(__file__).resolve().parent.parent / "project_initializer"
 
 _AUTH_MODES = [None, "token", "supabase", "entra"]
 
@@ -82,3 +85,26 @@ def test_scaffolded_nestjs_lockfile_is_populated(tmp_path, auth):
         f"nestjs+{auth or 'none'}: lock resolves only {len(lock['packages'])} "
         "packages — it looks like an empty stub, not a real tree"
     )
+
+
+@pytest.mark.parametrize(
+    "overlay,ships_manifest",
+    [
+        ("templates-api-nestjs", True),
+        ("templates-supabase-nestjs", True),
+        ("templates-entra-nestjs", True),
+        ("templates-token-nestjs", False),
+    ],
+)
+def test_nestjs_layer_owns_a_lock_exactly_when_it_ships_a_package_json(
+    overlay, ships_manifest
+):
+    """A lock follows its package.json: an overlay with its own manifest carries its own lock,
+    and the token overlay, which has none, inherits the base pair. A lock without its manifest
+    would overwrite the base lock with one that matches nothing.
+
+    Validates the package.json and package-lock.json of project_initializer/templates-{api,supabase,entra,token}-nestjs/api.
+    """
+    api = _TEMPLATES / overlay / "api"
+    assert (api / "package.json").is_file() is ships_manifest
+    assert (api / "package-lock.json").is_file() is ships_manifest

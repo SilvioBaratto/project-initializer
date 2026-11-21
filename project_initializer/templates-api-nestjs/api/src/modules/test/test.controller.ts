@@ -1,87 +1,59 @@
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import { ApiBadRequestResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ZodResponse } from 'nestjs-zod';
 import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
-  Body,
-  Param,
-  HttpCode,
-  HttpStatus,
-} from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { ZodSerializerDto } from 'nestjs-zod';
-import { TestService } from './test.service';
-import {
-  CreateItemDto,
-  UpdateItemDto,
-  ItemResponseDto,
-  ItemListResponseDto,
-} from './dto/item.dto';
-import { EchoRequestDto, EchoResponseDto } from './dto/echo.dto';
+  EchoParamDto,
+  EchoRequestDto,
+  EchoResponseDto,
+  PING_MESSAGE,
+  PingResponseDto,
+} from './dto/echo.dto';
 
+const VALIDATION_FAILED_DESCRIPTION = 'The message is missing or longer than the limit';
+
+/** Smoke-test routes that touch no database, mounted at `/api/v1/test`. */
 @ApiTags('Test')
 @Controller('test')
 export class TestController {
-  constructor(private readonly testService: TestService) {}
-
+  /**
+   * Proves the server is up and the serialization pipeline runs.
+   *
+   * @returns the fixed `pong` message.
+   */
   @Get('ping')
+  @ZodResponse({ status: HttpStatus.OK, type: PingResponseDto })
   @ApiOperation({ summary: 'Ping endpoint' })
-  ping() {
-    return { message: 'pong' };
+  ping(): PingResponseDto {
+    return { message: PING_MESSAGE };
   }
 
+  /**
+   * Returns the path parameter unchanged.
+   *
+   * @param params - the validated path parameter.
+   * @returns the message that was sent.
+   */
   @Get('echo/:message')
-  @ZodSerializerDto(EchoResponseDto)
+  @ZodResponse({ status: HttpStatus.OK, type: EchoResponseDto })
   @ApiOperation({ summary: 'Echo a message (GET)' })
-  echoGet(@Param('message') message: string): EchoResponseDto {
-    return { message };
+  @ApiBadRequestResponse({ description: VALIDATION_FAILED_DESCRIPTION })
+  echoGet(@Param() params: EchoParamDto): EchoResponseDto {
+    return { message: params.message };
   }
 
+  /**
+   * Returns the request body's message unchanged. Answers 200 rather than 201 because nothing is
+   * created.
+   *
+   * @param body - the validated request body.
+   * @returns the message that was sent.
+   */
   @Post('echo')
-  @ZodSerializerDto(EchoResponseDto)
+  @HttpCode(HttpStatus.OK)
+  @ZodResponse({ status: HttpStatus.OK, type: EchoResponseDto })
   @ApiOperation({ summary: 'Echo a message (POST)' })
+  @ApiBadRequestResponse({ description: VALIDATION_FAILED_DESCRIPTION })
   echoPost(@Body() body: EchoRequestDto): EchoResponseDto {
     return { message: body.message };
-  }
-
-  @Get('items')
-  @ZodSerializerDto(ItemListResponseDto)
-  @ApiOperation({ summary: 'List all items' })
-  findAll(): ItemResponseDto[] {
-    return this.testService.findAll();
-  }
-
-  @Post('items')
-  @HttpCode(HttpStatus.CREATED)
-  @ZodSerializerDto(ItemResponseDto)
-  @ApiOperation({ summary: 'Create an item' })
-  @ApiResponse({ status: 201, description: 'Item created' })
-  create(@Body() createItemDto: CreateItemDto): ItemResponseDto {
-    return this.testService.create(createItemDto);
-  }
-
-  @Get('items/:id')
-  @ZodSerializerDto(ItemResponseDto)
-  @ApiOperation({ summary: 'Get an item by ID' })
-  findOne(@Param('id') id: string): ItemResponseDto {
-    return this.testService.findOne(id);
-  }
-
-  @Put('items/:id')
-  @ZodSerializerDto(ItemResponseDto)
-  @ApiOperation({ summary: 'Update an item' })
-  update(
-    @Param('id') id: string,
-    @Body() updateItemDto: UpdateItemDto,
-  ): ItemResponseDto {
-    return this.testService.update(id, updateItemDto);
-  }
-
-  @Delete('items/:id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete an item' })
-  remove(@Param('id') id: string): void {
-    this.testService.remove(id);
   }
 }

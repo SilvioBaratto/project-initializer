@@ -1,12 +1,7 @@
-"""
-End-to-End Tests
-================
+"""End-to-end smoke tests of the assembled application.
 
-End-to-end tests for complete user workflows.
-
-These tests should:
-- Test complete user journeys
-- Verify business processes work end-to-end
-- Run against a fully configured test environment
-- Be slower but comprehensive
+They check that the application boots, which routes it mounts, what its
+OpenAPI document publishes and whether the interactive docs follow the
+configured policy. They run in-process: no server, database or provider is
+contacted. Mark each test ``e2e``.
 """

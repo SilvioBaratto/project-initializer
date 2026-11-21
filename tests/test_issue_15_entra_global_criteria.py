@@ -13,6 +13,11 @@ Criteria covered (oracle: all UNIT-verifiable):
 from pathlib import Path
 import re
 
+from tests.fastapi_entra_sources import (
+    auth_failure_statuses_are_wired,
+    entra_verifier_text,
+)
+
 ROOT = Path(__file__).resolve().parent.parent
 PKG = ROOT / "project_initializer"
 
@@ -67,46 +72,72 @@ def test_when_fastapi_overlay_read_pyjwt_crypto_is_declared_as_dependency():
     )
 
 
-def test_when_fastapi_dependencies_read_rs256_algorithm_is_referenced():
-    """dependencies.py must reference RS256 so the signature check is not skipped."""
-    deps_file = _find_file(ENTRA_FASTAPI, "api/deps.py")
-    content = deps_file.read_text(encoding="utf-8")
-    assert "RS256" in content, "RS256 algorithm not referenced in dependencies.py"
+def test_when_fastapi_verifier_read_rs256_algorithm_is_referenced():
+    """entra.py must reference RS256 so the signature check is not skipped.
 
-
-def test_when_fastapi_dependencies_read_aud_claim_is_validated():
-    content = _read_dep(ENTRA_FASTAPI, "api/deps.py")
-    assert "aud" in content, "audience claim not validated in FastAPI dependencies.py"
-
-
-def test_when_fastapi_dependencies_read_iss_claim_is_validated():
-    content = _read_dep(ENTRA_FASTAPI, "api/deps.py")
-    assert "iss" in content, "issuer claim not validated in FastAPI dependencies.py"
-
-
-def test_when_fastapi_dependencies_read_tid_claim_is_validated():
-    """Tenant pinning via tid must be explicit."""
-    content = _read_dep(ENTRA_FASTAPI, "api/deps.py")
-    assert "tid" in content, "tid (tenant) pinning missing from FastAPI dependencies.py"
-
-
-def test_when_fastapi_dependencies_read_scp_scope_is_enforced():
-    content = _read_dep(ENTRA_FASTAPI, "api/deps.py")
-    assert "scp" in content, (
-        "scp scope enforcement missing from FastAPI dependencies.py"
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+    """
+    assert "RS256" in entra_verifier_text(), (
+        "RS256 algorithm not referenced in entra.py"
     )
 
 
-def test_when_fastapi_auth_route_read_401_is_returned_on_auth_failure():
-    """The 401 status code must be emitted on validation failure."""
-    content = _read_dep(ENTRA_FASTAPI, "api/deps.py")
-    assert "401" in content, "HTTP 401 not referenced for auth failure in FastAPI"
+def test_when_fastapi_verifier_read_aud_claim_is_validated():
+    """The verifier checks the aud claim.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+    """
+    content = entra_verifier_text()
+    assert "aud" in content, "audience claim not validated in FastAPI entra.py"
 
 
-def test_when_fastapi_auth_route_read_403_is_returned_on_insufficient_scope():
-    """The 403 status code must be emitted on scope failure."""
-    content = _read_dep(ENTRA_FASTAPI, "api/deps.py")
-    assert "403" in content, "HTTP 403 not referenced for scope failure in FastAPI"
+def test_when_fastapi_verifier_read_iss_claim_is_validated():
+    """The verifier checks the iss claim.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+    """
+    content = entra_verifier_text()
+    assert "iss" in content, "issuer claim not validated in FastAPI entra.py"
+
+
+def test_when_fastapi_verifier_read_tid_claim_is_validated():
+    """Tenant pinning via tid must be explicit.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+    """
+    content = entra_verifier_text()
+    assert "tid" in content, "tid (tenant) pinning missing from FastAPI entra.py"
+
+
+def test_when_fastapi_verifier_read_scp_scope_is_enforced():
+    """The verifier enforces the required scope through the scp claim.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+    """
+    content = entra_verifier_text()
+    assert "scp" in content, "scp scope enforcement missing from FastAPI entra.py"
+
+
+def test_when_fastapi_verifier_and_handlers_read_401_is_returned_on_auth_failure():
+    """The 401 status code must be emitted on validation failure.
+
+    The verifier raises AuthenticationError and handlers.py answers it with 401.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py and project_initializer/templates-api-fastapi/api/app/api/handlers.py.
+    """
+    unauthorized, _ = auth_failure_statuses_are_wired()
+    assert unauthorized, "HTTP 401 not wired for auth failure in FastAPI"
+
+
+def test_when_fastapi_verifier_and_handlers_read_403_is_returned_on_insufficient_scope():
+    """The 403 status code must be emitted on scope failure.
+
+    The verifier raises AuthorizationError and handlers.py answers it with 403.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py and project_initializer/templates-api-fastapi/api/app/api/handlers.py.
+    """
+    _, forbidden = auth_failure_statuses_are_wired()
+    assert forbidden, "HTTP 403 not wired for scope failure in FastAPI"
 
 
 # ---------------------------------------------------------------------------
@@ -144,6 +175,10 @@ def test_when_nestjs_auth_service_read_iss_claim_is_validated():
 
 
 def test_when_nestjs_auth_guard_read_401_is_returned_on_auth_failure():
+    """The Entra verifier raises the 401 that the shared guard passes through.
+
+    Validates project_initializer/templates-entra-nestjs/api/src/modules/auth/auth.service.ts.
+    """
     content = _read_nestjs_auth_guard()
     assert "401" in content or "UnauthorizedException" in content, (
         "HTTP 401 / UnauthorizedException not referenced in NestJS auth guard"
@@ -151,6 +186,10 @@ def test_when_nestjs_auth_guard_read_401_is_returned_on_auth_failure():
 
 
 def test_when_nestjs_auth_guard_read_403_is_returned_on_insufficient_scope():
+    """The Entra verifier raises the 403 that the shared guard passes through.
+
+    Validates project_initializer/templates-entra-nestjs/api/src/modules/auth/auth.service.ts.
+    """
     content = _read_nestjs_auth_guard()
     assert "403" in content or "ForbiddenException" in content, (
         "HTTP 403 / ForbiddenException not referenced in NestJS auth guard"
@@ -163,7 +202,10 @@ def test_when_nestjs_auth_guard_read_403_is_returned_on_insufficient_scope():
 
 
 def test_when_fastapi_overlay_files_read_client_secret_is_absent():
-    """No template file under templates-entra-fastapi may contain a client secret."""
+    """No template file under templates-entra-fastapi may contain a client secret.
+
+    Validates every file under project_initializer/templates-entra-fastapi.
+    """
     for path in ENTRA_FASTAPI.rglob("*"):
         if path.is_file():
             text = path.read_text(encoding="utf-8", errors="replace")
@@ -176,7 +218,10 @@ def test_when_fastapi_overlay_files_read_client_secret_is_absent():
 
 
 def test_when_nestjs_overlay_files_read_client_secret_is_absent():
-    """No template file under templates-entra-nestjs may contain a client secret."""
+    """No template file under templates-entra-nestjs may contain a client secret.
+
+    Validates every file under project_initializer/templates-entra-nestjs.
+    """
     for path in ENTRA_NESTJS.rglob("*"):
         if path.is_file():
             text = path.read_text(encoding="utf-8", errors="replace")
@@ -289,10 +334,13 @@ def test_when_manifest_in_read_entra_frontend_overlay_is_included():
 # ---------------------------------------------------------------------------
 
 
-def test_when_fastapi_dependencies_read_pyjwkclient_is_used():
-    """FastAPI must use PyJWKClient (not a manual key fetch) to get auto-refresh on rotation."""
-    content = _read_dep(ENTRA_FASTAPI, "api/deps.py")
-    assert "PyJWKClient" in content, "PyJWKClient not used in FastAPI dependencies.py"
+def test_when_fastapi_verifier_read_pyjwkclient_is_used():
+    """FastAPI must use PyJWKClient (not a manual key fetch) to get auto-refresh on rotation.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+    """
+    content = entra_verifier_text()
+    assert "PyJWKClient" in content, "PyJWKClient not used in FastAPI entra.py"
 
 
 def test_when_nestjs_auth_service_read_jwks_rsa_cache_option_is_set():
@@ -309,14 +357,17 @@ def test_when_nestjs_auth_service_read_jwks_rsa_rate_limit_option_is_set():
     )
 
 
-def test_when_fastapi_dependencies_read_no_hard_coded_refresh_interval():
-    """No fixed sleep/interval for JWKS refresh — auto-refresh must be library-driven."""
-    content = _read_dep(ENTRA_FASTAPI, "api/deps.py")
+def test_when_fastapi_verifier_read_no_hard_coded_refresh_interval():
+    """No fixed sleep/interval for JWKS refresh — auto-refresh must be library-driven.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+    """
+    content = entra_verifier_text()
     assert not re.search(r"time\.sleep\s*\(", content), (
-        "hard-coded sleep found in FastAPI dependencies.py (must not hard-code refresh schedule)"
+        "hard-coded sleep found in FastAPI entra.py (must not hard-code refresh schedule)"
     )
     assert not re.search(r"refresh_interval\s*=\s*\d+", content), (
-        "hard-coded refresh_interval found in FastAPI dependencies.py"
+        "hard-coded refresh_interval found in FastAPI entra.py"
     )
 
 
@@ -350,7 +401,12 @@ def _read_nestjs_auth_service() -> str:
 
 
 def _read_nestjs_auth_guard() -> str:
-    return _find_file(ENTRA_NESTJS, "auth.guard.ts").read_text(encoding="utf-8")
+    """Source that decides 401 vs 403 for the Entra NestJS variant.
+
+    The shared guard passes a verifier's HttpException through unchanged, so the status codes
+    are raised by the Entra verifier (`auth.service.ts`), not by a per-variant guard file.
+    """
+    return _find_file(ENTRA_NESTJS, "auth.service.ts").read_text(encoding="utf-8")
 
 
 def _find_env_ts(overlay: Path) -> Path:

@@ -1,7 +1,10 @@
 {
   "moduleFileExtensions": ["js", "json", "ts"],
-  "rootDir": ".",
+  "rootDir": "..",
+  "roots": ["<rootDir>/test"],
+  "setupFiles": ["<rootDir>/test/support/test-env.ts"],
   "testEnvironment": "node",
+  "testTimeout": 20000,
   "testRegex": ".e2e-spec.ts$",
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
@@ -11,6 +14,5 @@
     "^@generated/zod$": "<rootDir>/generated/zod/schemas/index",
     "^@generated/zod/(.*)$": "<rootDir>/generated/zod/schemas/$1",
     "^@/(.*)$": "<rootDir>/src/$1"
-  },
-  "transformIgnorePatterns": ["node_modules/(?!(uuid)/)"]
+  }
 }

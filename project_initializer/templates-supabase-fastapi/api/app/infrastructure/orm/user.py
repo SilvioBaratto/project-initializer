@@ -1,96 +1,48 @@
-"""
-User profile model for Supabase authentication integration.
+"""ORM record for the ``profiles`` table of the Supabase variant.
 
-This model represents a profiles table that references Supabase's auth.users table.
-Authentication is handled entirely by Supabase client-side. This table stores
-additional user profile information.
-
-Design:
-- Primary key (id) is the Supabase auth.users UUID (as string for compatibility)
-- No password_hash or auth-related fields (Supabase handles this)
-- Profile data only (display name, avatar, preferences, etc.)
-- Foreign key relationship to auth.users implicit via matching UUID
+The module is named ``user`` because the layer merge replaces the base ``user``
+module by path, and ``app.infrastructure.orm`` imports it under that name to
+register the table. Keeping the name leaves the package untouched.
 """
 
-from datetime import datetime
-from typing import Optional
+from typing import Any
 
-from sqlalchemy import DateTime, Index, String, Text, func
+from sqlalchemy import JSON, Index, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.infrastructure.orm.base import Base
+from app.domain.constants import ENTITY_ID_LENGTH
+from app.infrastructure.orm.base import Base, TimestampMixin
+
+DISPLAY_NAME_MAX_LENGTH = 100
+AVATAR_URL_MAX_LENGTH = 500
 
 
-class UserProfile(Base):
-    """
-    User profile table referencing Supabase auth.users.
+class ProfileRecord(TimestampMixin, Base):
+    """Profile data attached to a Supabase user.
 
-    The id field matches the UUID from Supabase's auth.users table.
-    This is a profile/extension table, not an auth table.
+    Supabase Auth owns credentials and identity in its own ``auth.users`` table.
+    This table only extends it with application data, so it stores no password
+    or authentication field. It never leaves the infrastructure layer.
+
+    The primary key is the Supabase user id (a UUID in text form). It is
+    supplied by the caller and never generated here. The model declares no
+    foreign key to ``auth.users``, which belongs to Supabase and is not part of
+    this schema, so the caller is what keeps a profile paired with its user.
     """
 
     __tablename__ = "profiles"
+    __table_args__ = (Index("idx_profiles_display_name", "display_name"),)
 
-    # Primary key - matches Supabase auth.users UUID
-    # Supabase auth.users.id is UUID type, we store as string for compatibility
-    id: Mapped[str] = mapped_column(
-        String(36),
-        primary_key=True,
-        nullable=False,
-        comment="Supabase auth.users UUID (as string)",
-    )
-
-    # Profile fields
-    display_name: Mapped[Optional[str]] = mapped_column(
-        String(100), nullable=True, comment="User's display name (public)"
-    )
-
-    avatar_url: Mapped[Optional[str]] = mapped_column(
-        String(500),
-        nullable=True,
-        comment="URL to user's avatar image (typically Supabase Storage)",
-    )
-
-    bio: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True, comment="User's bio/description"
-    )
-
-    # Additional preferences
-    preferences: Mapped[Optional[dict]] = mapped_column(
-        JSONB, nullable=True, comment="User preferences/settings as JSON"
-    )
-
-    # Timestamps
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-        comment="Profile creation timestamp",
-    )
-
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
-        comment="Profile last update timestamp",
-    )
-
-    # Table constraints and indexes
-    __table_args__ = (
-        Index("idx_profiles_display_name", "display_name"),
-        {
-            "comment": "User profiles table - extends Supabase auth.users with additional profile data"
-        },
+    id: Mapped[str] = mapped_column(String(ENTITY_ID_LENGTH), primary_key=True)
+    display_name: Mapped[str | None] = mapped_column(String(DISPLAY_NAME_MAX_LENGTH))
+    avatar_url: Mapped[str | None] = mapped_column(String(AVATAR_URL_MAX_LENGTH))
+    bio: Mapped[str | None] = mapped_column(Text)
+    # Binary JSON gives PostgreSQL an indexable document type; the generic JSON
+    # variant keeps the table creatable on the SQLite database the tests use.
+    preferences: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql")
     )
 
     def __repr__(self) -> str:
-        return f"<UserProfile(id={self.id}, display_name={self.display_name})>"
-
-
-# Keep User as an alias for backward compatibility
-# But the canonical model is now UserProfile
-User = UserProfile
-
-__all__ = ["UserProfile", "User"]
+        return f"<ProfileRecord id={self.id}>"

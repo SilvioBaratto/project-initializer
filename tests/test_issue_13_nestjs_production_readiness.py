@@ -13,7 +13,7 @@ Verifiable criteria covered (per oracle report):
   [UNIT] NestJS template test scaffold exists (e2e spec + config present)
 
 NOT VERIFIABLE criteria (skipped per oracle):
-  Terminus health module, e2e scaffold existence as a suite-gate, BullMQ offload,
+  Terminus health module, e2e scaffold existence as a suite-gate,
   end-to-end verified status table, gap-filing prose, all-tests-pass boilerplate,
   SOLID / line-count subjective rules.
 """
@@ -23,19 +23,21 @@ from pathlib import Path
 
 TEMPLATES_ROOT = Path(__file__).parent.parent / "project_initializer"
 
-TOKEN_APP_MODULE = (
-    TEMPLATES_ROOT / "templates-token-nestjs" / "api" / "src" / "app.module.ts"
+# The root module is shared by all variants; each overlay's `app.auth.ts` registers its global guard.
+TOKEN_APP_AUTH = (
+    TEMPLATES_ROOT / "templates-token-nestjs" / "api" / "src" / "app.auth.ts"
 )
-SUPABASE_APP_MODULE = (
-    TEMPLATES_ROOT / "templates-supabase-nestjs" / "api" / "src" / "app.module.ts"
+SUPABASE_APP_AUTH = (
+    TEMPLATES_ROOT / "templates-supabase-nestjs" / "api" / "src" / "app.auth.ts"
 )
+# DATABASE_URL and the throwing validator are declared once, in the base env module.
 BASE_ENV_VALIDATION = (
     TEMPLATES_ROOT
     / "templates-api-nestjs"
     / "api"
     / "src"
     / "config"
-    / "env.validation.ts"
+    / "env.base.ts"
 )
 SUPABASE_ENV_VALIDATION = (
     TEMPLATES_ROOT
@@ -46,13 +48,7 @@ SUPABASE_ENV_VALIDATION = (
     / "env.validation.ts"
 )
 SERIALIZATION_SPEC = (
-    TEMPLATES_ROOT
-    / "templates-api-nestjs"
-    / "api"
-    / "src"
-    / "modules"
-    / "test"
-    / "serialization.spec.ts"
+    TEMPLATES_ROOT / "templates-api-nestjs" / "api" / "src" / "serialization.spec.ts"
 )
 # api/.claude/CLAUDE.md is generated per-flag (docs_generator), not shipped
 # static — expose the generated NestJS api CLAUDE.md via a .read_text() shim.
@@ -78,30 +74,34 @@ E2E_JEST_CONFIG = (
 # ---------------------------------------------------------------------------
 
 
-def test_when_token_overlay_app_module_is_read_then_auth_guard_is_wired_as_app_guard():
+def test_when_token_overlay_app_auth_is_read_then_access_token_guard_is_wired_as_app_guard():
     """
     Routes in the token overlay must be protected by default.
     The only way NestJS enforces a guard globally is via { provide: APP_GUARD, useClass: ... }.
+
+    Validates project_initializer/templates-token-nestjs/api/src/app.auth.ts.
     """
-    content = TOKEN_APP_MODULE.read_text(encoding="utf-8")
+    content = TOKEN_APP_AUTH.read_text(encoding="utf-8")
     assert re.search(r"provide\s*:\s*APP_GUARD", content), (
-        "Token overlay app.module.ts must register APP_GUARD"
+        "Token overlay app.auth.ts must register APP_GUARD"
     )
-    assert re.search(r"useClass\s*:\s*AuthGuard", content), (
-        "Token overlay must wire AuthGuard as the APP_GUARD useClass"
+    assert re.search(r"useClass\s*:\s*AccessTokenGuard", content), (
+        "Token overlay must wire AccessTokenGuard as the APP_GUARD useClass"
     )
 
 
-def test_when_supabase_overlay_app_module_is_read_then_supabase_auth_guard_is_wired_as_app_guard():
+def test_when_supabase_overlay_app_auth_is_read_then_access_token_guard_is_wired_as_app_guard():
     """
-    Routes in the supabase overlay must be protected by default via SupabaseAuthGuard.
+    Routes in the supabase overlay must be protected by default via the shared guard.
+
+    Validates project_initializer/templates-supabase-nestjs/api/src/app.auth.ts.
     """
-    content = SUPABASE_APP_MODULE.read_text(encoding="utf-8")
+    content = SUPABASE_APP_AUTH.read_text(encoding="utf-8")
     assert re.search(r"provide\s*:\s*APP_GUARD", content), (
-        "Supabase overlay app.module.ts must register APP_GUARD"
+        "Supabase overlay app.auth.ts must register APP_GUARD"
     )
-    assert re.search(r"useClass\s*:\s*SupabaseAuthGuard", content), (
-        "Supabase overlay must wire SupabaseAuthGuard as the APP_GUARD useClass"
+    assert re.search(r"useClass\s*:\s*AccessTokenGuard", content), (
+        "Supabase overlay must wire AccessTokenGuard as the APP_GUARD useClass"
     )
 
 
@@ -114,10 +114,12 @@ def test_when_base_env_validation_is_read_then_database_url_is_a_required_field(
     """
     The base template's env validation must check DATABASE_URL;
     the validate() function must throw so the app refuses to start without it.
+
+    Validates project_initializer/templates-api-nestjs/api/src/config/env.base.ts.
     """
     content = BASE_ENV_VALIDATION.read_text(encoding="utf-8")
     assert "DATABASE_URL" in content, (
-        "env.validation.ts must declare DATABASE_URL as a required environment variable"
+        "env.base.ts must declare DATABASE_URL as a required environment variable"
     )
     assert re.search(r"throw\s+new\s+Error|throw\s+new\s+\w*Error", content), (
         "validate() must throw an Error when required env vars are missing"
@@ -129,14 +131,22 @@ def test_when_supabase_env_validation_is_read_then_supabase_url_is_a_required_fi
     The supabase overlay's env validation must check SUPABASE_URL (and/or SUPABASE_*);
     the app must refuse to start when those secrets are absent.
     Choice: 'SUPABASE_URL' is the minimal required supabase secret per requirements.md §5.
+
+    Validates project_initializer/templates-supabase-nestjs/api/src/config/env.validation.ts and project_initializer/templates-api-nestjs/api/src/config/env.base.ts.
     """
     content = SUPABASE_ENV_VALIDATION.read_text(encoding="utf-8")
     assert "SUPABASE" in content, (
         "Supabase overlay env.validation.ts must declare SUPABASE_* as required"
     )
-    assert re.search(r"throw\s+new\s+Error|throw\s+new\s+\w*Error", content), (
-        "Supabase validate() must throw an Error when SUPABASE_* vars are missing"
+    # The throw lives in the shared validator factory; the overlay must build its validate()
+    # from it over a schema that extends the base one, or the SUPABASE_* check would not run.
+    assert "createEnvValidator(envSchema)" in content and "baseEnvSchema" in content, (
+        "Supabase validate() must come from createEnvValidator over the extended base schema"
     )
+    assert re.search(
+        r"throw\s+new\s+Error|throw\s+new\s+\w*Error",
+        BASE_ENV_VALIDATION.read_text(encoding="utf-8"),
+    ), "createEnvValidator must throw an Error when SUPABASE_* vars are missing"
 
 
 # ---------------------------------------------------------------------------
@@ -148,6 +158,8 @@ def test_when_serialization_spec_is_read_then_it_asserts_secret_field_is_absent_
     """
     The serialization spec must prove that a field named 'password' or equivalent secret
     is stripped from the serialized response — not merely present in the raw object.
+
+    Validates project_initializer/templates-api-nestjs/api/src/serialization.spec.ts.
     """
     content = SERIALIZATION_SPEC.read_text(encoding="utf-8")
     has_secret_field = bool(
@@ -170,7 +182,7 @@ def test_when_serialization_spec_is_read_then_it_asserts_secret_field_is_absent_
 
 # ---------------------------------------------------------------------------
 # Criterion: CLAUDE.md carries the full concerns checklist with legend,
-#            nine sections, six Global acceptance criteria, citations, provenance
+#            nine sections, five Global acceptance criteria, citations, provenance
 # ---------------------------------------------------------------------------
 
 _NINE_SECTION_KEYWORDS = [
@@ -193,7 +205,6 @@ _GLOBAL_CRITERIA_KEYWORDS = [
     "whitelist",
     "Terminus",
     "e2e",
-    "BullMQ",
 ]
 
 
@@ -214,7 +225,11 @@ def test_when_claude_md_is_read_then_it_covers_all_nine_concern_sections():
         )
 
 
-def test_when_claude_md_is_read_then_it_references_all_six_global_acceptance_criteria():
+def test_when_claude_md_is_read_then_it_references_all_five_global_acceptance_criteria():
+    """The generated checklist names the keyword of each of the five global criteria.
+
+    Validates project_initializer/docs_generator.py generate_api_claude() global acceptance criteria table.
+    """
     content = CLAUDE_MD.read_text(encoding="utf-8")
     for keyword in _GLOBAL_CRITERIA_KEYWORDS:
         assert keyword in content, (

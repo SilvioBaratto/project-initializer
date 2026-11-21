@@ -1,75 +1,107 @@
+import {
+  AUTH_TEST_ENV,
+  TEST_ENTRA_API_AUDIENCE,
+  TEST_ENTRA_API_CLIENT_ID,
+  TEST_ENTRA_API_SCOPE,
+  TEST_ENTRA_TENANT_ID,
+} from '../../test/support/auth-test-env';
 import { validate } from './env.validation';
 
-const VALID_CONFIG = {
+const VALID_CONFIG: Record<string, unknown> = {
   DATABASE_URL: 'postgresql://localhost:5432/test',
   DIRECT_URL: 'postgresql://localhost:5432/test',
-  ENTRA_TENANT_ID: 'test-tenant-id',
-  ENTRA_API_CLIENT_ID: 'test-api-client-id',
-  ENTRA_API_AUDIENCE: 'api://test-api-client-id',
-  ENTRA_API_SCOPE: 'access_as_user',
+  ...AUTH_TEST_ENV,
 };
 
+// The ids in the shared fixtures are all digits, which no case change would alter.
+const MIXED_CASE_GUID = 'ABCDEF12-3456-4789-8ABC-DEF012345678';
+
+const REQUIRED_ENTRA_KEYS = [
+  'ENTRA_TENANT_ID',
+  'ENTRA_API_CLIENT_ID',
+  'ENTRA_API_AUDIENCE',
+  'ENTRA_API_SCOPE',
+];
+
+function without(config: Record<string, unknown>, key: string): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(config).filter(([name]) => name !== key));
+}
+
+/** Validates src/config/env.validation.ts for the Entra variant's keys. */
 describe('validate (entra overlay)', () => {
-  it('when all required vars are present, returns without throwing', () => {
-    expect(() => validate(VALID_CONFIG)).not.toThrow();
+  it('when all required variables are present, then the Entra identifiers are returned', () => {
+    const validated = validate(VALID_CONFIG);
+
+    expect(validated.ENTRA_TENANT_ID).toBe(TEST_ENTRA_TENANT_ID);
+    expect(validated.ENTRA_API_SCOPE).toBe(TEST_ENTRA_API_SCOPE);
   });
 
-  it('when ENTRA_TENANT_ID is absent, throws naming ENTRA_TENANT_ID', () => {
-    const { ENTRA_TENANT_ID: _, ...rest } = VALID_CONFIG;
-    expect(() => validate(rest)).toThrow('ENTRA_TENANT_ID');
+  it('when NODE_ENV is production and DATABASE_URL has no sslmode, then it is refused', () => {
+    expect(() => validate({ ...VALID_CONFIG, NODE_ENV: 'production' })).toThrow(
+      'DATABASE_URL must carry sslmode',
+    );
   });
 
-  it('when ENTRA_API_CLIENT_ID is absent, throws naming ENTRA_API_CLIENT_ID', () => {
-    const { ENTRA_API_CLIENT_ID: _, ...rest } = VALID_CONFIG;
-    expect(() => validate(rest)).toThrow('ENTRA_API_CLIENT_ID');
+  it.each(REQUIRED_ENTRA_KEYS)('when %s is absent, then validation throws naming it', (key) => {
+    expect(() => validate(without(VALID_CONFIG, key))).toThrow(key);
   });
 
-  it('when ENTRA_API_AUDIENCE is absent, throws naming ENTRA_API_AUDIENCE', () => {
-    const { ENTRA_API_AUDIENCE: _, ...rest } = VALID_CONFIG;
-    expect(() => validate(rest)).toThrow('ENTRA_API_AUDIENCE');
+  it('when ENTRA_TENANT_ID is not a GUID, then validation throws naming it', () => {
+    expect(() => validate({ ...VALID_CONFIG, ENTRA_TENANT_ID: 'your-tenant-id' })).toThrow(
+      'ENTRA_TENANT_ID',
+    );
   });
 
-  it('when ENTRA_API_SCOPE is absent, throws naming ENTRA_API_SCOPE', () => {
-    const { ENTRA_API_SCOPE: _, ...rest } = VALID_CONFIG;
-    expect(() => validate(rest)).toThrow('ENTRA_API_SCOPE');
+  it('when ENTRA_API_CLIENT_ID is not a GUID, then validation throws naming it', () => {
+    expect(() => validate({ ...VALID_CONFIG, ENTRA_API_CLIENT_ID: 'your-api-client-id' })).toThrow(
+      'ENTRA_API_CLIENT_ID',
+    );
   });
 
-  it('when DATABASE_URL is absent, throws naming DATABASE_URL', () => {
-    const { DATABASE_URL: _, ...rest } = VALID_CONFIG;
-    expect(() => validate(rest)).toThrow('DATABASE_URL');
+  it('when ENTRA_API_AUDIENCE is empty, then validation throws naming it', () => {
+    expect(() => validate({ ...VALID_CONFIG, ENTRA_API_AUDIENCE: '' })).toThrow(
+      'ENTRA_API_AUDIENCE',
+    );
   });
 
-  it('when DIRECT_URL is absent, throws naming DIRECT_URL', () => {
-    const { DIRECT_URL: _, ...rest } = VALID_CONFIG;
-    expect(() => validate(rest)).toThrow('DIRECT_URL');
+  it.each(['ENTRA_TENANT_ID', 'ENTRA_API_CLIENT_ID'] as const)(
+    'when %s is written in uppercase, then it is lowercased to match the issuer and tid claims',
+    (key) => {
+      const validated = validate({ ...VALID_CONFIG, [key]: MIXED_CASE_GUID });
+
+      expect(validated[key]).toBe(MIXED_CASE_GUID.toLowerCase());
+    },
+  );
+
+  describe('ENTRA_API_SCOPE', () => {
+    it.each([
+      ['the full URI the portal shows', `${TEST_ENTRA_API_AUDIENCE}/${TEST_ENTRA_API_SCOPE}`],
+      ['a bare name with blanks around it', `  ${TEST_ENTRA_API_SCOPE}  `],
+    ])('when it is %s, then the bare scope name is validated', (_label, configured) => {
+      expect(validate({ ...VALID_CONFIG, ENTRA_API_SCOPE: configured }).ENTRA_API_SCOPE).toBe(
+        TEST_ENTRA_API_SCOPE,
+      );
+    });
+
+    it.each([
+      ['empty', ''],
+      ['blank', '   '],
+      ['a URI that ends in a slash', `api://${TEST_ENTRA_API_CLIENT_ID}/`],
+    ])('when it is %s, then validation throws naming it', (_label, configured) => {
+      expect(() => validate({ ...VALID_CONFIG, ENTRA_API_SCOPE: configured })).toThrow(
+        'ENTRA_API_SCOPE: ENTRA_API_SCOPE must name a scope',
+      );
+    });
   });
 
-  it('when config is empty, throws with descriptive message', () => {
-    expect(() => validate({})).toThrow('Invalid environment variables:');
+  it('when a base variable is absent, then validation still throws naming it', () => {
+    expect(() => validate(without(VALID_CONFIG, 'DATABASE_URL'))).toThrow('DATABASE_URL');
   });
 
-  it('when unknown keys are present, they are passed through', () => {
-    const result = validate({ ...VALID_CONFIG, EXTRA_KEY: 'value' }) as Record<string, unknown>;
-    expect(result.EXTRA_KEY).toBe('value');
-  });
+  it('when POSTGRES_* variables are present, then they are not part of the validated config', () => {
+    const validated = validate({ ...VALID_CONFIG, POSTGRES_HOST: 'db', POSTGRES_PASSWORD: 'pw' });
 
-  it('when valid config is given, returned data includes default PORT 3000', () => {
-    const result = validate(VALID_CONFIG) as Record<string, unknown>;
-    expect(result.PORT).toBe(3000);
-  });
-
-  it('when REDIS_HOST is absent, returned data defaults to localhost', () => {
-    const result = validate(VALID_CONFIG) as Record<string, unknown>;
-    expect(result.REDIS_HOST).toBe('localhost');
-  });
-
-  it('when REDIS_PORT is absent, returned data defaults to 6379', () => {
-    const result = validate(VALID_CONFIG) as Record<string, unknown>;
-    expect(result.REDIS_PORT).toBe(6379);
-  });
-
-  it('when REDIS_PORT is provided as a string, it is coerced to a number', () => {
-    const result = validate({ ...VALID_CONFIG, REDIS_PORT: '6380' }) as Record<string, unknown>;
-    expect(result.REDIS_PORT).toBe(6380);
+    expect(validated).not.toHaveProperty('POSTGRES_HOST');
+    expect(validated).not.toHaveProperty('POSTGRES_PASSWORD');
   });
 });

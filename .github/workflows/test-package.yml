@@ -13,39 +13,31 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # NOTE: the baml-py pin in install_cmd must match the `version` in the
-        # templates' baml_src/generators.baml — BAML enforces a major/minor match.
         include:
           - variant: "fastapi"
             flags: "--fastapi"
             scope: "fullstack"
-            install_cmd: "pip install baml-py==0.223.0"
-            baml_cmd: "baml-cli generate"
+            install_cmd: "pip install -r /tmp/test-project/api/requirements.txt"
           - variant: "nestjs"
             flags: "--nestjs"
             scope: "fullstack"
             install_cmd: "npm install --prefix /tmp/test-project/api"
-            baml_cmd: "npx baml-cli generate"
           - variant: "fastapi-entra"
             flags: "--fastapi --auth entra"
             scope: "fullstack"
-            install_cmd: "pip install baml-py==0.223.0"
-            baml_cmd: "baml-cli generate"
+            install_cmd: "pip install -r /tmp/test-project/api/requirements.txt"
           - variant: "nestjs-entra"
             flags: "--nestjs --auth entra"
             scope: "fullstack"
             install_cmd: "npm install --prefix /tmp/test-project/api"
-            baml_cmd: "npx baml-cli generate"
           - variant: "fastapi-api"
             flags: "--fastapi --scope api"
             scope: "api"
-            install_cmd: "pip install baml-py==0.223.0"
-            baml_cmd: "baml-cli generate"
+            install_cmd: "pip install -r /tmp/test-project/api/requirements.txt"
           - variant: "nestjs-api"
             flags: "--nestjs --scope api"
             scope: "api"
             install_cmd: "npm install --prefix /tmp/test-project/api"
-            baml_cmd: "npx baml-cli generate"
           - variant: "frontend"
             flags: "--scope frontend"
             scope: "frontend"
@@ -87,11 +79,6 @@ jobs:
       - name: Install API dependencies
         if: matrix.scope != 'frontend'
         run: ${{ matrix.install_cmd }}
-
-      - name: Generate BAML client
-        if: matrix.scope != 'frontend'
-        working-directory: /tmp/test-project/api
-        run: ${{ matrix.baml_cmd }}
 
       - name: Start Docker services
         working-directory: /tmp/test-project
@@ -163,3 +150,109 @@ jobs:
         if: always()
         working-directory: /tmp/test-project
         run: docker compose down -v
+
+  # Each scaffolded variant ships its own test suite. The job above proves the
+  # stack boots; this one proves the generated tests, lint and formatting hold
+  # for every auth mode, without Docker (the suites use in-memory fakes).
+  test-variant-suites:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: "fastapi-none"
+            stack: "fastapi"
+            flags: "--fastapi"
+          - suite: "fastapi-token"
+            stack: "fastapi"
+            flags: "--fastapi --auth token"
+          - suite: "fastapi-supabase"
+            stack: "fastapi"
+            flags: "--fastapi --auth supabase"
+          - suite: "fastapi-entra"
+            stack: "fastapi"
+            flags: "--fastapi --auth entra"
+          - suite: "fastapi-async"
+            stack: "fastapi"
+            flags: "--fastapi --async-db"
+          - suite: "nestjs-none"
+            stack: "nestjs"
+            flags: "--nestjs"
+          - suite: "nestjs-token"
+            stack: "nestjs"
+            flags: "--nestjs --auth token"
+          - suite: "nestjs-supabase"
+            stack: "nestjs"
+            flags: "--nestjs --auth supabase"
+          - suite: "nestjs-entra"
+            stack: "nestjs"
+            flags: "--nestjs --auth entra"
+
+    name: Suite ${{ matrix.suite }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install project-initializer package
+        run: pip install -e .
+
+      - name: Create test project
+        run: project-initializer /tmp/suite-project ${{ matrix.flags }} --scope api --force --yes
+
+      - name: Install FastAPI dependencies
+        if: matrix.stack == 'fastapi'
+        working-directory: /tmp/suite-project/api
+        run: pip install -r requirements.txt
+
+      - name: Run FastAPI test suite
+        if: matrix.stack == 'fastapi'
+        working-directory: /tmp/suite-project/api
+        run: pytest -q
+
+      # Prisma 7 and ESLint 10 need Node 20.19+; the generated Dockerfile runs 22.
+      - name: Set up Node.js
+        if: matrix.stack == 'nestjs'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install NestJS dependencies
+        if: matrix.stack == 'nestjs'
+        working-directory: /tmp/suite-project/api
+        run: npm ci --no-audit --no-fund
+
+      # postinstall swallows a failed generate (`|| true`); running it here
+      # makes that failure visible before the tests import the client.
+      - name: Generate Prisma client
+        if: matrix.stack == 'nestjs'
+        working-directory: /tmp/suite-project/api
+        run: npx prisma generate
+
+      - name: Lint NestJS sources
+        if: matrix.stack == 'nestjs'
+        working-directory: /tmp/suite-project/api
+        run: npm run lint
+
+      - name: Check NestJS formatting
+        if: matrix.stack == 'nestjs'
+        working-directory: /tmp/suite-project/api
+        run: npm run format:check
+
+      # test:cov (not test) so the 75% coverageThreshold in package.json gates the build.
+      - name: Run NestJS unit tests with the coverage gate
+        if: matrix.stack == 'nestjs'
+        working-directory: /tmp/suite-project/api
+        run: npm run test:cov
+
+      - name: Run NestJS e2e tests
+        if: matrix.stack == 'nestjs'
+        working-directory: /tmp/suite-project/api
+        run: npm run test:e2e

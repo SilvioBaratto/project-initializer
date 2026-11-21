@@ -35,10 +35,6 @@ describe('ICON_PROVIDER', () => {
       expect(ICON_PROVIDER.useValue.getIcon('Menu')).toBeTruthy();
     });
 
-    it('returns icon data for MessageSquare', () => {
-      expect(ICON_PROVIDER.useValue.getIcon('MessageSquare')).toBeTruthy();
-    });
-
     it('returns icon data for Home', () => {
       expect(ICON_PROVIDER.useValue.getIcon('Home')).toBeTruthy();
     });

@@ -1,73 +1,96 @@
-import os
-import sys
-from logging.config import fileConfig
+"""Alembic environment.
+
+The database URL comes from the application settings (``DIRECT_DATABASE_URL``,
+falling back to ``DATABASE_URL``), so migrations and the application read the
+same configuration and the connection arguments, TLS mode included, stay in one
+place. Logging goes through the application's structured logger rather than
+Alembic's ``fileConfig``, so migration output carries the same timestamps and
+format as the rest of the service.
+
+A caller that embeds the migrations, such as the test suite, sets
+``config.attributes["embedded"]``: the environment and logging are then left as
+the caller made them. It may also hand in an open connection through
+``config.attributes["connection"]``.
+"""
+
+from typing import Any
+
+from sqlalchemy import Connection, create_engine, pool
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from app.infrastructure.config import load_configuration
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+EMBEDDED_ATTRIBUTE = "embedded"
+CONNECTION_ATTRIBUTE = "connection"
 
-from app.infrastructure.orm import Base
-
-# this is the Alembic Config object, which provides
-# access to the values within the .ini file in use.
 config = context.config
+embedded = config.attributes.get(EMBEDDED_ATTRIBUTE, False)
 
-# Override sqlalchemy.url with DATABASE_URL environment variable if set
-database_url = os.getenv("DATABASE_URL")
-if database_url:
-    config.set_main_option("sqlalchemy.url", database_url)
+# The settings singleton is built when its module is imported, so the project
+# .env must reach the environment first.
+if not embedded:
+    load_configuration()
 
-# Interpret the config file for Python logging.
-# This line sets up loggers basically.
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+from app.infrastructure.database import build_connect_args  # noqa: E402
+from app.infrastructure.migration_safety import (  # noqa: E402
+    include_object,
+    preserve_dropped_tables,
+)
+from app.infrastructure.orm.base import Base  # noqa: E402
+from app.infrastructure.settings import settings  # noqa: E402
+from app.infrastructure.structured_logging import configure_logging  # noqa: E402
+
+if not embedded:
+    configure_logging(settings.log_level, settings.log_format)
 
 target_metadata = Base.metadata
 
 
-def run_migrations_offline() -> None:
-    """Run migrations in 'offline' mode.
-
-    This configures the context with just a URL
-    and not an Engine, though an Engine is acceptable
-    here as well.  By skipping the Engine creation
-    we don't even need a DBAPI to be available.
-
-    Calls to context.execute() here emit the given string to the
-    script output.
-
-    """
-    url = config.get_main_option("sqlalchemy.url")
+def _configure(**options: Any) -> None:
     context.configure(
-        url=url,
         target_metadata=target_metadata,
+        include_object=include_object,
+        process_revision_directives=preserve_dropped_tables,
+        compare_type=True,
+        compare_server_default=True,
+        **options,
+    )
+
+
+def run_migrations_offline() -> None:
+    """Emit the migration SQL without connecting to a database."""
+    _configure(
+        url=settings.migration_database_url,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
+    with context.begin_transaction():
+        context.run_migrations()
 
+
+def _run_migrations(connection: Connection) -> None:
+    _configure(connection=connection)
     with context.begin_transaction():
         context.run_migrations()
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode.
-
-    In this scenario we need to create an Engine
-    and associate a connection with the context.
-
-    """
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
+    """Apply the migrations on a live connection, in one transaction where supported."""
+    injected = config.attributes.get(CONNECTION_ATTRIBUTE)
+    if injected is not None:
+        _run_migrations(injected)
+        return
+    url = settings.migration_database_url
+    # Bound parameters stay out of error messages: a failed statement could
+    # otherwise write row values into the migration log.
+    engine = create_engine(
+        url,
         poolclass=pool.NullPool,
+        hide_parameters=True,
+        connect_args=build_connect_args(url, settings),
     )
-
-    with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
-
-        with context.begin_transaction():
-            context.run_migrations()
+    with engine.connect() as connection:
+        _run_migrations(connection)
 
 
 if context.is_offline_mode():

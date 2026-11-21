@@ -3,22 +3,21 @@ FROM node:22-alpine AS dev
 
 WORKDIR /app
 
-# Install netcat for entrypoint health-check
 RUN apk add --no-cache netcat-openbsd
 
-# Copy package files and install ALL dependencies (including devDependencies)
 COPY package.json package-lock.json* ./
 RUN if [ -f package-lock.json ]; then npm ci --ignore-scripts; else npm install --ignore-scripts; fi
 
-# Copy source and generate clients
 COPY . .
 RUN npx prisma generate
-RUN npx baml-cli generate
 
-# Copy entrypoint script. Strip any CR (defends against a CRLF checkout on
-# Windows) and make it executable so the shebang resolves inside the container.
+# A CRLF checkout on Windows leaves a carriage return in the shebang line, which makes the kernel
+# look for an interpreter named "sh\r".
 COPY entrypoint.sh /entrypoint.sh
 RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
+
+# The compose bind mount hides the client generated above, so it is rebuilt at every start.
+ENV PRISMA_GENERATE_ON_START=true
 
 EXPOSE 8000
 
@@ -35,34 +34,30 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-# Install netcat for entrypoint health-check
+# PORT must match EXPOSE and the HEALTHCHECK below; the application default is 3000.
+ENV NODE_ENV=production PORT=8000
+
 RUN apk add --no-cache netcat-openbsd
 
-# Create non-root user
 RUN addgroup -g 1001 -S appgroup && \
     adduser -S appuser -u 1001 -G appgroup
 
-# Copy package files and lockfile from builder, install prod deps only
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/package-lock.json ./package-lock.json
 RUN npm ci --omit=dev --ignore-scripts
 
-# Copy generated clients and built application from builder
 COPY --from=builder /app/generated ./generated
 COPY --from=builder /app/prisma ./prisma
+# The entrypoint runs `prisma migrate deploy`, which takes its datasource from this file and
+# stops with "datasource.url property is required" without it.
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/baml_client ./baml_client
-COPY --from=builder /app/baml_src ./baml_src
 
-# Copy entrypoint script. Strip any CR (defends against a CRLF checkout on
-# Windows) and make it executable so the shebang resolves inside the container.
 COPY entrypoint.sh /entrypoint.sh
 RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 
-# Change ownership
 RUN chown -R appuser:appgroup /app /entrypoint.sh
 
-# Switch to non-root user
 USER appuser
 
 EXPOSE 8000

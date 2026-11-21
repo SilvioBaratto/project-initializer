@@ -1,19 +1,3 @@
-from app.infrastructure.orm.base import (
-    Base,
-    BaseModel,
-    StringUUIDPrimaryKeyMixin,
-    TimestampMixin,
-    UUIDPrimaryKeyMixin,
-)
-from app.infrastructure.orm.item import Item
-from app.infrastructure.orm.user import User
+"""ORM records. Importing the package registers every table on ``Base.metadata``."""
 
-__all__ = [
-    "Base",
-    "BaseModel",
-    "StringUUIDPrimaryKeyMixin",
-    "TimestampMixin",
-    "UUIDPrimaryKeyMixin",
-    "Item",
-    "User",
-]
+from app.infrastructure.orm import item, user  # noqa: F401

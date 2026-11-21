@@ -7,17 +7,26 @@ authority, scope) reach the frontend environment.ts.
 import pathlib
 import re
 
-OVERLAY_FASTAPI = pathlib.Path("project_initializer/templates-entra-fastapi")
+from tests.fastapi_entra_sources import (
+    entra_auth_deps_text,
+    entra_auth_settings_text,
+    entra_verifier_text,
+    generated_entra_env_example,
+)
+
 OVERLAY_NESTJS = pathlib.Path("project_initializer/templates-entra-nestjs")
 OVERLAY_FRONTEND = pathlib.Path("project_initializer/templates-entra-frontend")
 
 _SECRET_PATTERN = re.compile(r"client[_-]?secret", re.IGNORECASE)
-_ENV_EXAMPLE_FASTAPI = OVERLAY_FASTAPI / "api" / ".env.example"
 _ENV_EXAMPLE_NESTJS = OVERLAY_NESTJS / "api" / ".env.example"
 
 
 def test_when_fastapi_env_example_is_read_then_no_client_secret_key_is_present():
-    text = _ENV_EXAMPLE_FASTAPI.read_text(encoding="utf-8")
+    """The FastAPI overlay ships no .env.example; the one the CLI generates is checked.
+
+    Validates project_initializer/env_generator.py generate_env().
+    """
+    text = generated_entra_env_example()
     assert not _SECRET_PATTERN.search(text), (
         "FastAPI .env.example must not contain any client_secret variable"
     )
@@ -30,12 +39,19 @@ def test_when_nestjs_env_example_is_read_then_no_client_secret_key_is_present():
     )
 
 
-def test_when_fastapi_dependencies_are_read_then_no_client_secret_usage_is_present():
-    deps = OVERLAY_FASTAPI / "api" / "app" / "api" / "deps.py"
-    text = deps.read_text(encoding="utf-8")
-    assert not _SECRET_PATTERN.search(text), (
-        "FastAPI dependencies.py must not use a client_secret"
-    )
+def test_when_fastapi_entra_auth_modules_are_read_then_no_client_secret_usage_is_present():
+    """None of the entra auth modules (seam, settings, verifier) may use a client secret.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/api/auth_deps.py, project_initializer/templates-entra-fastapi/api/app/infrastructure/auth_settings.py and project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+    """
+    for name, text in (
+        ("auth_deps.py", entra_auth_deps_text()),
+        ("auth_settings.py", entra_auth_settings_text()),
+        ("entra.py", entra_verifier_text()),
+    ):
+        assert not _SECRET_PATTERN.search(text), (
+            f"FastAPI {name} must not use a client_secret"
+        )
 
 
 def test_when_nestjs_auth_service_is_read_then_no_client_secret_usage_is_present():

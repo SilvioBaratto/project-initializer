@@ -27,7 +27,7 @@ services:
       db:
         condition: service_healthy
     # env_file feeds the container the whole root .env (ENVIRONMENT, DEBUG,
-    # LOG_LEVEL, CORS_ORIGINS, JWT/auth secrets, LLM/BAML keys, ...). The
+    # LOG_LEVEL, CORS_ORIGINS, JWT/auth secrets, ...). The
     # environment: block is applied AFTER env_file and overrides ONLY
     # DATABASE_URL — pinning it to the compose-network host (db:5432) instead of
     # the localhost URL the app uses outside Docker. Everything else must come
@@ -42,7 +42,7 @@ services:
       - ./api:/app
     networks:
       - app_network
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-access-log --reload
 
   # Angular Frontend with nginx and API proxy
   frontend:

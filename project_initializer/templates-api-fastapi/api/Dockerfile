@@ -1,66 +1,46 @@
-# Build stage
-FROM python:3.12-slim as builder
+FROM python:3.12-slim AS builder
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    postgresql-client \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements and install dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+# One --prefix directory lets the runtime stage take the packages as a whole
+# without the pip cache or any build tooling.
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
-# Runtime stage
+
 FROM python:3.12-slim
 
+# pg_isready, which entrypoint.sh uses to wait for the database.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --uid 1000 appuser
+
+# The code stays root-owned, so the unprivileged process cannot rewrite it and
+# cannot write bytecode next to it either. Unbuffered output keeps container
+# logs in order and free of delay.
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+COPY --from=builder /install /usr/local
+
 WORKDIR /app
-
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-    postgresql-client \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create non-root user first
-RUN useradd -m -u 1000 appuser
-
-# Copy Python dependencies from builder to appuser's home
-COPY --from=builder /root/.local /home/appuser/.local
-
-# Copy application code
 COPY . .
 
-# Generate BAML client (before changing to non-root user)
-ENV PYTHONPATH=/home/appuser/.local/lib/python3.12/site-packages
-RUN /home/appuser/.local/bin/baml-cli generate
-
-# Copy entrypoint script. Strip any CR (defends against a CRLF checkout on
-# Windows) and make it executable so the shebang resolves inside the container.
+# Strip any CR (defends against a CRLF checkout on Windows) and make the script
+# executable so the shebang resolves inside the container.
 COPY entrypoint.sh /entrypoint.sh
 RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 
-# Change ownership
-RUN chown -R appuser:appuser /app && \
-    chown -R appuser:appuser /home/appuser/.local && \
-    chown appuser:appuser /entrypoint.sh
-
-# Switch to non-root user
 USER appuser
 
-# Make sure scripts in .local are usable
-ENV PATH=/home/appuser/.local/bin:$PATH
-
-# Expose port
 EXPOSE 8000
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()"
 
-# Use entrypoint script to run migrations and setup before starting the app
 ENTRYPOINT ["/entrypoint.sh"]
 
-# Run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Uvicorn's access log prints the client address and query string unstructured;
+# the structured http.request log from the logging middleware replaces it.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]

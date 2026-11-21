@@ -2,8 +2,11 @@
 Source-blind example tests for issue #3:
 feat(entra): add templates-entra-fastapi backend overlay with in-process v2 JWT validation
 
-Tests are derived from acceptance criteria only; no implementation source was read.
-Expected to FAIL before the overlay is created and PASS once all files are in place.
+Tests are derived from acceptance criteria only. The overlay replaces the auth
+seam of the base layer: ``api/auth_deps.py`` (the dependency), ``infrastructure/
+auth_settings.py`` (the settings) and a new ``infrastructure/auth/entra.py`` (the
+verifier). Everything else, such as ``deps.py``, ``settings.py`` and the auth
+route, is inherited from the base layer and never forked.
 """
 
 import ast
@@ -12,21 +15,29 @@ from pathlib import Path
 
 import pytest
 
+from tests.fastapi_entra_sources import (
+    auth_failure_statuses_are_wired,
+    base_handlers_text,
+    entra_auth_deps_text,
+    entra_auth_settings_text,
+    entra_verifier_text,
+    generated_entra_env_example,
+)
+
 # ---------------------------------------------------------------------------
-# Paths — all computed from repo root; nothing under src/ or the overlay is
-# opened to derive test logic.
+# Paths — all computed from repo root.
 # ---------------------------------------------------------------------------
 
 _REPO_ROOT = Path(__file__).parent.parent
-_CLI_PY = _REPO_ROOT / "project_initializer" / "cli.py"
-_OVERLAY_ROOT = _REPO_ROOT / "project_initializer" / "templates-entra-fastapi"
+_PACKAGE_ROOT = _REPO_ROOT / "project_initializer"
+_CLI_PY = _PACKAGE_ROOT / "cli.py"
+_OVERLAY_ROOT = _PACKAGE_ROOT / "templates-entra-fastapi"
 _API_ROOT = _OVERLAY_ROOT / "api"
-_APP_ROOT = _API_ROOT / "app"
-_CONFIG_PY = _APP_ROOT / "infrastructure/settings.py"
-_DEPENDENCIES_PY = _APP_ROOT / "api/deps.py"
 _REQUIREMENTS_TXT = _API_ROOT / "requirements.txt"
-_ENV_EXAMPLE = _API_ROOT / ".env.example"
-_AUTH_PY = _APP_ROOT / "api" / "v1" / "endpoints" / "auth.py"
+_BASE_APP_ROOT = _PACKAGE_ROOT / "templates-api-fastapi" / "api" / "app"
+_BASE_SETTINGS_PY = _BASE_APP_ROOT / "infrastructure" / "settings.py"
+_BASE_AUTH_PY = _BASE_APP_ROOT / "api" / "v1" / "endpoints" / "auth.py"
+_BASE_PAGINATION_PY = _BASE_APP_ROOT / "api" / "pagination.py"
 
 # ---------------------------------------------------------------------------
 # Helper — AST-level name extraction; never imports or executes the module
@@ -55,7 +66,10 @@ def _top_level_names(source: str) -> set[str]:
 
 
 def test_when_cli_py_is_read_then_entra_is_in_auth_modes():
-    """'entra' must appear as a quoted string inside AUTH_MODES so argparse accepts --auth entra."""
+    """'entra' must appear as a quoted string inside AUTH_MODES so argparse accepts --auth entra.
+
+    Validates project_initializer/cli.py.
+    """
     content = _CLI_PY.read_text(encoding="utf-8")
     assert '"entra"' in content or "'entra'" in content, (
         "'entra' not found in cli.py — --auth entra will be rejected by argparse"
@@ -63,23 +77,53 @@ def test_when_cli_py_is_read_then_entra_is_in_auth_modes():
 
 
 # ===========================================================================
-# Criterion: templates-entra-fastapi/ ships all required files
+# Criterion: templates-entra-fastapi/ ships the seam, the settings and the verifier
 # ===========================================================================
 
 
 @pytest.mark.parametrize(
     "relative_path",
     [
-        "api/app/infrastructure/settings.py",
-        "api/app/api/deps.py",
+        "api/app/api/auth_deps.py",
+        "api/app/infrastructure/auth_settings.py",
+        "api/app/infrastructure/auth/entra.py",
         "api/requirements.txt",
-        "api/.env.example",
-        "api/app/api/v1/endpoints/auth.py",
+        "api/tests/auth_test_env.py",
+        "api/tests/entra_tokens.py",
+        "api/tests/integration/test_auth.py",
     ],
 )
 def test_when_overlay_is_present_then_required_file_exists(relative_path: str):
+    """The overlay ships the seam, the settings, the verifier and its own tests.
+
+    Validates project_initializer/templates-entra-fastapi/api (seam, settings, verifier, requirements and test helpers).
+    """
     assert (_OVERLAY_ROOT / relative_path).exists(), (
         f"Required overlay file missing: {relative_path}"
+    )
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "api/app/api/deps.py",
+        "api/app/api/v1/router.py",
+        "api/app/api/v1/endpoints/auth.py",
+        "api/app/infrastructure/settings.py",
+        "api/.env.example",
+    ],
+)
+def test_when_overlay_is_present_then_a_base_file_is_not_forked(relative_path: str):
+    """A layer overwrites by path, so a copy of a base file silently forks it.
+
+    The overlay replaces only the auth seam; ``deps.py``, the router, the auth
+    route and ``settings.py`` come from the base layer, and the CLI generates
+    ``.env.example``.
+
+    Validates project_initializer/templates-entra-fastapi/api (absence of forked base files).
+    """
+    assert not (_OVERLAY_ROOT / relative_path).exists(), (
+        f"{relative_path} must not be shipped by the entra overlay"
     )
 
 
@@ -89,21 +133,45 @@ def test_when_overlay_is_present_then_required_file_exists(relative_path: str):
 
 
 class TestRequirementsTxt:
+    """Dependency declarations of the entra overlay."""
+
     @pytest.fixture(scope="class")
     def content(self) -> str:
+        """Text of the overlay's requirements.txt."""
         return _REQUIREMENTS_TXT.read_text(encoding="utf-8")
 
     def test_when_requirements_are_read_then_pyjwt_crypto_is_declared(
         self, content: str
     ):
+        """PyJWT with the crypto extra verifies RS256 signatures.
+
+        Validates project_initializer/templates-entra-fastapi/api/requirements.txt.
+        """
         assert "pyjwt[crypto]" in content.lower(), (
             "PyJWT[crypto] must be declared in requirements.txt for in-process JWKS validation"
         )
 
+    def test_when_requirements_are_read_then_pyjwt_is_pinned_to_the_audited_release(
+        self, content: str
+    ):
+        """PyJWT stays on 2.15.1: a failed key-set reload there keeps the cached keys.
+
+        Validates project_initializer/templates-entra-fastapi/api/requirements.txt.
+        """
+        assert "PyJWT[crypto]==2.15.1" in content
+
     def test_when_requirements_are_read_then_httpx_is_declared(self, content: str):
+        """httpx is the HTTP client the template and its tests rely on.
+
+        Validates project_initializer/templates-entra-fastapi/api/requirements.txt.
+        """
         assert "httpx" in content.lower()
 
     def test_when_requirements_are_read_then_supabase_is_absent(self, content: str):
+        """The entra variant must not pull in the Supabase client.
+
+        Validates project_initializer/templates-entra-fastapi/api/requirements.txt.
+        """
         assert "supabase" not in content.lower(), (
             "supabase must not appear in requirements.txt — entra overlay uses PyJWT, not supabase-py"
         )
@@ -115,84 +183,115 @@ class TestRequirementsTxt:
 
 _CLIENT_SECRET_RE = re.compile(r"client[_-]?secret", re.IGNORECASE)
 
+_CLIENT_SECRET_SOURCES = {
+    "auth_settings.py": entra_auth_settings_text,
+    "auth_deps.py": entra_auth_deps_text,
+    "entra.py": entra_verifier_text,
+    "generated .env.example": generated_entra_env_example,
+    "requirements.txt": lambda: _REQUIREMENTS_TXT.read_text(encoding="utf-8"),
+    "base auth.py": lambda: _BASE_AUTH_PY.read_text(encoding="utf-8"),
+}
 
-@pytest.mark.parametrize(
-    "file_path",
-    [_CONFIG_PY, _DEPENDENCIES_PY, _ENV_EXAMPLE, _REQUIREMENTS_TXT, _AUTH_PY],
-    ids=lambda p: p.name,
-)
-def test_when_overlay_file_is_read_then_no_client_secret_appears(file_path: Path):
-    """Validation is signature-only; no client secret is ever needed or permitted."""
-    content = file_path.read_text(encoding="utf-8")
+
+@pytest.mark.parametrize("source_name", list(_CLIENT_SECRET_SOURCES))
+def test_when_overlay_file_is_read_then_no_client_secret_appears(source_name: str):
+    """Validation is signature-only; no client secret is ever needed or permitted.
+
+    Validates project_initializer/templates-entra-fastapi/api sources, the generated .env.example (project_initializer/env_generator.py generate_env()) and project_initializer/templates-api-fastapi/api/app/api/v1/endpoints/auth.py.
+    """
+    content = _CLIENT_SECRET_SOURCES[source_name]()
     match = _CLIENT_SECRET_RE.search(content)
     assert match is None, (
-        f"Client secret pattern '{match.group()}' found in {file_path.name}"
+        f"Client secret pattern '{match.group()}' found in {source_name}"
     )
 
 
 # ===========================================================================
-# Criterion: config.py and .env.example retain the local Docker DATABASE_URL
+# Criterion: the generated .env.example and the settings retain the local
+# Docker DATABASE_URL
 # ===========================================================================
 
 
 class TestLocalDockerDatabase:
+    """The entra variant uses the local Docker database, not a hosted one."""
+
     def test_when_env_example_is_read_then_database_url_key_is_present(self):
-        content = _ENV_EXAMPLE.read_text(encoding="utf-8")
-        assert "DATABASE_URL" in content
+        """The generated example names the database URL.
+
+        Validates project_initializer/env_generator.py generate_env() (fastapi, entra, use_placeholders=True).
+        """
+        assert "DATABASE_URL" in generated_entra_env_example()
 
     def test_when_env_example_is_read_then_supabase_pooler_host_is_absent(self):
-        content = _ENV_EXAMPLE.read_text(encoding="utf-8")
-        assert "supabase.co" not in content, (
+        """The generated example points at no Supabase host.
+
+        Validates project_initializer/env_generator.py generate_env() (fastapi, entra, use_placeholders=True).
+        """
+        assert "supabase.co" not in generated_entra_env_example(), (
             "Entra overlay must use the local Docker DB, not the Supabase pooler URL"
         )
 
-    def test_when_config_py_is_read_then_database_url_field_is_declared(self):
-        source = _CONFIG_PY.read_text(encoding="utf-8")
+    def test_when_base_settings_are_read_then_database_url_field_is_declared(self):
+        """The base settings own the database URL the overlay inherits.
+
+        Validates project_initializer/templates-api-fastapi/api/app/infrastructure/settings.py.
+        """
+        source = _BASE_SETTINGS_PY.read_text(encoding="utf-8")
         assert "DATABASE_URL" in source or "database_url" in source
 
-    def test_when_config_py_is_read_then_supabase_url_field_is_absent(self):
-        source = _CONFIG_PY.read_text(encoding="utf-8")
-        assert "supabase_url" not in source, (
-            "config.py must not declare supabase_url — entra keeps the local Docker DB"
-        )
+    @pytest.mark.parametrize(
+        "source_reader", [entra_auth_settings_text, entra_auth_deps_text]
+    )
+    def test_when_entra_auth_files_are_read_then_supabase_settings_are_absent(
+        self, source_reader
+    ):
+        """Neither entra auth module declares a Supabase setting.
 
-    def test_when_config_py_is_read_then_supabase_publishable_key_field_is_absent(self):
-        source = _CONFIG_PY.read_text(encoding="utf-8")
+        Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth_settings.py and project_initializer/templates-entra-fastapi/api/app/api/auth_deps.py.
+        """
+        source = source_reader()
+        assert "supabase_url" not in source, (
+            "the entra overlay must not declare supabase_url — it keeps the local Docker DB"
+        )
         assert "supabase_publishable_key" not in source
 
 
 # ===========================================================================
-# Criterion: supabase public surface preserved with identical exported names
+# Criterion: the auth seam keeps the names every route and the role guard import
 # ===========================================================================
 
-_REQUIRED_SYMBOLS = [
-    "get_current_user",
-    "get_optional_user",
-    "get_user_id",
-    "CurrentUser",
-    "OptionalUser",
-    "UserId",
-    "DBSession",
-    "RateLimiter",
-    "get_rate_limiter",
-    "PaginationParams",
-    "Pagination",
-]
+_SEAM_SYMBOLS = ["get_current_user", "get_token_verifier", "CurrentUser"]
 
 
-@pytest.mark.parametrize("symbol", _REQUIRED_SYMBOLS)
-def test_when_dependencies_py_is_parsed_then_required_symbol_is_defined(symbol: str):
-    """Every name from the supabase surface must be present at module level in dependencies.py."""
-    source = _DEPENDENCIES_PY.read_text(encoding="utf-8")
-    names = _top_level_names(source)
+@pytest.mark.parametrize("symbol", _SEAM_SYMBOLS)
+def test_when_auth_deps_is_parsed_then_seam_symbol_is_defined(symbol: str):
+    """The seam module must define every name the base routes import from it.
+
+    ``get_optional_user``, ``get_user_id``, ``DBSession`` and the per-process rate
+    limiter no longer exist: routes depend on ``CurrentUser`` only, sessions come
+    from ``get_db``, and the limiter is a middleware.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/api/auth_deps.py.
+    """
+    names = _top_level_names(entra_auth_deps_text())
     assert symbol in names, (
-        f"'{symbol}' not found as a top-level name in dependencies.py — "
-        "supabase public surface parity is broken"
+        f"'{symbol}' not found as a top-level name in auth_deps.py — "
+        "the auth seam surface is broken"
     )
 
 
+@pytest.mark.parametrize("symbol", ["PaginationParams", "Pagination"])
+def test_when_base_pagination_is_parsed_then_pagination_symbol_is_defined(symbol: str):
+    """Pagination moved out of the overlay's dependencies into the base ``pagination.py``.
+
+    Validates project_initializer/templates-api-fastapi/api/app/api/pagination.py.
+    """
+    names = _top_level_names(_BASE_PAGINATION_PY.read_text(encoding="utf-8"))
+    assert symbol in names
+
+
 # ===========================================================================
-# Criterion: config.py declares the required Entra-specific settings fields
+# Criterion: auth_settings.py declares the required Entra-specific settings fields
 # ===========================================================================
 
 
@@ -203,13 +302,126 @@ def test_when_dependencies_py_is_parsed_then_required_symbol_is_defined(symbol: 
         "entra_api_client_id",
         "entra_api_audience",
         "entra_api_scope",
-        "entra_spa_client_id",
+        "entra_authority",
+        "entra_jwks_timeout",
+        "entra_jwks_refresh_cooldown",
     ],
 )
-def test_when_config_py_is_read_then_entra_field_is_declared(field_name: str):
-    """config.py must expose each ENTRA_* env var as a Pydantic field or property."""
-    source = _CONFIG_PY.read_text(encoding="utf-8").lower()
-    assert field_name in source, f"Entra setting '{field_name}' not found in config.py"
+def test_when_auth_settings_is_read_then_entra_field_is_declared(field_name: str):
+    """auth_settings.py must expose each ENTRA_* env var as a Pydantic field or property.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth_settings.py.
+    """
+    source = entra_auth_settings_text().lower()
+    assert field_name in source, (
+        f"Entra setting '{field_name}' not found in auth_settings.py"
+    )
+
+
+def test_when_auth_settings_is_read_then_the_spa_client_id_is_not_a_backend_setting():
+    """The API validates tokens; the SPA registration's id is a frontend value only.
+
+    ``ENTRA_SPA_CLIENT_ID`` stays in the generated ``.env`` for the frontend
+    build, and the settings ignore unknown variables, so the API never reads it.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth_settings.py and project_initializer/env_generator.py generate_env().
+    """
+    assert "entra_spa_client_id" not in entra_auth_settings_text().lower()
+    assert "ENTRA_SPA_CLIENT_ID" in generated_entra_env_example()
+
+
+@pytest.mark.parametrize("field_name", ["entra_tenant_id", "entra_api_client_id"])
+def test_when_auth_settings_is_read_then_the_identifier_is_validated_as_a_guid(
+    field_name: str,
+):
+    """Tenant and client ids must be GUIDs, stored lowercase, or the app refuses to start.
+
+    A domain-style tenant or ``common`` never equals the ``tid`` claim, so every
+    token would be refused; the issuer and tenant checks compare lowercase text.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth_settings.py.
+    """
+    source = entra_auth_settings_text()
+    assert f'"{field_name}"' in source
+    assert "UUID(" in source
+    assert "must be a GUID" in source
+    assert "return str(parsed)" in source
+
+
+def test_when_auth_settings_is_read_then_the_scope_is_normalised_and_never_empty():
+    """The scope is stored as its bare name and an empty one is refused.
+
+    ``scp`` carries bare names, so ``api://<id>/access_as_user`` has to reduce to
+    ``access_as_user``; a scope that reduces to nothing would disable the check.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth_settings.py and project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+    """
+    source = entra_auth_settings_text()
+    assert "def normalize_scope" in source
+    assert "rsplit(SCOPE_SEPARATOR, 1)[-1]" in source
+    assert "entra_api_scope: ScopeName" in source
+    assert "ENTRA_API_SCOPE must be one scope name" in source
+    assert "normalize_scope(required_scope)" in entra_verifier_text()
+    assert "a non-empty required scope is needed" in entra_verifier_text()
+
+
+def test_when_auth_settings_is_read_then_the_refresh_cooldown_is_bounded():
+    """ENTRA_JWKS_REFRESH_COOLDOWN is positive and capped, so reloads stay rate limited.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth_settings.py.
+    """
+    source = entra_auth_settings_text()
+    assert "DEFAULT_JWKS_REFRESH_COOLDOWN_SECONDS = 30.0" in source
+    assert "entra_jwks_refresh_cooldown: float = Field(" in source
+    assert "gt=0" in source
+    assert "le=MAX_JWKS_REFRESH_COOLDOWN_SECONDS" in source
+
+
+def test_when_the_verifier_is_read_then_the_cooldown_setting_reaches_the_resolver():
+    """from_settings hands the cooldown to the resolver that wraps the key client.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+    """
+    source = entra_verifier_text()
+    assert "CooldownSigningKeyResolver(" in source
+    assert (
+        "refresh_cooldown_seconds=auth_settings.entra_jwks_refresh_cooldown" in source
+    )
+
+
+def test_when_the_generated_env_is_read_then_the_entra_settings_are_present():
+    """The generated example names the identifiers the API needs, and no more.
+
+    Validates project_initializer/env_generator.py generate_env() (fastapi, entra, use_placeholders=True).
+    """
+    env_example = generated_entra_env_example()
+    for key in (
+        "ENTRA_TENANT_ID",
+        "ENTRA_API_CLIENT_ID",
+        "ENTRA_API_AUDIENCE",
+        "ENTRA_API_SCOPE",
+    ):
+        assert f"{key}=" in env_example
+
+
+# ===========================================================================
+# Criterion: the principal's email comes from the email claim alone
+# ===========================================================================
+
+
+def test_when_verifier_is_read_then_email_comes_from_the_email_claim_only():
+    """``preferred_username`` is a mutable sign-in name, never promoted to ``email``.
+
+    Code that links or authorises accounts by email would otherwise trust a value
+    the user can change.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+    """
+    source = entra_verifier_text()
+    assert 'email=_text_claim(claims, "email")' in source
+    assert "username=preferred_username" in source
+    assert re.search(r"email=[^\n]*preferred_username", source) is None
+    assert "or preferred_username" not in source
 
 
 # ===========================================================================
@@ -217,11 +429,13 @@ def test_when_config_py_is_read_then_entra_field_is_declared(field_name: str):
 # ===========================================================================
 
 
-def test_when_dependencies_py_is_read_then_pyjwkclient_is_used():
-    """In-process JWKS auto-refresh requires PyJWKClient from PyJWT."""
-    source = _DEPENDENCIES_PY.read_text(encoding="utf-8")
-    assert "PyJWKClient" in source, (
-        "PyJWKClient not found in dependencies.py — JWKS key resolution requires it"
+def test_when_verifier_is_read_then_pyjwkclient_is_used():
+    """In-process JWKS auto-refresh requires PyJWKClient from PyJWT.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+    """
+    assert "PyJWKClient" in entra_verifier_text(), (
+        "PyJWKClient not found in entra.py — JWKS key resolution requires it"
     )
 
 
@@ -235,13 +449,16 @@ def test_when_dependencies_py_is_read_then_pyjwkclient_is_used():
         "APScheduler",
     ],
 )
-def test_when_dependencies_py_is_read_then_no_hardcoded_refresh_schedule_appears(
-    scheduling_pattern: str,
+@pytest.mark.parametrize("source_reader", [entra_verifier_text, entra_auth_deps_text])
+def test_when_verifier_files_are_read_then_no_hardcoded_refresh_schedule_appears(
+    scheduling_pattern: str, source_reader
 ):
-    """Auto-refresh must rely on PyJWKClient's built-in caching, not an explicit scheduler."""
-    source = _DEPENDENCIES_PY.read_text(encoding="utf-8")
-    assert scheduling_pattern not in source, (
-        f"Hard-coded refresh pattern '{scheduling_pattern}' found in dependencies.py"
+    """Auto-refresh must rely on PyJWKClient's built-in caching, not an explicit scheduler.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py and project_initializer/templates-entra-fastapi/api/app/api/auth_deps.py.
+    """
+    assert scheduling_pattern not in source_reader(), (
+        f"Hard-coded refresh pattern '{scheduling_pattern}' found in the entra auth code"
     )
 
 
@@ -251,52 +468,81 @@ def test_when_dependencies_py_is_read_then_no_hardcoded_refresh_schedule_appears
 # ===========================================================================
 
 
-def test_when_dependencies_py_is_read_then_http_401_is_referenced():
-    source = _DEPENDENCIES_PY.read_text(encoding="utf-8")
-    assert "401" in source or "HTTP_401_UNAUTHORIZED" in source, (
-        "No HTTP 401 reference found — authentication failures must return 401"
+def test_when_verifier_is_read_then_authentication_failure_is_answered_with_401():
+    """The verifier raises AuthenticationError and handlers.py maps it to HTTP 401.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py and project_initializer/templates-api-fastapi/api/app/api/handlers.py.
+    """
+    unauthorized, _ = auth_failure_statuses_are_wired()
+    assert unauthorized, (
+        "authentication failures must raise AuthenticationError, mapped to HTTP_401_UNAUTHORIZED"
     )
 
 
-def test_when_dependencies_py_is_read_then_http_403_is_referenced():
-    source = _DEPENDENCIES_PY.read_text(encoding="utf-8")
-    assert "403" in source or "HTTP_403_FORBIDDEN" in source, (
-        "No HTTP 403 reference found — insufficient scope must return 403, not 401"
+def test_when_verifier_is_read_then_insufficient_scope_is_answered_with_403():
+    """The verifier raises AuthorizationError and handlers.py maps it to HTTP 403.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py and project_initializer/templates-api-fastapi/api/app/api/handlers.py.
+    """
+    _, forbidden = auth_failure_statuses_are_wired()
+    assert forbidden, (
+        "insufficient scope must raise AuthorizationError, mapped to HTTP_403_FORBIDDEN, not 401"
     )
 
 
-def test_when_dependencies_py_is_read_then_scp_claim_is_checked():
-    """Scope enforcement must read the 'scp' claim (Entra v2 scope claim name)."""
-    source = _DEPENDENCIES_PY.read_text(encoding="utf-8")
+def test_when_verifier_is_read_then_scp_claim_is_checked():
+    """Scope enforcement must read the 'scp' claim (Entra v2 scope claim name).
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+    """
+    source = entra_verifier_text()
     assert '"scp"' in source or "'scp'" in source, (
-        "'scp' claim not referenced in dependencies.py — scope enforcement requires it"
+        "'scp' claim not referenced in entra.py — scope enforcement requires it"
     )
 
 
-def test_when_dependencies_py_is_read_then_tid_claim_is_checked():
-    """Tenant pinning must verify the 'tid' claim to prevent cross-tenant token reuse."""
-    source = _DEPENDENCIES_PY.read_text(encoding="utf-8")
+def test_when_verifier_is_read_then_tid_claim_is_checked():
+    """Tenant pinning must verify the 'tid' claim to prevent cross-tenant token reuse.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+    """
+    source = entra_verifier_text()
     assert '"tid"' in source or "'tid'" in source, (
-        "'tid' claim not referenced in dependencies.py — tenant pinning requires it"
+        "'tid' claim not referenced in entra.py — tenant pinning requires it"
     )
 
 
+def test_when_handlers_are_read_then_service_outage_is_answered_with_503():
+    """A signing-key outage raises ExternalServiceError, which the handlers answer with 503.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py and project_initializer/templates-api-fastapi/api/app/api/handlers.py.
+    """
+    assert "ExternalServiceError" in entra_verifier_text()
+    assert "HTTP_503_SERVICE_UNAVAILABLE" in base_handlers_text()
+
+
 # ===========================================================================
-# Criterion: api/app/api/v1/endpoints/auth.py exposes GET /auth/me returning CurrentUser
+# Criterion: the base auth route exposes GET /auth/me returning the current user
 # ===========================================================================
 
 
-def test_when_auth_py_is_read_then_get_me_route_is_declared():
-    """The auth router must register the '/me' path for GET requests."""
-    source = _AUTH_PY.read_text(encoding="utf-8")
+def test_when_base_auth_route_is_read_then_get_me_route_is_declared():
+    """The auth router must register the '/me' path for GET requests.
+
+    Validates project_initializer/templates-api-fastapi/api/app/api/v1/endpoints/auth.py.
+    """
+    source = _BASE_AUTH_PY.read_text(encoding="utf-8")
     assert '"/me"' in source or "'/me'" in source, (
         "Route '/me' not found in auth.py — GET /auth/me must be exposed"
     )
 
 
-def test_when_auth_py_is_read_then_current_user_dependency_is_used():
-    """The /auth/me handler must use CurrentUser so the return type is declared in the spec."""
-    source = _AUTH_PY.read_text(encoding="utf-8")
+def test_when_base_auth_route_is_read_then_current_user_dependency_is_used():
+    """The /auth/me handler must use CurrentUser so the entra seam decides who the caller is.
+
+    Validates project_initializer/templates-api-fastapi/api/app/api/v1/endpoints/auth.py.
+    """
+    source = _BASE_AUTH_PY.read_text(encoding="utf-8")
     assert "CurrentUser" in source, (
-        "CurrentUser not referenced in auth.py — /auth/me must return CurrentUser"
+        "CurrentUser not referenced in auth.py — /auth/me must return the current user"
     )

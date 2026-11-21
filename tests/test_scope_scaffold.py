@@ -7,10 +7,12 @@ Test data is read from the real template files so fixtures cannot drift.
 
 import hashlib
 import re
+from pathlib import Path
 
 import pytest
 
 from project_initializer.cli import copy_template, get_api_templates_dir
+from project_initializer.env_generator import GENERATED_SECRET_KEYS
 
 FRAMEWORKS = ["fastapi", "nestjs"]
 AUTHS = [None, "token", "supabase"]
@@ -39,9 +41,22 @@ def _compose_services(text):
     return services
 
 
+def _masked_env_bytes(env_path):
+    """The .env with generated secret values blanked: those differ on every scaffold."""
+    lines = []
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        key, _, _ = line.partition("=")
+        lines.append(f"{key}=" if key in GENERATED_SECRET_KEYS else line)
+    return "\n".join(lines).encode("utf-8")
+
+
 def _tree_hashes(root):
     return {
-        str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest()
+        str(p.relative_to(root)): hashlib.sha256(
+            _masked_env_bytes(p)
+            if p.relative_to(root) == Path(".env")
+            else p.read_bytes()
+        ).hexdigest()
         for p in sorted(root.rglob("*"))
         if p.is_file()
     }
@@ -127,6 +142,10 @@ def test_when_fullstack_scope_both_halves_present(tmp_path, framework, auth):
 @pytest.mark.parametrize("framework", FRAMEWORKS)
 @pytest.mark.parametrize("auth", AUTHS)
 def test_when_fullstack_scaffolded_twice_trees_are_identical(tmp_path, framework, auth):
+    """Scaffolding is deterministic: the generated secrets are the only thing that differs.
+
+    Validates project_initializer/cli.py copy_template() and project_initializer/env_generator.py GENERATED_SECRET_KEYS.
+    """
     first, second = tmp_path / "first", tmp_path / "second"
     _scaffold(first, "fullstack", framework, auth)
     _scaffold(second, "fullstack", framework, auth)

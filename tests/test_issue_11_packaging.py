@@ -59,17 +59,22 @@ def test_when_existing_auth_mode_checked_then_it_remains_in_auth_modes(
 # ---------------------------------------------------------------------------
 
 
-def test_when_fastapi_entra_overlay_checked_then_dependencies_py_provides_jwt_validation() -> (
-    None
-):
+@pytest.mark.parametrize(
+    "relative",
+    ["app/api/auth_deps.py", "app/infrastructure/auth/entra.py"],
+)
+def test_when_fastapi_entra_overlay_checked_then_auth_seam_and_verifier_exist(
+    relative: str,
+) -> None:
     """
-    FastAPI entra overlay must contain app/api/deps.py to provide in-process JWKS validation.
-    Assumption: in-process validation means a dedicated dependencies module mirroring the supabase overlay.
+    FastAPI entra overlay replaces the auth seam (app/api/auth_deps.py) and ships the
+    in-process JWKS verifier (app/infrastructure/auth/entra.py). The base layer's deps.py
+    is the composition root and is no longer forked by an overlay.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/api/auth_deps.py and app/infrastructure/auth/entra.py.
     """
-    assert (
-        _PKG / "templates-entra-fastapi" / "api" / "app" / "api" / "deps.py"
-    ).exists(), (
-        "templates-entra-fastapi/api/app/api/deps.py is required for in-process JWT validation"
+    assert (_PKG / "templates-entra-fastapi" / "api" / relative).exists(), (
+        f"templates-entra-fastapi/api/{relative} is required for in-process JWT validation"
     )
 
 
@@ -100,15 +105,22 @@ def test_when_nestjs_entra_overlay_checked_then_auth_service_provides_jwt_valida
 # ---------------------------------------------------------------------------
 
 
-def test_when_fastapi_entra_env_example_checked_then_no_client_secret_is_present() -> (
-    None
-):
-    """FastAPI entra overlay .env.example must not expose a client secret."""
-    env_path = _PKG / "templates-entra-fastapi" / "api" / ".env.example"
-    assert env_path.exists(), ".env.example missing from templates-entra-fastapi/api/"
-    content = env_path.read_text(encoding="utf-8").lower()
+@pytest.mark.parametrize("framework", ["fastapi", "nestjs"])
+def test_when_entra_env_example_generated_then_no_client_secret_is_present(
+    framework: str,
+) -> None:
+    """The generated entra .env.example must not expose a client secret.
+
+    The FastAPI overlay no longer ships its own .env.example: the CLI generates the
+    example file from the flags, so that is the file checked here.
+
+    Validates project_initializer/env_generator.py generate_env().
+    """
+    from project_initializer.env_generator import generate_env
+
+    content = generate_env(framework, "entra", use_placeholders=True).lower()
     assert "client_secret" not in content, (
-        "FastAPI entra .env.example must not contain a client_secret — "
+        f"{framework} entra .env.example must not contain a client_secret — "
         "backend validates via RS256 signature only"
     )
 

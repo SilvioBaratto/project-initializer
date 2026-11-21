@@ -1,5 +1,6 @@
 services:
-  # FastAPI Backend (connects to hosted Supabase DB)
+  # No db or adminer service: DATABASE_URL in .env points at the hosted Supabase
+  # project.
   api:
     build:
       context: ./api
@@ -12,9 +13,9 @@ services:
       - ./api:/app
     networks:
       - app_network
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-access-log --reload
 
-  # Angular Frontend with nginx and API proxy
+  # nginx forwards /api/ to the api service, so the browser needs only one origin.
   frontend:
     build:
       context: ./frontend

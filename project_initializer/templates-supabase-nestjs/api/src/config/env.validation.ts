@@ -1,28 +1,39 @@
 import { z } from 'zod';
+import { baseEnvSchema, createEnvValidator } from './env.base';
 
-export const envSchema = z
-  .object({
-    DATABASE_URL: z.string().min(1),
-    DIRECT_URL: z.string().min(1),
-    SUPABASE_URL: z.string().url(),
+const HTTPS_PROTOCOL = 'https:';
+const PRODUCTION_NODE_ENV = 'production';
+
+/**
+ * Environment contract of the Supabase variant: the shared platform keys plus the project URL and
+ * the publishable key used to verify access tokens.
+ *
+ * The service-role (secret) key is deliberately absent. It bypasses Row Level Security and nothing
+ * here needs it, so the schema neither requires nor exposes it.
+ *
+ * In production `SUPABASE_URL` must use `https`: every token check sends the caller's access token
+ * and the publishable key to that URL. Plain `http` is accepted elsewhere for the local Supabase
+ * CLI (`http://127.0.0.1:54321`).
+ */
+export const envSchema = baseEnvSchema
+  .extend({
+    SUPABASE_URL: z.url({ protocol: /^https?$/ }),
     SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
-    SUPABASE_SECRET_KEY: z.string().optional(),
-    PORT: z.coerce.number().default(3000),
-    NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-    REDIS_HOST: z.string().default('localhost'),
-    REDIS_PORT: z.coerce.number().default(6379),
-    CORS_ORIGINS: z.string().optional(),
-    LOG_LEVEL: z.string().optional(),
   })
-  .passthrough();
+  .refine(
+    (env) =>
+      env.NODE_ENV !== PRODUCTION_NODE_ENV || new URL(env.SUPABASE_URL).protocol === HTTPS_PROTOCOL,
+    { path: ['SUPABASE_URL'], error: 'SUPABASE_URL must use https when NODE_ENV is production' },
+  );
 
-export function validate(config: Record<string, unknown>): Record<string, unknown> {
-  const parsed = envSchema.safeParse(config);
-  if (!parsed.success) {
-    const failures = parsed.error.issues
-      .map((i) => `${i.path.join('.')}: ${i.message}`)
-      .join('; ');
-    throw new Error(`Invalid environment variables: ${failures}`);
-  }
-  return parsed.data as Record<string, unknown>;
-}
+/** Validated configuration of the Supabase variant. */
+export type Env = z.output<typeof envSchema>;
+
+/**
+ * `ConfigModule` validation hook for the Supabase variant.
+ *
+ * @param config - Raw environment as loaded by `ConfigModule`.
+ * @returns The parsed configuration with defaults applied.
+ * @throws Error naming every invalid key; values are never echoed.
+ */
+export const validate = createEnvValidator(envSchema);

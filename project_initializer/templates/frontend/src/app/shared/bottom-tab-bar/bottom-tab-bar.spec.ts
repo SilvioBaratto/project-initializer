@@ -42,7 +42,7 @@ describe('BottomTabBarComponent', () => {
   it('when the bar renders, one tab per navigation destination is shown, within the M3 3–5', async () => {
     const tabs = tabsOf(await setup());
     expect(tabs.length).toBe(NAV_ITEMS.length);
-    expect(tabs.length).toBe(4);
+    expect(tabs.length).toBe(3);
   });
 
   it('when the bar renders, it pads by the safe-area insets from its own stylesheet, with no utility classes', async () => {
@@ -86,13 +86,12 @@ describe('BottomTabBarComponent', () => {
     }
   });
 
-  it('when the tabs render, the Home, Dashboard, Chat and Settings labels are shown', async () => {
+  it('when the tabs render, the Home, Dashboard and Settings labels are shown', async () => {
     const text = tabsOf(await setup())
       .map((t) => t.textContent)
       .join(' ');
     expect(text).toContain('Home');
     expect(text).toContain('Dashboard');
-    expect(text).toContain('Chat');
     expect(text).toContain('Settings');
   });
 

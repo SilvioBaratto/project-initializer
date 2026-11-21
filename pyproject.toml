@@ -86,6 +86,3 @@ include = ["project_initializer*"]
     "**/node_modules/*",
     "**/node_modules/**/*",
 ]
-
-[tool.ruff]
-exclude = ["**/baml_client/**"]

@@ -8,6 +8,8 @@ Tests read template source text only — they do not import or run generated app
 import pathlib
 import re
 
+from tests.fastapi_entra_sources import entra_verifier_text
+
 OVERLAY_FASTAPI = pathlib.Path("project_initializer/templates-entra-fastapi")
 OVERLAY_NESTJS = pathlib.Path("project_initializer/templates-entra-nestjs")
 
@@ -18,24 +20,30 @@ OVERLAY_NESTJS = pathlib.Path("project_initializer/templates-entra-nestjs")
 
 
 def _fastapi_deps_text() -> str:
-    deps = OVERLAY_FASTAPI / "api" / "app" / "api" / "deps.py"
-    return deps.read_text(encoding="utf-8")
+    """Source of the FastAPI verifier, where the JWKS client lives."""
+    return entra_verifier_text()
 
 
-def test_when_fastapi_dependencies_are_read_then_pyjwkclient_is_used_for_key_fetching():
-    """PyJWKClient (not a manual urllib call) handles JWKS fetch + cache + rotation."""
+def test_when_fastapi_verifier_is_read_then_pyjwkclient_is_used_for_key_fetching():
+    """PyJWKClient (not a manual urllib call) handles JWKS fetch + cache + rotation.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+    """
     text = _fastapi_deps_text()
     assert "PyJWKClient" in text, (
-        "dependencies.py must use PyJWKClient for automatic JWKS caching and key-rotation"
+        "entra.py must use PyJWKClient for automatic JWKS caching and key-rotation"
     )
 
 
-def test_when_fastapi_dependencies_are_read_then_no_hard_coded_refresh_interval_is_present():
-    """No explicit sleep/interval/schedule — PyJWKClient handles rotation internally."""
+def test_when_fastapi_verifier_is_read_then_no_hard_coded_refresh_interval_is_present():
+    """No explicit sleep/interval/schedule — PyJWKClient handles rotation internally.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+    """
     text = _fastapi_deps_text()
     hard_coded = re.search(r"sleep\s*\(|refresh_interval\s*=|schedule\.", text)
     assert not hard_coded, (
-        "dependencies.py must not hard-code a refresh schedule; PyJWKClient auto-refreshes"
+        "entra.py must not hard-code a refresh schedule; PyJWKClient auto-refreshes"
     )
 
 

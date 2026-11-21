@@ -1,29 +1,12 @@
 services:
-  # Redis (BullMQ queue backend)
-  redis:
-    image: redis:7-alpine
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - app_network
-
   # NestJS Backend (connects to hosted Supabase DB)
   api:
     build:
       context: ./api
       dockerfile: Dockerfile
       target: dev
-    depends_on:
-      redis:
-        condition: service_healthy
     env_file:
       - .env
-    environment:
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
     ports:
       - "${API_HOST_PORT:-8000}:8000"
     volumes:

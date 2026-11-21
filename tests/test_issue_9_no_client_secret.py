@@ -16,6 +16,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.fastapi_entra_sources import generated_entra_env_example
+
 _PKG = Path(__file__).parent.parent / "project_initializer"
 _FASTAPI_OVERLAY = _PKG / "templates-entra-fastapi"
 _NESTJS_OVERLAY = _PKG / "templates-entra-nestjs"
@@ -62,7 +64,10 @@ def _contains_secret(text: str) -> bool:
 
 
 def test_when_fastapi_overlay_present_then_no_client_secret_is_in_source():
-    """FastAPI overlay Python source must not contain any CLIENT_SECRET variable."""
+    """FastAPI overlay Python source must not contain any CLIENT_SECRET variable.
+
+    Validates project_initializer/templates-entra-fastapi/**/*.py.
+    """
     if not _FASTAPI_OVERLAY.is_dir():
         pytest.fail("templates-entra-fastapi/ does not exist yet (Red phase expected)")
     source = _all_source_text(_FASTAPI_OVERLAY, ".py")
@@ -72,14 +77,19 @@ def test_when_fastapi_overlay_present_then_no_client_secret_is_in_source():
 
 
 def test_when_fastapi_overlay_env_example_present_then_no_client_secret_is_listed():
-    """FastAPI overlay .env.example must not contain a CLIENT_SECRET key."""
+    """The .env.example the CLI generates for FastAPI entra must not contain a CLIENT_SECRET key.
+
+    The overlay ships no .env.example of its own, so it must not carry one either.
+
+    Validates project_initializer/templates-entra-fastapi, which ships no .env.example, and project_initializer/env_generator.py generate_env().
+    """
     if not _FASTAPI_OVERLAY.is_dir():
         pytest.fail("templates-entra-fastapi/ does not exist yet (Red phase expected)")
-    env_files = list(_FASTAPI_OVERLAY.rglob(".env.example"))
-    assert env_files, "templates-entra-fastapi/ must contain a .env.example file"
-    content = "\n".join(_read(f) for f in env_files)
-    assert not _contains_secret(content), (
-        ".env.example in FastAPI overlay must not list a client secret"
+    assert not list(_FASTAPI_OVERLAY.rglob(".env.example")), (
+        "templates-entra-fastapi/ must not ship a .env.example; the CLI generates it"
+    )
+    assert not _contains_secret(generated_entra_env_example()), (
+        ".env.example generated for FastAPI entra must not list a client secret"
     )
 
 
@@ -89,7 +99,10 @@ def test_when_fastapi_overlay_env_example_present_then_no_client_secret_is_liste
 
 
 def test_when_nestjs_overlay_present_then_no_client_secret_is_in_source():
-    """NestJS overlay TypeScript source must not contain any CLIENT_SECRET variable."""
+    """NestJS overlay TypeScript source must not contain any CLIENT_SECRET variable.
+
+    Validates project_initializer/templates-entra-nestjs/**/*.ts.
+    """
     if not _NESTJS_OVERLAY.is_dir():
         pytest.fail("templates-entra-nestjs/ does not exist yet (Red phase expected)")
     source = _all_source_text(_NESTJS_OVERLAY, ".ts")

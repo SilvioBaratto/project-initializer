@@ -14,22 +14,21 @@ pydantic-settings==2.14.1
 # Required by pydantic EmailStr (UserBase.email); pydantic does not bundle it.
 email-validator==2.3.0
 
-# File Handling
+# Form-encoded request bodies: FastAPI refuses to declare a Form() parameter
+# without it. Only the token overlay's login endpoint uses it; this variant keeps it
+# so the base application code imports cleanly.
 python-multipart==0.0.32
-
-# Monitoring
-psutil==7.2.2
-prometheus-client==0.25.0
 
 # HTTP Client
 httpx==0.28.1
 
 # Authentication - Microsoft Entra ID (in-process RS256 JWKS validation)
-PyJWT[crypto]==2.10.1
+# Stay on 2.13 or later: from there a failed key-set reload no longer wipes the
+# cached keys, which the unknown-kid cooldown relies on to keep known users in
+# during an Entra outage (tests/unit/test_entra_jwks_client_contract.py).
+PyJWT[crypto]==2.15.1
 
 # Testing
 pytest==9.0.3
 pytest-asyncio==1.4.0
-
-# AI/ML
-baml-py==0.223.0
+pytest-cov==7.1.0

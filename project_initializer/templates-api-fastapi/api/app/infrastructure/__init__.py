@@ -1,1 +1,1 @@
-"""Infrastructure layer — framework/IO adapters implementing domain ports."""
+"""Adapters that implement the domain ports: persistence, resilience, logging."""

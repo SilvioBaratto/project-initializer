@@ -12,10 +12,10 @@ Criteria covered (per oracle report):
   [UNIT] ConfigModule validates env and fails fast on missing secrets
   [UNIT] Response schemas whitelist fields (no secret column leakage)
   [UNIT] logger.config.ts lowercases LOG_LEVEL before passing to pino
-  [UNIT] No new .spec.ts introduced (Cycle 3 owns NestJS behavior tests)
+  [UNIT] logger.config.ts has a companion spec (reversed: it used to forbid one)
 
 Criteria skipped (oracle: NOT VERIFIABLE):
-  Terminus health module, e2e scaffold, BullMQ offload, all-tests-pass gate,
+  Terminus health module, e2e scaffold, all-tests-pass gate,
   SOLID code-quality prose.
 """
 
@@ -93,15 +93,24 @@ def nestjs_supabase_project(tmp_path_factory) -> Path:
 def test_when_token_auth_scaffolded_auth_guard_is_registered_as_app_guard(
     nestjs_token_project,
 ):
-    """when token auth is scaffolded, APP_GUARD and AuthGuard both appear in AppModule."""
-    app_module = _find_file(nestjs_token_project / "api", "app.module.ts")
-    content = app_module.read_text(encoding="utf-8")
+    """when token auth is scaffolded, APP_GUARD and AccessTokenGuard both appear in app.auth.ts.
+
+    Validates project_initializer/templates-token-nestjs/api/src/app.auth.ts and project_initializer/templates-api-nestjs/api/src/app.module.ts.
+    """
+    auth_wiring = nestjs_token_project / "api" / "src" / "app.auth.ts"
+    content = auth_wiring.read_text(encoding="utf-8")
     assert "APP_GUARD" in content, (
-        "APP_GUARD provider token not found in token-overlay app.module.ts — "
+        "APP_GUARD provider token not found in token-overlay app.auth.ts — "
         "routes are unprotected by default"
     )
-    assert "AuthGuard" in content, (
-        "AuthGuard class not referenced in token-overlay app.module.ts"
+    assert "AccessTokenGuard" in content, (
+        "AccessTokenGuard class not referenced in token-overlay app.auth.ts"
+    )
+    app_module = (nestjs_token_project / "api" / "src" / "app.module.ts").read_text(
+        encoding="utf-8"
+    )
+    assert "...AUTH_GUARDS" in app_module, (
+        "app.module.ts does not spread AUTH_GUARDS, so the guard is never registered"
     )
 
 
@@ -111,15 +120,24 @@ def test_when_token_auth_scaffolded_auth_guard_is_registered_as_app_guard(
 def test_when_supabase_auth_scaffolded_auth_guard_is_registered_as_app_guard(
     nestjs_supabase_project,
 ):
-    """when supabase auth is scaffolded, APP_GUARD and SupabaseAuthGuard both appear in AppModule."""
-    app_module = _find_file(nestjs_supabase_project / "api", "app.module.ts")
-    content = app_module.read_text(encoding="utf-8")
+    """when supabase auth is scaffolded, APP_GUARD and AccessTokenGuard both appear in app.auth.ts.
+
+    Validates project_initializer/templates-supabase-nestjs/api/src/app.auth.ts and project_initializer/templates-api-nestjs/api/src/app.module.ts.
+    """
+    auth_wiring = nestjs_supabase_project / "api" / "src" / "app.auth.ts"
+    content = auth_wiring.read_text(encoding="utf-8")
     assert "APP_GUARD" in content, (
-        "APP_GUARD provider token not found in supabase-overlay app.module.ts — "
+        "APP_GUARD provider token not found in supabase-overlay app.auth.ts — "
         "routes are unprotected by default"
     )
-    assert "SupabaseAuthGuard" in content, (
-        "SupabaseAuthGuard class not referenced in supabase-overlay app.module.ts"
+    assert "AccessTokenGuard" in content, (
+        "AccessTokenGuard class not referenced in supabase-overlay app.auth.ts"
+    )
+    app_module = (nestjs_supabase_project / "api" / "src" / "app.module.ts").read_text(
+        encoding="utf-8"
+    )
+    assert "...AUTH_GUARDS" in app_module, (
+        "app.module.ts does not spread AUTH_GUARDS, so the guard is never registered"
     )
 
 
@@ -225,26 +243,23 @@ def test_when_nestjs_scaffolded_logger_config_falls_back_to_info_when_log_level_
     )
 
 
-# ── Criterion: no new .spec.ts files introduced ───────────────────────────────
+# ── Criterion: the log-level normalisation is covered by a spec ──────────────
 #
-# From issue AC: "No new .spec.ts is introduced (Cycle 3 owns NestJS behavior
-# tests); the existing npm test suite stays green."
-# From requirements.md §9: only prisma-ssl.util.spec.ts is present in the template.
+# Reversal of the original "no new .spec.ts" criterion: the code standard asks for unit tests
+# on every config helper, so the base template ships logger.config.spec.ts.
 
 
-def test_when_nestjs_base_scaffolded_no_logger_config_spec_is_introduced(
+def test_when_nestjs_base_scaffolded_logger_config_has_a_companion_spec(
     nestjs_base_project,
 ):
-    """when NestJS base is scaffolded, logger.config.ts has no companion .spec.ts.
+    """when NestJS base is scaffolded, logger.config.ts has a companion .spec.ts.
 
-    The criterion 'no new .spec.ts is introduced' means Issue #6's single-line
-    fix to logger.config.ts must not ship a companion logger.config.spec.ts —
-    Cycle 3 owns NestJS behavior tests.
+    Validates project_initializer/templates-api-nestjs/api/src logger.config.spec.ts.
     """
     logger_spec = list((nestjs_base_project / "api").rglob("logger.config.spec.ts"))
-    assert not logger_spec, (
-        "logger.config.spec.ts was found in the scaffolded template — "
-        "Issue #6 must not add a spec file (Cycle 3 owns NestJS behavior tests)"
+    assert logger_spec, (
+        "logger.config.spec.ts is missing from the scaffolded template — "
+        "the log-level normalisation and request-id helpers must be unit-tested"
     )
 
 
