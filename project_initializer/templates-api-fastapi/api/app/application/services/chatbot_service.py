@@ -1,74 +1,82 @@
+"""Chatbot use cases: answer a question, whole or streamed.
+
+The service converts API-facing turns into domain messages and delegates to a
+``ChatModelPort``, so no LLM client is imported here and unit tests run against
+a fake model.
 """
-Chatbot Service
-===============
 
-Service layer for chatbot business logic using BAML.
-"""
-
-from typing import AsyncGenerator
-
-from baml_client.async_client import b as baml_async_client
-from baml_client.types import ConversationHistory
+from collections.abc import AsyncIterator, Sequence
 
 from app.application.dto.chatbot import (
-    ChatRequest,
-    ChatResponse,
-    StreamChunk,
+    ChatAnswer,
+    ChatQuery,
+    ChatStreamChunk,
+    ChatTurnDTO,
 )
+from app.domain.entities.chat import ChatMessage, ChatRole
+from app.domain.exceptions import DomainValidationError
+from app.domain.ports.chat_model import ChatModelPort
 
 
 class ChatbotService:
-    """Service for chatbot operations using BAML."""
+    """Orchestrates chatbot use cases over a ``ChatModelPort``."""
 
-    async def chat(self, request: ChatRequest) -> ChatResponse:
-        """
-        Process a chat request and return a response.
+    def __init__(self, chat_model: ChatModelPort) -> None:
+        """Wire the service.
 
         Args:
-            request: The chat request containing user question and context
+            chat_model: The model that produces replies.
+        """
+        self._chat_model = chat_model
+
+    async def answer(self, query: ChatQuery) -> ChatAnswer:
+        """Answer a question in one piece.
+
+        Args:
+            query: The question and the conversation so far.
 
         Returns:
-            ChatResponse with answer
-        """
-        baml_history = None
-        if request.conversation_history:
-            baml_history = ConversationHistory(
-                messages=request.conversation_history.messages
-            )
+            The complete reply.
 
-        result = await baml_async_client.Chat(
-            user_question=request.user_question,
-            conversation_history=baml_history,
+        Raises:
+            DomainValidationError: A history turn has an unknown role.
+            ExternalServiceError: The model could not produce a reply.
+        """
+        reply = await self._chat_model.complete(
+            query.question, _to_messages(query.history)
         )
+        return ChatAnswer(answer=reply)
 
-        return ChatResponse(answer=result.answer)
+    async def stream_answer(self, query: ChatQuery) -> AsyncIterator[ChatStreamChunk]:
+        """Answer a question incrementally.
 
-    async def stream_chat(
-        self, request: ChatRequest
-    ) -> AsyncGenerator[StreamChunk, None]:
-        """
-        Process a chat request with streaming response.
+        Validation and model errors surface on the first iteration, not at call
+        time, because this is an async generator.
 
         Args:
-            request: The chat request containing user question and context
+            query: The question and the conversation so far.
 
         Yields:
-            StreamChunk objects with partial responses
+            Partial chunks, then one chunk with ``done`` set.
+
+        Raises:
+            DomainValidationError: A history turn has an unknown role.
+            ExternalServiceError: The model failed before or during streaming.
         """
-        baml_history = None
-        if request.conversation_history:
-            baml_history = ConversationHistory(
-                messages=request.conversation_history.messages
-            )
+        history = _to_messages(query.history)
+        async for chunk in self._chat_model.stream(query.question, history):
+            yield ChatStreamChunk(content=chunk.content, done=chunk.is_final)
 
-        stream = baml_async_client.stream.StreamChat(
-            user_question=request.user_question,
-            conversation_history=baml_history,
-        )
 
-        async for partial in stream:
-            if partial and partial.answer:
-                yield StreamChunk(content=partial.answer, done=False)
+def _to_messages(history: Sequence[ChatTurnDTO]) -> list[ChatMessage]:
+    return [ChatMessage(role=_to_role(turn), content=turn.content) for turn in history]
 
-        final = await stream.get_final_response()
-        yield StreamChunk(content=final.answer, done=True)
+
+def _to_role(turn: ChatTurnDTO) -> ChatRole:
+    try:
+        return ChatRole(turn.role)
+    except ValueError:
+        # The role string came from the client, so it is logged but not echoed.
+        raise DomainValidationError(
+            "Unknown chat role", log_context={"role": turn.role}
+        ) from None

@@ -1,409 +1,289 @@
-"""FastAPI exception handlers.
+"""Turns exceptions into responses that carry the error envelope.
 
-Renders the framework-free domain exceptions (``app/domain/exceptions.py``) into
-standardized JSON HTTP responses and registers a handler for each type on the
-app. This is the HTTP adapter for the domain error hierarchy.
+Four handlers cover everything: domain errors, request validation failures,
+framework HTTP errors and anything unexpected. The HTTP status of each domain
+error lives in ``DOMAIN_ERROR_MAPPINGS``, the only place that knows about it, so
+the domain layer stays free of HTTP. Responses never echo submitted values or
+exception text: details go to the logs, the client gets a stable code and a
+message written for it.
+
+Starlette re-raises an exception after its server-error handler has answered it,
+which makes the ASGI server log it a second time and sends the response from
+outside every middleware. ``UnhandledErrorMiddleware`` therefore answers
+unexpected errors from inside the middleware stack, with the two functions below;
+the registered ``Exception`` handler is only the fallback for an application
+built without that middleware.
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from http import HTTPStatus
+from types import MappingProxyType
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.api.errors import error_response, request_id_of, route_template
+from app.api.headers import RETRY_AFTER_HEADER, WWW_AUTHENTICATE_HEADER
+from app.api.schemas.errors import FieldError
 from app.domain.exceptions import (
     AuthenticationError,
     AuthorizationError,
-    BaseAPIException,
-    DatabaseConnectionError,
-    DatabaseError,
-    DatabaseTimeoutError,
+    ConflictError,
+    DomainError,
+    DomainValidationError,
+    EntityNotFoundError,
     ExternalServiceError,
-    RateLimitError,
-    SecurityViolationError,
-    ValidationError,
 )
+from app.infrastructure.errors import DatabaseOperationError
 
 logger = logging.getLogger(__name__)
 
+SERVICE_UNAVAILABLE_RETRY_AFTER_SECONDS = 30
+VALIDATION_ERROR_CODE = "VALIDATION_ERROR"
+VALIDATION_ERROR_MESSAGE = "The request failed validation"
+INTERNAL_ERROR_CODE = "INTERNAL_SERVER_ERROR"
+GENERIC_SERVER_ERROR_MESSAGE = "An unexpected error occurred"
+BEARER_CHALLENGE = "Bearer"
 
-def create_error_response(
-    status_code: int,
-    message: str,
-    error_code: str,
-    details: Optional[Dict[str, Any]] = None,
-    request_id: Optional[str] = None,
-) -> JSONResponse:
-    """Create a standardized error response."""
 
-    content: Dict[str, Any] = {
-        "error": {
-            "code": error_code,
-            "message": message,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
+@dataclass(frozen=True)
+class ErrorMapping:
+    """How one kind of domain error is answered and logged.
+
+    Attributes:
+        status_code: HTTP status of the response.
+        log_level: Severity of the log record. Client mistakes log low, while
+            failures that need an operator's attention log high.
+        headers: Extra response headers.
+    """
+
+    status_code: int
+    log_level: int
+    headers: Mapping[str, str] = field(default_factory=dict)
+
+
+DOMAIN_ERROR_MAPPINGS: Mapping[type[DomainError], ErrorMapping] = MappingProxyType(
+    {
+        DomainValidationError: ErrorMapping(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, logging.INFO
+        ),
+        EntityNotFoundError: ErrorMapping(status.HTTP_404_NOT_FOUND, logging.INFO),
+        ConflictError: ErrorMapping(status.HTTP_409_CONFLICT, logging.INFO),
+        AuthenticationError: ErrorMapping(
+            status.HTTP_401_UNAUTHORIZED,
+            logging.WARNING,
+            {WWW_AUTHENTICATE_HEADER: BEARER_CHALLENGE},
+        ),
+        AuthorizationError: ErrorMapping(status.HTTP_403_FORBIDDEN, logging.WARNING),
+        ExternalServiceError: ErrorMapping(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            logging.ERROR,
+            {RETRY_AFTER_HEADER: str(SERVICE_UNAVAILABLE_RETRY_AFTER_SECONDS)},
+        ),
+        DatabaseOperationError: ErrorMapping(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, logging.ERROR
+        ),
     }
+)
 
-    if details:
-        content["error"]["details"] = details
+# A DomainError subclass nobody mapped is still the caller's problem, not a crash.
+FALLBACK_DOMAIN_MAPPING = ErrorMapping(status.HTTP_400_BAD_REQUEST, logging.WARNING)
 
-    if request_id:
-        content["error"]["request_id"] = request_id
 
-    return JSONResponse(status_code=status_code, content=content)
+def resolve_mapping(error_type: type[DomainError]) -> ErrorMapping:
+    """Find the mapping for a domain error class.
+
+    Walks the class hierarchy so a subclass, such as a circuit-open error, is
+    answered like the nearest mapped ancestor.
+
+    Args:
+        error_type: Class of the raised error.
+
+    Returns:
+        The mapping of the nearest mapped ancestor, or ``FALLBACK_DOMAIN_MAPPING``
+        when none of its ancestors is mapped.
+    """
+    for candidate in error_type.__mro__:
+        mapping = DOMAIN_ERROR_MAPPINGS.get(candidate)
+        if mapping is not None:
+            return mapping
+    return FALLBACK_DOMAIN_MAPPING
+
+
+def _field_path(location: tuple[int | str, ...]) -> str:
+    # The first element only names where the value came from (body, query, header).
+    path = location[1:] or location
+    return ".".join(str(part) for part in path)
+
+
+def _field_errors(exc: RequestValidationError) -> list[FieldError]:
+    # Pydantic's ``input`` and ``ctx`` entries can hold the submitted value, so
+    # only the location and the message are read.
+    return [
+        FieldError(field=_field_path(tuple(error["loc"])), message=error["msg"])
+        for error in exc.errors()
+    ]
+
+
+async def handle_domain_error(request: Request, exc: DomainError) -> JSONResponse:
+    """Answer a domain error with its mapped status and public message.
+
+    Args:
+        request: The failed request.
+        exc: The raised ``DomainError``.
+
+    Returns:
+        An error envelope response. Diagnostic context goes to the log only.
+    """
+    mapping = resolve_mapping(type(exc))
+    logger.log(
+        mapping.log_level,
+        "request.domain_error",
+        extra={
+            "error_code": exc.error_code,
+            "path": route_template(request.scope),
+            "method": request.method,
+            "context": exc.log_context,
+        },
+    )
+    return error_response(
+        mapping.status_code,
+        exc.error_code,
+        exc.public_message,
+        request_id=request_id_of(request),
+        headers=mapping.headers,
+    )
+
+
+async def handle_validation_error(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """Answer a failed request validation with 422 and per-field messages.
+
+    Args:
+        request: The failed request.
+        exc: The raised ``RequestValidationError``.
+
+    Returns:
+        An error envelope listing field paths and messages, never the input.
+    """
+    details = _field_errors(exc)
+    logger.info(
+        "request.validation_failed",
+        extra={
+            "path": route_template(request.scope),
+            "method": request.method,
+            "fields": [item.field for item in details],
+        },
+    )
+    return error_response(
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        VALIDATION_ERROR_CODE,
+        VALIDATION_ERROR_MESSAGE,
+        request_id=request_id_of(request),
+        details=details,
+    )
+
+
+async def handle_http_exception(
+    request: Request, exc: StarletteHTTPException
+) -> JSONResponse:
+    """Answer a framework HTTP error, keeping the headers it carries.
+
+    Args:
+        request: The failed request.
+        exc: The raised HTTP exception, for example an unknown route (404) or a
+            wrong method (405, which carries ``Allow``).
+
+    Returns:
+        An error envelope response. A 5xx status gets a generic message, since
+        the exception detail may describe internals.
+    """
+    is_server_error = exc.status_code >= HTTPStatus.INTERNAL_SERVER_ERROR
+    logger.log(
+        logging.ERROR if is_server_error else logging.INFO,
+        "request.http_error",
+        extra={
+            "status": exc.status_code,
+            "path": route_template(request.scope),
+            "method": request.method,
+        },
+    )
+    message = GENERIC_SERVER_ERROR_MESSAGE if is_server_error else str(exc.detail)
+    return error_response(
+        exc.status_code,
+        f"HTTP_{exc.status_code}",
+        message,
+        request_id=request_id_of(request),
+        headers=exc.headers,
+    )
+
+
+def log_unexpected_error(request: Request, exc: Exception) -> None:
+    """Write the one log record of an unexpected exception.
+
+    Args:
+        request: The failed request.
+        exc: The raised exception. Its text and traceback go to the log only.
+    """
+    # The request id is passed explicitly: when Starlette's outermost layer
+    # answers, the logging middleware has already reset its context variable.
+    logger.error(
+        "request.unhandled_exception",
+        exc_info=exc,
+        extra={
+            "path": route_template(request.scope),
+            "method": request.method,
+            "request_id": request_id_of(request),
+        },
+    )
+
+
+def unexpected_error_response(request: Request) -> JSONResponse:
+    """Build the generic 500 that reveals nothing about the failure.
+
+    Args:
+        request: The failed request.
+
+    Returns:
+        An error envelope response carrying the request id.
+    """
+    return error_response(
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+        INTERNAL_ERROR_CODE,
+        GENERIC_SERVER_ERROR_MESSAGE,
+        request_id=request_id_of(request),
+    )
+
+
+async def handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
+    """Answer any unhandled exception with a generic 500.
+
+    Args:
+        request: The failed request.
+        exc: The raised exception. Its text and traceback go to the log only.
+
+    Returns:
+        An error envelope response that reveals nothing about the failure.
+    """
+    log_unexpected_error(request, exc)
+    return unexpected_error_response(request)
 
 
 def setup_exception_handlers(app: FastAPI) -> None:
-    """Setup all exception handlers for the application."""
+    """Register the four handlers on the application.
 
-    @app.exception_handler(ValidationError)
-    async def validation_error_handler(request: Request, exc: ValidationError):
-        """Handle business logic validation errors"""
+    The ``Exception`` handler only answers errors that no
+    ``UnhandledErrorMiddleware`` caught first.
 
-        logger.warning(
-            f"Validation error: {exc.message}",
-            extra={
-                "error_code": exc.error_code,
-                "status_code": exc.status_code,
-                "details": exc.details,
-                "path": request.url.path,
-                "method": request.method,
-                "validation_error": True,  # Flag for validation monitoring
-            },
-        )
-
-        return create_error_response(
-            status_code=exc.status_code,
-            message=exc.message,
-            error_code=exc.error_code,
-            details=exc.details,
-            request_id=getattr(request.state, "request_id", None),
-        )
-
-    @app.exception_handler(SecurityViolationError)
-    async def security_violation_handler(request: Request, exc: SecurityViolationError):
-        """Handle security violation exceptions with enhanced logging"""
-
-        # Log security events with high priority
-        logger.error(
-            f"SECURITY VIOLATION: {exc.message}",
-            extra={
-                "error_code": exc.error_code,
-                "status_code": exc.status_code,
-                "details": exc.details,
-                "path": request.url.path,
-                "client_ip": request.client.host if request.client else "unknown",
-                "user_agent": request.headers.get("user-agent", "unknown"),
-                "method": request.method,
-                "security_event": True,  # Flag for security monitoring
-            },
-        )
-
-        # Add security-specific headers
-        response = create_error_response(
-            status_code=exc.status_code,
-            message=exc.message,
-            error_code=exc.error_code,
-            details=exc.details,
-            request_id=getattr(request.state, "request_id", None),
-        )
-
-        # Add security headers
-        response.headers["X-Security-Event"] = "violation_detected"
-        response.headers["X-Request-Blocked"] = "true"
-
-        return response
-
-    @app.exception_handler(AuthenticationError)
-    async def authentication_error_handler(request: Request, exc: AuthenticationError):
-        """Handle authentication errors with audit logging"""
-
-        # Extract client information for audit trail
-        client_ip = request.client.host if request.client else "unknown"
-        user_agent = request.headers.get("user-agent", "unknown")
-
-        logger.warning(
-            f"Authentication failed: {exc.message}",
-            extra={
-                "error_code": exc.error_code,
-                "status_code": exc.status_code,
-                "path": request.url.path,
-                "client_ip": client_ip,
-                "user_agent": user_agent,
-                "method": request.method,
-                "auth_failure": True,  # Flag for auth monitoring
-            },
-        )
-
-        # Create response with auth-specific headers
-        response = create_error_response(
-            status_code=exc.status_code,
-            message=exc.message,
-            error_code=exc.error_code,
-            details=getattr(exc, "details", {}),
-            request_id=getattr(request.state, "request_id", None),
-        )
-
-        # Add authentication-specific headers
-        response.headers["WWW-Authenticate"] = "Bearer"
-        response.headers["X-Auth-Error"] = "true"
-
-        return response
-
-    @app.exception_handler(AuthorizationError)
-    async def authorization_error_handler(request: Request, exc: AuthorizationError):
-        """Handle authorization errors with permission tracking"""
-
-        client_ip = request.client.host if request.client else "unknown"
-
-        logger.warning(
-            f"Authorization failed: {exc.message}",
-            extra={
-                "error_code": exc.error_code,
-                "status_code": exc.status_code,
-                "path": request.url.path,
-                "client_ip": client_ip,
-                "method": request.method,
-                "authorization_failure": True,  # Flag for permission monitoring
-            },
-        )
-
-        response = create_error_response(
-            status_code=exc.status_code,
-            message=exc.message,
-            error_code=exc.error_code,
-            details=getattr(exc, "details", {}),
-            request_id=getattr(request.state, "request_id", None),
-        )
-
-        response.headers["X-Permission-Required"] = "true"
-
-        return response
-
-    @app.exception_handler(RateLimitError)
-    async def rate_limit_handler(request: Request, exc: RateLimitError):
-        """Handle rate limit exceptions with retry information"""
-
-        logger.info(
-            f"Rate limit exceeded: {exc.message}",
-            extra={
-                "error_code": exc.error_code,
-                "status_code": exc.status_code,
-                "path": request.url.path,
-                "client_ip": request.client.host if request.client else "unknown",
-                "rate_limit_exceeded": True,
-            },
-        )
-
-        response = create_error_response(
-            status_code=exc.status_code,
-            message=exc.message,
-            error_code=exc.error_code,
-            details=exc.details,
-            request_id=getattr(request.state, "request_id", None),
-        )
-
-        # Add rate limiting headers
-        retry_after = exc.details.get("retry_after", 60)
-        response.headers["Retry-After"] = str(retry_after)
-        response.headers["X-RateLimit-Exceeded"] = "true"
-
-        return response
-
-    @app.exception_handler(DatabaseTimeoutError)
-    async def database_timeout_error_handler(
-        request: Request, exc: DatabaseTimeoutError
-    ):
-        """Handle database timeout errors with specific monitoring"""
-
-        logger.error(
-            f"Database timeout error: {exc.message}",
-            extra={
-                "error_code": exc.error_code,
-                "status_code": exc.status_code,
-                "path": request.url.path,
-                "timeout_duration": exc.details.get("timeout_duration"),
-                "database_timeout_error": True,  # Flag for database monitoring
-            },
-        )
-
-        response = create_error_response(
-            status_code=exc.status_code,
-            message=exc.message,
-            error_code=exc.error_code,
-            details=exc.details,
-            request_id=getattr(request.state, "request_id", None),
-        )
-
-        response.headers["X-Database-Error"] = "timeout"
-        response.headers["Retry-After"] = "5"  # Suggest retry after 5 seconds
-
-        return response
-
-    @app.exception_handler(DatabaseConnectionError)
-    async def database_connection_error_handler(
-        request: Request, exc: DatabaseConnectionError
-    ):
-        """Handle database connection errors with circuit breaker info"""
-
-        logger.error(
-            f"Database connection error: {exc.message}",
-            extra={
-                "error_code": exc.error_code,
-                "status_code": exc.status_code,
-                "path": request.url.path,
-                "connection_info": exc.details.get("connection_info"),
-                "database_connection_error": True,  # Flag for database monitoring
-            },
-        )
-
-        response = create_error_response(
-            status_code=exc.status_code,
-            message=exc.message,
-            error_code=exc.error_code,
-            details=exc.details,
-            request_id=getattr(request.state, "request_id", None),
-        )
-
-        response.headers["X-Database-Error"] = "connection_failed"
-        response.headers["Retry-After"] = "10"  # Suggest retry after 10 seconds
-
-        return response
-
-    @app.exception_handler(ExternalServiceError)
-    async def external_service_error_handler(
-        request: Request, exc: ExternalServiceError
-    ):
-        """Handle external service errors with service monitoring"""
-
-        logger.error(
-            f"External service error: {exc.message}",
-            extra={
-                "error_code": exc.error_code,
-                "status_code": exc.status_code,
-                "path": request.url.path,
-                "service": exc.details.get("service", "unknown"),
-                "external_service_error": True,  # Flag for service monitoring
-            },
-        )
-
-        response = create_error_response(
-            status_code=exc.status_code,
-            message=exc.message,
-            error_code=exc.error_code,
-            details=exc.details,
-            request_id=getattr(request.state, "request_id", None),
-        )
-
-        response.headers["X-Service-Error"] = exc.details.get("service", "unknown")
-
-        return response
-
-    @app.exception_handler(DatabaseError)
-    async def database_error_handler(request: Request, exc: DatabaseError):
-        """Handle generic database errors"""
-
-        logger.error(
-            f"Database error: {exc.message}",
-            extra={
-                "error_code": exc.error_code,
-                "status_code": exc.status_code,
-                "path": request.url.path,
-                "method": request.method,
-                "database_error": True,  # Flag for database monitoring
-            },
-        )
-
-        return create_error_response(
-            status_code=exc.status_code,
-            message=exc.message,
-            error_code=exc.error_code,
-            details=exc.details,
-            request_id=getattr(request.state, "request_id", None),
-        )
-
-    @app.exception_handler(BaseAPIException)
-    async def api_exception_handler(request: Request, exc: BaseAPIException):
-        """Handle custom API exceptions"""
-
-        # Log the error
-        logger.error(
-            f"API Exception: {exc.error_code} - {exc.message}",
-            extra={
-                "error_code": exc.error_code,
-                "status_code": exc.status_code,
-                "details": exc.details,
-                "path": request.url.path,
-            },
-        )
-
-        return create_error_response(
-            status_code=exc.status_code,
-            message=exc.message,
-            error_code=exc.error_code,
-            details=exc.details,
-            request_id=getattr(request.state, "request_id", None),
-        )
-
-    @app.exception_handler(RequestValidationError)
-    async def validation_exception_handler(
-        request: Request, exc: RequestValidationError
-    ):
-        """Handle Pydantic validation errors"""
-
-        # Format validation errors
-        errors = {}
-        for error in exc.errors():
-            field = ".".join(str(loc) for loc in error["loc"][1:])
-            if field not in errors:
-                errors[field] = []
-            errors[field].append(error["msg"])
-
-        logger.warning(
-            f"Validation error on {request.url.path}", extra={"errors": errors}
-        )
-
-        return create_error_response(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            message="Validation failed",
-            error_code="VALIDATION_ERROR",
-            details={"validation_errors": errors},
-            request_id=getattr(request.state, "request_id", None),
-        )
-
-    @app.exception_handler(StarletteHTTPException)
-    async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-        """Handle Starlette HTTP exceptions"""
-
-        logger.warning(
-            f"HTTP Exception: {exc.status_code} - {exc.detail}",
-            extra={"path": request.url.path},
-        )
-
-        return create_error_response(
-            status_code=exc.status_code,
-            message=str(exc.detail),
-            error_code=f"HTTP_{exc.status_code}",
-            request_id=getattr(request.state, "request_id", None),
-        )
-
-    @app.exception_handler(Exception)
-    async def general_exception_handler(request: Request, exc: Exception):
-        """Handle unexpected exceptions"""
-
-        logger.exception(f"Unexpected error on {request.url.path}", exc_info=exc)
-
-        # Don't expose internal errors in production
-        message = "An unexpected error occurred"
-        if app.debug:
-            message = str(exc)
-
-        return create_error_response(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            message=message,
-            error_code="INTERNAL_SERVER_ERROR",
-            request_id=getattr(request.state, "request_id", None),
-        )
+    Args:
+        app: The application to configure.
+    """
+    app.add_exception_handler(DomainError, handle_domain_error)
+    app.add_exception_handler(RequestValidationError, handle_validation_error)
+    app.add_exception_handler(StarletteHTTPException, handle_http_exception)
+    app.add_exception_handler(Exception, handle_unexpected_error)

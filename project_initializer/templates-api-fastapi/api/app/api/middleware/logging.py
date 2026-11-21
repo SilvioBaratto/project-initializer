@@ -1,133 +1,106 @@
-"""Request logging middleware"""
+"""Request correlation id and one access-log line per request.
 
-import time
+The middleware is pure ASGI rather than ``BaseHTTPMiddleware``: the latter runs the
+application in a separate task, which breaks context variables and streaming
+responses. It deliberately logs no request or response bodies, no query string
+and no client address, because those carry tokens, emails and other personal data.
+The path is logged as the matched route template, never as the raw URL path, since
+a path parameter can hold user text.
+"""
+
 import logging
+import re
+import time
 import uuid
-import json
-from starlette.types import ASGIApp, Scope, Receive, Send, Message
+from http import HTTPStatus
+
+from starlette.datastructures import Headers, MutableHeaders
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+from app.api.errors import route_template
+from app.api.headers import REQUEST_ID_HEADER
+from app.infrastructure.request_context import bind_request_id, reset_request_id
+
+REQUEST_ID_PATTERN = r"^[A-Za-z0-9._-]{1,64}$"
+REQUEST_LOG_MESSAGE = "http.request"
+MILLISECONDS_PER_SECOND = 1000
+
+# An incoming id is reused so a caller (or a gateway) can correlate its own logs
+# with ours; the pattern keeps hostile values out of the log pipeline.
+_REQUEST_ID_RE = re.compile(REQUEST_ID_PATTERN)
 
 logger = logging.getLogger(__name__)
 
 
-class LoggingMiddleware:
-    """Middleware to log all requests and responses for monitoring and debugging"""
+def _resolve_request_id(scope: Scope) -> str:
+    incoming = Headers(scope=scope).get(REQUEST_ID_HEADER)
+    if incoming and _REQUEST_ID_RE.fullmatch(incoming):
+        return incoming
+    return uuid.uuid4().hex
 
-    def __init__(self, app: ASGIApp):
+
+def _log_request(scope: Scope, status_code: int, started: float) -> None:
+    logger.info(
+        REQUEST_LOG_MESSAGE,
+        extra={
+            "method": scope["method"],
+            "path": route_template(scope),
+            "status": status_code,
+            "duration_ms": round(
+                (time.perf_counter() - started) * MILLISECONDS_PER_SECOND, 2
+            ),
+        },
+    )
+
+
+class _ResponseTracker:
+    """Send wrapper that stamps the request id on the response and notes its status."""
+
+    def __init__(self, send: Send, request_id: str) -> None:
+        self._send = send
+        self._request_id = request_id
+        # An exception that escapes the application is answered with a 500 by an
+        # outer layer, so 500 is the right value when no response start is seen.
+        self.status_code = HTTPStatus.INTERNAL_SERVER_ERROR.value
+
+    async def __call__(self, message: Message) -> None:
+        if message["type"] == "http.response.start":
+            self.status_code = message["status"]
+            message.setdefault("headers", [])
+            MutableHeaders(scope=message)[REQUEST_ID_HEADER] = self._request_id
+        await self._send(message)
+
+
+class RequestLoggingMiddleware:
+    """Assigns every HTTP request an id and logs one ``http.request`` line.
+
+    The id is bound to a context variable (so every log line of the request
+    carries it), stored in ``scope["state"]["request_id"]`` (so error handlers
+    can put it in the response body) and returned in the ``X-Request-ID``
+    response header.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        """Wrap an ASGI application.
+
+        Args:
+            app: The next application in the middleware chain.
+        """
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """Handle one ASGI connection; only HTTP requests are logged."""
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
 
-        # Generate request ID for tracing
-        request_id = str(uuid.uuid4())
-
-        start_time = time.time()
-
-        # Extract request information from scope
-        method = scope.get("method", "")
-        path = scope.get("path", "")
-        query_string = scope.get("query_string", b"").decode()
-        client_ip = (
-            scope.get("client", ["unknown", None])[0]
-            if scope.get("client")
-            else "unknown"
-        )
-        headers_dict = dict(scope.get("headers", []))
-        user_agent = headers_dict.get(b"user-agent", b"unknown").decode()
-
-        # Log incoming request
-        logger.info(
-            f"Request {request_id}: {method} {path}",
-            extra={
-                "request_id": request_id,
-                "method": method,
-                "path": path,
-                "query": query_string if query_string else None,
-                "client_ip": client_ip,
-                "user_agent": user_agent,
-                "event_type": "request_start",
-            },
-        )
-
-        # Capture response data (cap at 64KB to prevent OOM on large responses)
-        _MAX_LOG_BODY_SIZE = 64 * 1024
-        response_body = b""
-        response_status = 200
-        response_headers = {}
-
-        async def send_wrapper(message: Message) -> None:
-            nonlocal response_body, response_status, response_headers
-
-            if message["type"] == "http.response.start":
-                response_status = message["status"]
-                response_headers = dict(message.get("headers", []))
-                # Add request ID to response headers
-                new_headers = list(message.get("headers", []))
-                new_headers.append((b"x-request-id", request_id.encode()))
-                new_headers.append(
-                    (b"x-process-time", f"{time.time() - start_time:.3f}s".encode())
-                )
-                message["headers"] = new_headers
-            elif message["type"] == "http.response.body":
-                if len(response_body) < _MAX_LOG_BODY_SIZE:
-                    response_body += message.get("body", b"")
-
-            await send(message)
-
-        # Process request
-        await self.app(scope, receive, send_wrapper)
-
-        # Calculate processing time
-        process_time = time.time() - start_time
-
-        # Parse response JSON if available
-        response_json = None
-
-        if response_body:
-            try:
-                # Check if it's JSON content
-                content_type = (
-                    response_headers.get(b"content-type", b"").decode().lower()
-                )
-                if "application/json" in content_type:
-                    response_text = response_body.decode("utf-8")
-                    response_json = json.loads(response_text)
-            except (json.JSONDecodeError, UnicodeDecodeError) as e:
-                logger.debug(f"Failed to parse response JSON for {request_id}: {e}")
-
-        # Prepare log extra data
-        log_extra = {
-            "request_id": request_id,
-            "status_code": response_status,
-            "process_time": process_time,
-            "event_type": "request_complete",
-        }
-
-        # Add response JSON if available
-        if response_json is not None:
-            log_extra["response_json"] = response_json
-
-        # Log response with JSON if available
-        if response_json is not None:
-            try:
-                # Format JSON beautifully with indentation - never truncate
-                formatted_json = json.dumps(
-                    response_json, indent=2, ensure_ascii=False, separators=(",", ": ")
-                )
-
-                logger.info(
-                    f"Response {request_id}: {response_status} in {process_time:.3f}s - JSON:\n{formatted_json}",
-                    extra=log_extra,
-                )
-            except (TypeError, ValueError) as e:
-                logger.info(
-                    f"Response {request_id}: {response_status} in {process_time:.3f}s - JSON: [serialization error: {e}]",
-                    extra=log_extra,
-                )
-        else:
-            logger.info(
-                f"Response {request_id}: {response_status} in {process_time:.3f}s",
-                extra=log_extra,
-            )
+        request_id = _resolve_request_id(scope)
+        scope.setdefault("state", {})["request_id"] = request_id
+        token = bind_request_id(request_id)
+        tracker = _ResponseTracker(send, request_id)
+        started = time.perf_counter()
+        try:
+            await self.app(scope, receive, tracker)
+        finally:
+            _log_request(scope, tracker.status_code, started)
+            reset_request_id(token)

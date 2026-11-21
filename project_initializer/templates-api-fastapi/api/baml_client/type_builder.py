@@ -20,7 +20,7 @@ from .globals import DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIM
 class TypeBuilder(type_builder.TypeBuilder):
     def __init__(self):
         super().__init__(classes=set(
-          ["ChatResponse","ConversationHistory",]
+          ["ChatResponse","ChatTurn",]
         ), enums=set(
           []
         ), runtime=DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIME)
@@ -39,8 +39,8 @@ class TypeBuilder(type_builder.TypeBuilder):
         return ChatResponseViewer(self)
 
     @property
-    def ConversationHistory(self) -> "ConversationHistoryViewer":
-        return ConversationHistoryViewer(self)
+    def ChatTurn(self) -> "ChatTurnViewer":
+        return ChatTurnViewer(self)
 
 
 
@@ -92,22 +92,22 @@ class ChatResponseProperties:
     
 
 
-class ConversationHistoryAst:
+class ChatTurnAst:
     def __init__(self, tb: type_builder.TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
-        self._bldr = _tb.class_("ConversationHistory")
-        self._properties: typing.Set[str] = set([  "messages",  ])
-        self._props = ConversationHistoryProperties(self._bldr, self._properties)
+        self._bldr = _tb.class_("ChatTurn")
+        self._properties: typing.Set[str] = set([  "role",  "content",  ])
+        self._props = ChatTurnProperties(self._bldr, self._properties)
 
     def type(self) -> baml_py.FieldType:
         return self._bldr.field()
 
     @property
-    def props(self) -> "ConversationHistoryProperties":
+    def props(self) -> "ChatTurnProperties":
         return self._props
 
 
-class ConversationHistoryViewer(ConversationHistoryAst):
+class ChatTurnViewer(ChatTurnAst):
     def __init__(self, tb: type_builder.TypeBuilder):
         super().__init__(tb)
 
@@ -117,7 +117,7 @@ class ConversationHistoryViewer(ConversationHistoryAst):
     
 
 
-class ConversationHistoryProperties:
+class ChatTurnProperties:
     def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
         self.__bldr = bldr
         self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
@@ -125,8 +125,12 @@ class ConversationHistoryProperties:
     
     
     @property
-    def messages(self) -> type_builder.ClassPropertyViewer:
-        return type_builder.ClassPropertyViewer(self.__bldr.property("messages"))
+    def role(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("role"))
+    
+    @property
+    def content(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("content"))
     
     
 

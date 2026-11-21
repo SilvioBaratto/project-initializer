@@ -47,8 +47,9 @@ def all_succeeded(checks: typing.Dict[CheckName, Check]) -> bool:
 class ChatResponse(BaseModel):
     answer: str = Field(description='The chatbot\'s answer to the user\'s question')
 
-class ConversationHistory(BaseModel):
-    messages: typing.List[str] = Field(description='List of previous messages in the conversation')
+class ChatTurn(BaseModel):
+    role: typing.Union[typing_extensions.Literal['user'], typing_extensions.Literal['assistant']]
+    content: str
 
 # #########################################################################
 # Generated type aliases (0)

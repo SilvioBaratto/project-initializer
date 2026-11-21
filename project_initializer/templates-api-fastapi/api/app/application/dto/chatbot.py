@@ -1,83 +1,53 @@
-"""
-Chatbot Schemas
-===============
+"""Chatbot DTOs: the contract between the API layer and ``ChatbotService``."""
 
-Schemas for chatbot request/response validation.
-Designed to match BAML function inputs/outputs.
-"""
-
-from typing import Optional, List
-from pydantic import BaseModel, Field
+from dataclasses import dataclass
 
 
-# ===========================
-# Request/Response Schemas
-# ===========================
+@dataclass(frozen=True, slots=True)
+class ChatTurnDTO:
+    """One earlier turn of the conversation.
 
-
-class ConversationHistory(BaseModel):
-    """
-    Conversation history for context.
-    Matches BAML ConversationHistory class.
+    Attributes:
+        role: ``"user"`` or ``"assistant"``; the service rejects anything else.
+        content: Message text.
     """
 
-    messages: List[str] = Field(
-        default_factory=list,
-        description="List of previous messages in the conversation",
-    )
+    role: str
+    content: str
 
 
-class ChatRequest(BaseModel):
-    """
-    Request schema for chat endpoint.
-    Maps to BAML Chat and StreamChat function inputs.
-    """
+@dataclass(frozen=True, slots=True)
+class ChatQuery:
+    """A question together with the conversation so far.
 
-    user_question: str = Field(
-        ...,
-        min_length=1,
-        max_length=2000,
-        description="The user's question or message",
-        examples=["Tell me about Silvio's portfolio"],
-    )
-    conversation_history: Optional[ConversationHistory] = Field(
-        default=None,
-        description="Previous conversation messages for context",
-        examples=[None],
-    )
-
-    model_config = {
-        "json_schema_extra": {
-            "examples": [
-                {"user_question": "Tell me about Silvio's portfolio"},
-                {
-                    "user_question": "What projects has he worked on?",
-                    "conversation_history": {
-                        "messages": [
-                            "User: Tell me about Silvio",
-                            "Assistant: Silvio Baratto is a full-stack developer...",
-                        ]
-                    },
-                },
-            ]
-        }
-    }
-
-
-class ChatResponse(BaseModel):
-    """
-    Response schema for chat endpoint.
-    Maps to BAML ChatResponse class.
+    Attributes:
+        question: The user's latest message.
+        history: Earlier turns, oldest first.
     """
 
-    answer: str = Field(..., description="The chatbot's response")
+    question: str
+    history: tuple[ChatTurnDTO, ...] = ()
 
 
-class StreamChunk(BaseModel):
+@dataclass(frozen=True, slots=True)
+class ChatAnswer:
+    """A complete reply.
+
+    Attributes:
+        answer: Reply text.
     """
-    Schema for streaming response chunks.
-    Sent as Server-Sent Events (SSE).
+
+    answer: str
+
+
+@dataclass(frozen=True, slots=True)
+class ChatStreamChunk:
+    """One piece of a streamed reply.
+
+    Attributes:
+        content: Reply text carried by this chunk.
+        done: True only for the last chunk, whose content is the complete reply.
     """
 
-    content: str = Field(..., description="Partial or complete response content")
-    done: bool = Field(default=False, description="Whether this is the final chunk")
+    content: str
+    done: bool

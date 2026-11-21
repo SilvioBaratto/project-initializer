@@ -82,34 +82,19 @@ class BamlAsyncClient:
     def parse_stream(self):
       return self.__llm_stream_parser
 
-    async def Chat(self, user_question: str,conversation_history: typing.Optional["types.ConversationHistory"] = None,
+    async def Chat(self, user_question: str,history: typing.List["types.ChatTurn"],
         baml_options: BamlCallOptions = {},
     ) -> types.ChatResponse:
         # Check if on_tick is provided
         if 'on_tick' in baml_options:
             # Use streaming internally when on_tick is provided
-            __stream__ = self.stream.Chat(user_question=user_question,conversation_history=conversation_history,
+            __stream__ = self.stream.Chat(user_question=user_question,history=history,
                 baml_options=baml_options)
             return await __stream__.get_final_response()
         else:
             # Original non-streaming code
             __result__ = await self.__options.merge_options(baml_options).call_function_async(function_name="Chat", args={
-                "user_question": user_question,"conversation_history": conversation_history,
-            })
-            return typing.cast(types.ChatResponse, __result__.cast_to(types, types, stream_types, False, __runtime__))
-    async def StreamChat(self, user_question: str,conversation_history: typing.Optional["types.ConversationHistory"] = None,
-        baml_options: BamlCallOptions = {},
-    ) -> types.ChatResponse:
-        # Check if on_tick is provided
-        if 'on_tick' in baml_options:
-            # Use streaming internally when on_tick is provided
-            __stream__ = self.stream.StreamChat(user_question=user_question,conversation_history=conversation_history,
-                baml_options=baml_options)
-            return await __stream__.get_final_response()
-        else:
-            # Original non-streaming code
-            __result__ = await self.__options.merge_options(baml_options).call_function_async(function_name="StreamChat", args={
-                "user_question": user_question,"conversation_history": conversation_history,
+                "user_question": user_question,"history": history,
             })
             return typing.cast(types.ChatResponse, __result__.cast_to(types, types, stream_types, False, __runtime__))
     
@@ -121,23 +106,11 @@ class BamlStreamClient:
     def __init__(self, options: DoNotUseDirectlyCallManager):
         self.__options = options
 
-    def Chat(self, user_question: str,conversation_history: typing.Optional["types.ConversationHistory"] = None,
+    def Chat(self, user_question: str,history: typing.List["types.ChatTurn"],
         baml_options: BamlCallOptions = {},
     ) -> baml_py.BamlStream[stream_types.ChatResponse, types.ChatResponse]:
         __ctx__, __result__ = self.__options.merge_options(baml_options).create_async_stream(function_name="Chat", args={
-            "user_question": user_question,"conversation_history": conversation_history,
-        })
-        return baml_py.BamlStream[stream_types.ChatResponse, types.ChatResponse](
-          __result__,
-          lambda x: typing.cast(stream_types.ChatResponse, x.cast_to(types, types, stream_types, True, __runtime__)),
-          lambda x: typing.cast(types.ChatResponse, x.cast_to(types, types, stream_types, False, __runtime__)),
-          __ctx__,
-        )
-    def StreamChat(self, user_question: str,conversation_history: typing.Optional["types.ConversationHistory"] = None,
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.BamlStream[stream_types.ChatResponse, types.ChatResponse]:
-        __ctx__, __result__ = self.__options.merge_options(baml_options).create_async_stream(function_name="StreamChat", args={
-            "user_question": user_question,"conversation_history": conversation_history,
+            "user_question": user_question,"history": history,
         })
         return baml_py.BamlStream[stream_types.ChatResponse, types.ChatResponse](
           __result__,
@@ -153,18 +126,11 @@ class BamlHttpRequestClient:
     def __init__(self, options: DoNotUseDirectlyCallManager):
         self.__options = options
 
-    async def Chat(self, user_question: str,conversation_history: typing.Optional["types.ConversationHistory"] = None,
+    async def Chat(self, user_question: str,history: typing.List["types.ChatTurn"],
         baml_options: BamlCallOptions = {},
     ) -> baml_py.baml_py.HTTPRequest:
         __result__ = await self.__options.merge_options(baml_options).create_http_request_async(function_name="Chat", args={
-            "user_question": user_question,"conversation_history": conversation_history,
-        }, mode="request")
-        return __result__
-    async def StreamChat(self, user_question: str,conversation_history: typing.Optional["types.ConversationHistory"] = None,
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.baml_py.HTTPRequest:
-        __result__ = await self.__options.merge_options(baml_options).create_http_request_async(function_name="StreamChat", args={
-            "user_question": user_question,"conversation_history": conversation_history,
+            "user_question": user_question,"history": history,
         }, mode="request")
         return __result__
     
@@ -175,18 +141,11 @@ class BamlHttpStreamRequestClient:
     def __init__(self, options: DoNotUseDirectlyCallManager):
         self.__options = options
 
-    async def Chat(self, user_question: str,conversation_history: typing.Optional["types.ConversationHistory"] = None,
+    async def Chat(self, user_question: str,history: typing.List["types.ChatTurn"],
         baml_options: BamlCallOptions = {},
     ) -> baml_py.baml_py.HTTPRequest:
         __result__ = await self.__options.merge_options(baml_options).create_http_request_async(function_name="Chat", args={
-            "user_question": user_question,"conversation_history": conversation_history,
-        }, mode="stream")
-        return __result__
-    async def StreamChat(self, user_question: str,conversation_history: typing.Optional["types.ConversationHistory"] = None,
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.baml_py.HTTPRequest:
-        __result__ = await self.__options.merge_options(baml_options).create_http_request_async(function_name="StreamChat", args={
-            "user_question": user_question,"conversation_history": conversation_history,
+            "user_question": user_question,"history": history,
         }, mode="stream")
         return __result__
     

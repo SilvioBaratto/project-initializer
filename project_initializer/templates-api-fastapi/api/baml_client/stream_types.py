@@ -29,8 +29,9 @@ class StreamState(BaseModel, typing.Generic[StreamStateValueT]):
 class ChatResponse(BaseModel):
     answer: typing.Optional[str] = Field(default=None, description='The chatbot\'s answer to the user\'s question')
 
-class ConversationHistory(BaseModel):
-    messages: typing.List[str] = Field(description='List of previous messages in the conversation')
+class ChatTurn(BaseModel):
+    role: typing.Optional[typing.Union[typing_extensions.Literal['user'], typing_extensions.Literal['assistant']]] = None
+    content: typing.Optional[str] = None
 
 # #########################################################################
 # Generated type aliases (0)

@@ -20,6 +20,11 @@ coverage.xml
 *.cover
 .hypothesis/
 .pytest_cache/
+htmlcov/
+
+# Tests ship with the repository, not with the image
+tests/
+pytest.ini
 
 # Environment and configs
 .env
@@ -34,6 +39,7 @@ Dockerfile
 # Development
 .git/
 .gitignore
+.claude/
 .vscode/
 .idea/
 *.swp

@@ -1,73 +1,42 @@
-"""Base model classes and mixins"""
+"""Declarative base and the column mixins every record reuses."""
 
 import uuid
 from datetime import datetime
-from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
+
 from sqlalchemy import DateTime, String, func
-from sqlalchemy.dialects.postgresql import UUID
-from typing import Any
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from app.domain.constants import ENTITY_ID_LENGTH
 
 
 class Base(DeclarativeBase):
-    """Base class for all SQLAlchemy models"""
+    """Base class of every ORM record."""
 
-    # Global type annotation map for modern SQLAlchemy
-    type_annotation_map = {
-        datetime: DateTime(timezone=True),
-    }
+    # A bare DateTime maps to "timestamp without time zone" on PostgreSQL, which
+    # drops the UTC offset, so every datetime column is timezone-aware.
+    type_annotation_map = {datetime: DateTime(timezone=True)}
 
 
 class TimestampMixin:
-    """Mixin to add created_at and updated_at timestamps"""
+    """Adds ``created_at`` and ``updated_at``, both set by the database.
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    ``updated_at`` is refreshed by SQLAlchemy on every ORM update. A raw SQL
+    update bypasses that, so write through the ORM.
+    """
+
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
+        server_default=func.now(), onupdate=func.now()
     )
 
 
-class UUIDPrimaryKeyMixin:
-    """Mixin to add UUID primary key"""
+class StringIdPrimaryKeyMixin:
+    """Adds a textual UUID primary key.
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False
-    )
-
-
-class StringUUIDPrimaryKeyMixin:
-    """Mixin to add string-based UUID primary key for compatibility"""
+    A string rather than a native UUID type keeps the schema identical on
+    PostgreSQL and on the SQLite database the tests use.
+    """
 
     id: Mapped[str] = mapped_column(
-        String(36),
-        primary_key=True,
-        nullable=False,  # UUID string length
+        String(ENTITY_ID_LENGTH), primary_key=True, default=lambda: str(uuid.uuid4())
     )
-
-
-class BaseModel(Base, UUIDPrimaryKeyMixin, TimestampMixin):
-    """
-    Abstract base model combining common patterns
-
-    Provides:
-    - UUID primary key
-    - Created/updated timestamps
-    - Common utilities
-    """
-
-    __abstract__ = True
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert model instance to dictionary"""
-        return {
-            column.name: getattr(self, column.name) for column in self.__table__.columns
-        }
-
-    def __repr__(self) -> str:
-        """String representation of the model"""
-        class_name = self.__class__.__name__
-        return f"<{class_name}(id={getattr(self, 'id', None)})>"

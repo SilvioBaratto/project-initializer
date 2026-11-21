@@ -1,59 +1,30 @@
-// Conversation history for context
-class ConversationHistory {
-  messages string[] @description("List of previous messages in the conversation")
+class ChatTurn {
+  role "user" | "assistant"
+  content string
 }
 
-// Simple response with just the answer
 class ChatResponse {
   answer string @description("The chatbot's answer to the user's question")
 }
 
-// Non-streaming chat function
-function Chat(
-  user_question: string,
-  conversation_history: ConversationHistory?
-) -> ChatResponse {
+// History is rendered as real user/assistant messages after the system block.
+// Inlining it in the system prompt would let a crafted "previous message" carry
+// system-level authority.
+function Chat(user_question: string, history: ChatTurn[]) -> ChatResponse {
   client AzureOpenAI
 
   prompt #"
     {{ _.role("system") }}
     You are a helpful AI assistant. Answer questions clearly and concisely.
 
-    {% if conversation_history %}
-    ## Previous Conversation:
-    {% for msg in conversation_history.messages %}
-    {{ msg }}
+    {{ ctx.output_format }}
+
+    {% for turn in history %}
+    {{ _.role(turn.role) }}
+    {{ turn.content }}
     {% endfor %}
-    {% endif %}
 
     {{ _.role("user") }}
     {{ user_question }}
-
-    {{ ctx.output_format }}
-  "#
-}
-
-// Streaming chat function for real-time responses
-function StreamChat(
-  user_question: string,
-  conversation_history: ConversationHistory?
-) -> ChatResponse {
-  client AzureOpenAI
-
-  prompt #"
-    {{ _.role("system") }}
-    You are a helpful AI assistant. Answer questions clearly and concisely.
-
-    {% if conversation_history %}
-    ## Previous Conversation:
-    {% for msg in conversation_history.messages %}
-    {{ msg }}
-    {% endfor %}
-    {% endif %}
-
-    {{ _.role("user") }}
-    {{ user_question }}
-
-    {{ ctx.output_format }}
   "#
 }

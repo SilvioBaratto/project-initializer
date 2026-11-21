@@ -19,8 +19,8 @@ type_map = {
     "types.ChatResponse": types.ChatResponse,
     "stream_types.ChatResponse": stream_types.ChatResponse,
 
-    "types.ConversationHistory": types.ConversationHistory,
-    "stream_types.ConversationHistory": stream_types.ConversationHistory,
+    "types.ChatTurn": types.ChatTurn,
+    "stream_types.ChatTurn": stream_types.ChatTurn,
 
 
 }

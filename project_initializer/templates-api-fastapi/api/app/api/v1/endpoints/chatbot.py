@@ -1,234 +1,129 @@
-"""
-Chatbot Endpoints
-=================
+"""Chatbot routes: a complete reply, or the reply streamed as server-sent events.
 
-API endpoints for chatbot interactions.
-Supports both standard and streaming responses.
+Both routes require an authenticated caller, because every call is paid for at
+the LLM provider. A provider failure reaches the client as a generic 503. On the
+stream route that holds until the first token is ready; a failure after the
+stream has started can only travel as a final event that carries an
+``error_code``. The cause is logged, never returned.
 """
 
-from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException, status
+import logging
+from collections.abc import AsyncIterator
+
+from fastapi import APIRouter, Depends, status
 from fastapi.responses import StreamingResponse
 
-from app.api.schemas import (
-    ChatRequest,
-    ChatResponse,
-    StreamChunk,
+from app.api.auth_deps import get_current_user
+from app.api.deps import ChatbotServiceDep
+from app.api.errors import AUTHENTICATED_ROUTE_ERRORS, error_responses
+from app.api.handlers import INTERNAL_ERROR_CODE, resolve_mapping
+from app.api.schemas.chatbot import ChatRequest, ChatResponse, StreamChunk
+from app.application.dto.chatbot import ChatStreamChunk
+from app.domain.exceptions import DomainError
+
+logger = logging.getLogger(__name__)
+
+STREAM_FAILURE_MESSAGE = "The reply could not be completed. Please try again."
+STREAM_FAILED_LOG_MESSAGE = "chat.stream_failed"
+SSE_MEDIA_TYPE = "text/event-stream"
+SSE_HEADERS = {
+    "Cache-Control": "no-cache",
+    # nginx would otherwise buffer the stream and release it all at once.
+    "X-Accel-Buffering": "no",
+}
+
+CHAT_ERRORS = {
+    **AUTHENTICATED_ROUTE_ERRORS,
+    **error_responses(status.HTTP_422_UNPROCESSABLE_CONTENT),
+}
+
+router = APIRouter(
+    prefix="/chat", tags=["Chatbot"], dependencies=[Depends(get_current_user)]
 )
-from app.application.services.chatbot_service import ChatbotService
 
 
-router = APIRouter(prefix="/chat", tags=["Chatbot"])
+def _server_sent_event(chunk: StreamChunk) -> str:
+    return f"data: {chunk.model_dump_json(exclude_none=True)}\n\n"
 
 
-# ===========================
-# Dependency Injection
-# ===========================
-
-
-def get_chatbot_service() -> ChatbotService:
-    """
-    Dependency that provides a ChatbotService instance.
-
-    Returns:
-        ChatbotService instance
-
-    Note:
-        Currently creates a new instance per request.
-        Can be modified to use caching or singleton pattern if needed.
-    """
-    return ChatbotService()
-
-
-# ===========================
-# Endpoints
-# ===========================
-
-
-@router.post("/", response_model=ChatResponse, status_code=status.HTTP_200_OK)
-async def chat(
-    request: ChatRequest,
-    service: Annotated[ChatbotService, Depends(get_chatbot_service)],
-):
-    """
-    Send a chat message and receive a complete response.
-
-    This endpoint returns the full response at once (non-streaming).
-
-    Args:
-        request: ChatRequest containing the user's question and optional context
-        service: Injected ChatbotService instance
-
-    Returns:
-        ChatResponse with the bot's answer and relevant URLs
-
-    Raises:
-        HTTPException: 500 if chat processing fails
-
-    Example Request:
-    ```json
-    {
-        "user_question": "Tell me about Silvio's portfolio",
-        "conversation_history": {
-            "messages": [
-                "User: Hi, I'm interested in learning more",
-                "Assistant: Sure! What would you like to know?"
-            ]
-        }
-    }
-    ```
-
-    Example Response:
-    ```json
-    {
-        "answer": "You can view Silvio's portfolio at https://silviobaratto.com. He specializes in AI/ML and full-stack development..."
-    }
-    ```
-    """
-    try:
-        response = await service.chat(request)
-        return response
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to process chat request: {str(e)}",
-        )
-
-
-@router.post("/stream", status_code=status.HTTP_200_OK)
-async def chat_stream(
-    request: ChatRequest,
-    service: Annotated[ChatbotService, Depends(get_chatbot_service)],
-):
-    """
-    Send a chat message and receive a streaming response.
-
-    This endpoint uses Server-Sent Events (SSE) to stream the response
-    token by token as it's generated.
-
-    Args:
-        request: ChatRequest containing the user's question and optional context
-        service: Injected ChatbotService instance
-
-    Returns:
-        StreamingResponse with text/event-stream content type
-
-    Response Format:
-        Each chunk is sent as a JSON object with the following structure:
-        ```json
-        {
-            "content": "partial or complete response text",
-            "done": false
-        }
-        ```
-
-        The final chunk includes:
-        ```json
-        {
-            "content": "complete response text",
-            "done": true
-        }
-        ```
-
-    Example Usage (JavaScript):
-    ```javascript
-    const response = await fetch('/api/v1/chat/stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            user_question: "Tell me about stockpy"
-        })
-    });
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-
-    while (true) {
-        const {done, value} = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\\n');
-
-        for (const line of lines) {
-            if (line.startsWith('data: ')) {
-                const data = JSON.parse(line.slice(6));
-                console.log(data.content);
-
-                if (data.done) {
-                    console.log('Stream complete');
-                }
-            }
-        }
-    }
-    ```
-
-    Example Usage (Python):
-    ```python
-    import httpx
-
-    async with httpx.AsyncClient() as client:
-        async with client.stream(
-            'POST',
-            'http://localhost:8000/api/v1/chat/stream',
-            json={"user_question": "Tell me about stockpy"}
-        ) as response:
-            async for line in response.aiter_lines():
-                if line.startswith('data: '):
-                    data = json.loads(line[6:])
-                    print(data['content'])
-                    if data['done']:
-                        print('Stream complete')
-    ```
-    """
-
-    async def event_generator():
-        """
-        Generator that yields Server-Sent Events (SSE) formatted chunks.
-
-        Yields:
-            SSE formatted strings: "data: {json}\\n\\n"
-        """
-        try:
-            async for chunk in service.stream_chat(request):
-                # Format as SSE (Server-Sent Events)
-                chunk_json = chunk.model_dump_json()
-                yield f"data: {chunk_json}\n\n"
-
-                # If this is the final chunk, we're done
-                if chunk.done:
-                    break
-
-        except Exception as e:
-            # Send error as SSE
-            error_chunk = StreamChunk(content=f"Error: {str(e)}", done=True)
-            yield f"data: {error_chunk.model_dump_json()}\n\n"
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # Disable buffering in nginx
-        },
+def _failure_event(error_code: str) -> str:
+    return _server_sent_event(
+        StreamChunk(content=STREAM_FAILURE_MESSAGE, done=True, error_code=error_code)
     )
 
 
-@router.get("/health", status_code=status.HTTP_200_OK)
-async def health_check():
-    """
-    Health check endpoint for the chatbot service.
+def _content_event(chunk: ChatStreamChunk) -> str:
+    return _server_sent_event(StreamChunk(content=chunk.content, done=chunk.done))
 
-    Returns:
-        Simple success message
 
-    Example Response:
-    ```json
-    {
-        "status": "healthy",
-        "service": "chatbot"
-    }
-    ```
+async def _stream_events(
+    first_chunk: ChatStreamChunk | None, remaining: AsyncIterator[ChatStreamChunk]
+) -> AsyncIterator[str]:
+    try:
+        if first_chunk is not None:
+            yield _content_event(first_chunk)
+        async for chunk in remaining:
+            yield _content_event(chunk)
+    except DomainError as error:
+        # The status line is already sent, so the failure can only travel as a
+        # final event. It is an expected kind of failure, so no traceback.
+        logger.log(
+            resolve_mapping(type(error)).log_level,
+            STREAM_FAILED_LOG_MESSAGE,
+            extra={"error_code": error.error_code, "context": error.log_context},
+        )
+        yield _failure_event(error.error_code)
+    except Exception:
+        # Whatever broke, the client must receive a terminated stream and no
+        # internal detail.
+        logger.exception(STREAM_FAILED_LOG_MESSAGE)
+        yield _failure_event(INTERNAL_ERROR_CODE)
+
+
+@router.post(
+    "/",
+    response_model=ChatResponse,
+    summary="Ask the chatbot",
+    response_description="The complete reply.",
+    responses=CHAT_ERRORS,
+)
+async def chat(request: ChatRequest, service: ChatbotServiceDep) -> ChatResponse:
+    """Answer a question in one response.
+
+    ``conversation_history`` carries earlier turns as ``"user: text"`` and
+    ``"assistant: text"`` strings, oldest first.
     """
-    return {"status": "healthy", "service": "chatbot"}
+    answer = await service.answer(request.to_query())
+    return ChatResponse(answer=answer.answer)
+
+
+@router.post(
+    "/stream",
+    response_class=StreamingResponse,
+    summary="Ask the chatbot, streaming the reply",
+    response_description="Server-sent events: JSON objects with `content` and `done`.",
+    responses={
+        status.HTTP_200_OK: {"content": {SSE_MEDIA_TYPE: {}}},
+        **CHAT_ERRORS,
+    },
+)
+async def chat_stream(
+    request: ChatRequest, service: ChatbotServiceDep
+) -> StreamingResponse:
+    """Answer a question as server-sent events.
+
+    Each event is ``data: {"content": "...", "done": false}``. The last event has
+    ``done`` true and holds the complete reply. When the stream breaks after it
+    has started, the last event instead holds a generic message and an
+    ``error_code``.
+    """
+    remaining = aiter(service.stream_answer(request.to_query()))
+    # Reading the first chunk here, before the response starts, lets a failure
+    # that precedes any output (an outage, a refused history) become a proper
+    # error response instead of a 200 whose body carries the error.
+    first_chunk = await anext(remaining, None)
+    return StreamingResponse(
+        _stream_events(first_chunk, remaining),
+        media_type=SSE_MEDIA_TYPE,
+        headers=SSE_HEADERS,
+    )

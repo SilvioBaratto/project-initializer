@@ -42,7 +42,7 @@ services:
       - ./api:/app
     networks:
       - app_network
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-access-log --reload
 
   # Angular Frontend with nginx and API proxy
   frontend:

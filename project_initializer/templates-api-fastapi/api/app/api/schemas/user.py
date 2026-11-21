@@ -1,39 +1,124 @@
-"""User Pydantic schemas for request/response validation."""
+"""User models: the registration payload and the identity views."""
 
-from typing import Optional
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from app.api.schemas.common import NulFreeStr
+from app.domain.constants import (
+    EMAIL_MAX_LENGTH,
+    PASSWORD_MAX_BYTES,
+    PASSWORD_MIN_LENGTH,
+    PERSON_NAME_MAX_LENGTH,
+    USERNAME_MAX_LENGTH,
+)
+from app.domain.entities.authenticated_user import AuthenticatedUser
 
 
 class UserBase(BaseModel):
-    """Base user schema with shared public fields."""
+    """Profile fields shared by the user models.
 
-    email: EmailStr = Field(..., description="User email address")
-    username: Optional[str] = Field(
-        default=None, max_length=50, description="Optional username"
+    Attributes:
+        email: Email address.
+        username: Optional public handle.
+        first_name: Optional given name.
+        last_name: Optional family name.
+    """
+
+    email: EmailStr = Field(
+        max_length=EMAIL_MAX_LENGTH,
+        description="User email address",
+        examples=["jane.doe@example.com"],
     )
-    first_name: Optional[str] = Field(default=None, description="First name")
-    last_name: Optional[str] = Field(default=None, description="Last name")
-    is_active: bool = Field(default=True, description="Whether user is active")
+    username: NulFreeStr | None = Field(
+        default=None,
+        max_length=USERNAME_MAX_LENGTH,
+        description="Optional username",
+        examples=["jane"],
+    )
+    first_name: NulFreeStr | None = Field(
+        default=None,
+        max_length=PERSON_NAME_MAX_LENGTH,
+        description="First name",
+        examples=["Jane"],
+    )
+    last_name: NulFreeStr | None = Field(
+        default=None,
+        max_length=PERSON_NAME_MAX_LENGTH,
+        description="Last name",
+        examples=["Doe"],
+    )
 
 
 class UserCreate(UserBase):
-    """Schema for creating a user — includes plain-text password."""
+    """Registration payload; the password is never part of a response.
 
-    password: str = Field(
-        ..., min_length=8, description="Plain-text password (min 8 chars)"
+    Attributes:
+        password: Plain-text password, at most ``PASSWORD_MAX_BYTES`` bytes
+            because bcrypt silently ignores anything beyond that. A NUL
+            character is refused for the same reason: bcrypt stops reading at it.
+    """
+
+    password: NulFreeStr = Field(
+        min_length=PASSWORD_MIN_LENGTH,
+        max_length=PASSWORD_MAX_BYTES,
+        description=(
+            f"Plain-text password, {PASSWORD_MIN_LENGTH} to {PASSWORD_MAX_BYTES} bytes"
+        ),
     )
+
+    @field_validator("password")
+    @classmethod
+    def _fits_bcrypt_limit(cls, value: str) -> str:
+        # The character limit alone passes multi-byte text beyond the byte limit.
+        if len(value.encode()) > PASSWORD_MAX_BYTES:
+            raise ValueError(f"must be at most {PASSWORD_MAX_BYTES} bytes")
+        return value
 
 
 class UserPublic(UserBase):
-    """Schema for public user responses — never exposes credentials."""
+    """A stored user as returned to clients; never exposes credentials.
+
+    Attributes:
+        id: User identifier.
+        is_active: Whether the account may sign in.
+    """
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: str = Field(..., description="User ID")
+    id: str = Field(description="User ID")
+    is_active: bool = Field(description="Whether the account is active")
 
 
-class UserInDB(UserPublic):
-    """Internal schema that carries the stored password hash."""
+class CurrentUserResponse(BaseModel):
+    """The caller's identity as seen by this API, whatever the auth variant.
 
-    password_hash: str = Field(..., description="Hashed password (internal use only)")
+    Attributes:
+        id: Stable identifier of the caller.
+        email: Email address when the identity provider supplies one.
+        username: Username when the identity provider supplies one.
+        roles: Roles granted to the caller.
+        auth_method: How the caller authenticated.
+    """
+
+    id: str
+    email: str | None = None
+    username: str | None = None
+    roles: list[str]
+    auth_method: str
+
+    @classmethod
+    def from_user(cls, user: AuthenticatedUser) -> "CurrentUserResponse":
+        """Build the response from an authenticated principal.
+
+        Args:
+            user: The principal resolved by ``get_current_user``.
+
+        Returns:
+            The response with the principal's roles as a list.
+        """
+        return cls(
+            id=user.id,
+            email=user.email,
+            username=user.username,
+            roles=list(user.roles),
+            auth_method=user.auth_method,
+        )

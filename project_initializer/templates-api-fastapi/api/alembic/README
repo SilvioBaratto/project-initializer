@@ -1,1 +1,88 @@
-Generic single-database configuration.
+Migration runbook
+=================
+
+Alembic owns the schema: the application never calls create_all. Run every
+command from the api/ directory. The database URL comes from DIRECT_DATABASE_URL,
+falling back to DATABASE_URL (see alembic/env.py); it is never written in
+alembic.ini.
+
+Apply
+-----
+
+    alembic upgrade head              # what entrypoint.sh runs at start
+    alembic upgrade head --sql        # print the SQL instead of running it
+    alembic current                   # revision the database is at
+    alembic history --verbose         # the chain, newest first
+
+Migrations run in one transaction where the database supports transactional DDL
+(PostgreSQL does), so a failed migration leaves the schema as it was.
+
+Create a revision
+-----------------
+
+    alembic revision --autogenerate --rev-id 0003_add_widget -m "add widget"
+
+The id is the sequence number plus a slug, at most 32 characters, and is also the
+file name (alembic.ini: file_template). Review the draft before committing it:
+renames look like a drop plus a create, and a missing downgrade is a defect. The
+header and imports come out formatted; run your formatter on the operations, which
+Alembic writes with single quotes and long lines.
+
+Every downgrade must keep the data it removes:
+
+- A dropped table goes through preserve_and_drop_table. Autogenerate writes that
+  call for you.
+- A dropped column goes through preserve_and_drop_column, which also needs the
+  key columns that identify a row.
+- op.drop_table and op.drop_column inside downgrade() fail
+  tests/integration/test_migrations.py.
+
+Keep literal column lengths in a migration, not imports from app.domain.constants:
+a migration is a snapshot of the schema at its revision.
+
+Roll back
+---------
+
+Newest first, one revision at a time:
+
+    alembic downgrade -1
+    alembic downgrade 0001_create_items    # newer revisions undone, this one stays
+
+Dropped tables are copied aside before they go. On PostgreSQL the copy lives in the
+migration_backup schema, named <table>__rollback_<UTC time to the microsecond>; on
+SQLite it sits next to the table under the same name. The log records it as
+migration.preserved with table= and backup=. The migration role needs the CREATE
+privilege on the database to create that schema.
+
+The copy carries rows only, no constraints or indexes, and PostgreSQL grants the
+schema to nobody but its creator, so the Supabase Data API and the application role
+cannot read it. Keep migration_backup out of the exposed schemas.
+
+Restore from a backup
+---------------------
+
+Upgrade again so the table exists, then copy the rows back. List the columns when
+the migrations changed them since the backup:
+
+    alembic upgrade head
+    psql "$DIRECT_DATABASE_URL" -c \
+      "INSERT INTO items SELECT * FROM migration_backup.items__rollback_20261121101530123456"
+
+Clean up
+--------
+
+Drop a backup once the restored data is verified, and the schema when it is empty:
+
+    psql "$DIRECT_DATABASE_URL" -c \
+      "DROP TABLE migration_backup.items__rollback_20261121101530123456"
+    psql "$DIRECT_DATABASE_URL" -c "DROP SCHEMA migration_backup"
+
+Validate before a deploy
+------------------------
+
+    alembic upgrade head --sql        # read what will run
+    alembic check                     # models and migrations agree
+    pytest tests/integration/test_migrations.py
+
+Then rehearse on a copy of production: alembic upgrade head, alembic downgrade
+base, alembic upgrade head. SQLite cannot prove PostgreSQL-only behaviour.

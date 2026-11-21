@@ -1,56 +1,56 @@
-"""Environment-adaptive configuration loader.
+"""Locates the project ``.env`` and loads it into the process environment.
 
-Locates the project ``.env`` by walking up the directory tree and loads it into
-``os.environ`` before any Settings instance is created. This is what lets the
-app find the ROOT-level ``.env`` (one directory above ``api/``) regardless of the
-current working directory — ``cd api && uvicorn`` and running from the project
-root both resolve the same file. In Docker no ``.env`` exists (compose injects the
-vars via ``env_file``), so the load step is simply skipped.
+The ``.env`` lives at the project root, one directory above ``api/``, so a plain
+``load_dotenv()`` would miss it when the API starts from ``api/``. Walking up
+from the working directory resolves the same file wherever the process starts.
+In Docker no ``.env`` exists, because compose injects the variables.
 """
 
 import logging
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 logger = logging.getLogger(__name__)
 
-# Markers of the PROJECT ROOT (where the .env and docker-compose.yml live). The
-# walk stops here so the search never escapes into a parent repo or the
-# filesystem root.
-_ROOT_MARKERS = ("docker-compose.yml", ".git")
+DOTENV_FILENAME = ".env"
+
+# The walk stops at the project root so the search never escapes into a parent
+# repository or the filesystem root and picks up an unrelated .env.
+_PROJECT_ROOT_MARKERS = ("docker-compose.yml", ".git")
 
 
 def _walk_up_for_dotenv(origin: Path) -> Path | None:
-    """Ascend from *origin*, returning the first ``.env`` found.
-
-    Stops at a project-root marker (docker-compose.yml / .git) so the search
-    never escapes past the project root.
-    """
     for directory in (origin, *origin.parents):
-        candidate = directory / ".env"
+        candidate = directory / DOTENV_FILENAME
         if candidate.is_file():
             return candidate
-        if any((directory / marker).exists() for marker in _ROOT_MARKERS):
+        if any((directory / marker).exists() for marker in _PROJECT_ROOT_MARKERS):
             return None
     return None
 
 
-def find_dotenv(start: Path | None = None) -> Path | None:
-    """Locate the project ``.env`` by walking up from *start*.
+def locate_project_dotenv(start: Path | None = None) -> Path | None:
+    """Find the project ``.env`` by walking up the directory tree.
 
-    Searches upward first from the current working directory (covers ``cd api &&
-    uvicorn`` and running from the project root), then from this module's
-    location (covers imports from odd CWDs / installed packages). Returns the
-    first ``.env`` found, or ``None`` — callers then rely on real environment
-    variables (12-factor).
+    Without ``start`` the search runs from the current working directory first
+    and then from this module's location, which covers processes launched from
+    an unrelated directory.
+
+    Args:
+        start: Directory (or file) to search upward from. When given, only this
+            origin is searched.
+
+    Returns:
+        The path of the first ``.env`` found below a project-root marker, or
+        None when there is none; callers then rely on real environment variables.
     """
-    search_origins = []
-    if start is not None:
-        search_origins.append(start.resolve())
-    else:
-        search_origins.append(Path.cwd())
-        search_origins.append(Path(__file__).resolve())
-
-    for origin in search_origins:
+    origins = (
+        (start.resolve(),)
+        if start is not None
+        else (Path.cwd(), Path(__file__).resolve())
+    )
+    for origin in origins:
         found = _walk_up_for_dotenv(origin)
         if found is not None:
             return found
@@ -58,17 +58,18 @@ def find_dotenv(start: Path | None = None) -> Path | None:
 
 
 def load_configuration(dot_env_path: Path | None = None) -> None:
-    """Populate ``os.environ`` from the project ``.env`` (best-effort).
+    """Copy the project ``.env`` into ``os.environ``, if there is one.
 
-    If a ``.env`` is found it is loaded via python-dotenv with ``override=False``
-    so real environment variables (Docker, CI, exported shell) always win. In
-    Docker no file exists and this is a no-op. When *dot_env_path* is None the
-    file is located by walking up the tree (see :func:`find_dotenv`), so it
-    resolves regardless of CWD; pass an explicit path in tests.
+    Variables already present in the environment win over the file, so Docker,
+    CI and exported shell values are never overridden. Missing files are not an
+    error.
+
+    Args:
+        dot_env_path: Explicit file to load, mainly for tests. When None the file
+            is located with ``locate_project_dotenv``.
     """
-    resolved = find_dotenv() if dot_env_path is None else dot_env_path
-    if resolved is not None and resolved.exists():
-        from dotenv import load_dotenv  # lazy import keeps module import cheap
-
-        load_dotenv(resolved, override=False)
-        logger.debug("Loaded configuration from %s", resolved)
+    resolved = locate_project_dotenv() if dot_env_path is None else dot_env_path
+    if resolved is None or not resolved.exists():
+        return
+    load_dotenv(resolved, override=False)
+    logger.debug("Loaded configuration from %s", resolved)

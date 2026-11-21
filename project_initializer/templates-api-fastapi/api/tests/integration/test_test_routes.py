@@ -1,79 +1,191 @@
-"""Integration tests for demo test routes and the DB-backed items CRUD slice.
+"""Integration tests for the demo routes under ``/test``."""
 
-Scope: issue #12. Covers `/api/v1/test/ping` + `/api/v1/test/echo` and the full
-create→get→list→update→delete round-trip against `/api/v1/items`, proving items
-persist across separate requests through the SQLite test DB.
-
-Credential-free: the base variant's `get_current_user` resolves a dev user, so
-writes need no header. Token/supabase 401 behavior is covered separately (#13).
-The round-trip creates then deletes its own item, so it does not depend on (or
-leave) shared row state — list membership is asserted, never an exact total.
-"""
+from datetime import UTC, datetime
+from http import HTTPStatus
+from urllib.parse import quote
 
 import pytest
 
-API = "/api/v1"
+from app.api.schemas.demo import (
+    ECHO_MESSAGE_MAX_LENGTH,
+    ECHO_METADATA_KEY_MAX_LENGTH,
+    ECHO_METADATA_MAX_ITEMS,
+    ECHO_METADATA_VALUE_MAX_LENGTH,
+)
+
+pytestmark = pytest.mark.integration
+
+PATH_MESSAGES = [
+    pytest.param("hello", id="ascii"),
+    pytest.param("two words", id="space"),
+    pytest.param("caffè ☕", id="unicode"),
+    pytest.param("a" * ECHO_MESSAGE_MAX_LENGTH, id="at-the-limit"),
+]
+REJECTED_METADATA = [
+    pytest.param(
+        {f"key-{n}": "v" for n in range(ECHO_METADATA_MAX_ITEMS + 1)},
+        id="too-many-items",
+    ),
+    pytest.param({"k" * (ECHO_METADATA_KEY_MAX_LENGTH + 1): "v"}, id="key-too-long"),
+    pytest.param(
+        {"key": "v" * (ECHO_METADATA_VALUE_MAX_LENGTH + 1)}, id="value-too-long"
+    ),
+    pytest.param({"key": 123}, id="value-not-text"),
+]
+ACCEPTED_METADATA = [
+    pytest.param(
+        {f"key-{n}": "v" for n in range(ECHO_METADATA_MAX_ITEMS)}, id="item-limit"
+    ),
+    pytest.param({"k" * ECHO_METADATA_KEY_MAX_LENGTH: "v"}, id="key-limit"),
+    pytest.param({"key": "v" * ECHO_METADATA_VALUE_MAX_LENGTH}, id="value-limit"),
+    pytest.param({}, id="empty"),
+]
 
 
-@pytest.mark.integration
-def test_when_ping_requested_then_pong_is_returned(client):
-    """when GET /test/ping is requested, 200 and {'message': 'pong'} are returned."""
-    resp = client.get(f"{API}/test/ping")
-
-    assert resp.status_code == 200
-    assert resp.json() == {"message": "pong"}
+@pytest.fixture
+def demo_url(api_prefix: str) -> str:
+    """Base URL of the demo routes."""
+    return f"{api_prefix}/test"
 
 
-@pytest.mark.integration
-def test_when_echo_get_called_then_path_message_is_echoed(client):
-    """when GET /test/echo/{message} is called, the path message is echoed back."""
-    resp = client.get(f"{API}/test/echo/hello")
+def test_when_ping_is_requested_then_pong_is_returned(client, demo_url):
+    """when GET /test/ping is requested, 200 and the pong message are returned.
 
-    assert resp.status_code == 200
-    assert resp.json()["echo"] == "hello"
+    Validates app.api.v1.endpoints.test.ping().
+    """
+    response = client.get(f"{demo_url}/ping")
 
-
-@pytest.mark.integration
-def test_when_echo_post_called_then_body_message_is_echoed(client):
-    """when POST /test/echo is called, the body message is echoed back."""
-    resp = client.post(f"{API}/test/echo", json={"message": "world"})
-
-    assert resp.status_code == 200
-    assert resp.json()["echo"] == "world"
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == {"message": "pong"}
 
 
-@pytest.mark.integration
-def test_when_item_crud_round_trips_then_it_persists_and_deletes(client):
-    """when an item is created, it round-trips through the DB and a delete removes it."""
-    # CREATE (201)
-    created = client.post(
-        f"{API}/items",
-        json={"name": "Widget", "description": "A widget", "price": 9.99},
+@pytest.mark.parametrize("message", PATH_MESSAGES)
+def test_when_echo_get_is_called_then_the_path_message_is_echoed(
+    client, demo_url, message
+):
+    """when GET /test/echo/{message} is called, the decoded message comes back.
+
+    Validates app.api.v1.endpoints.test.echo_get().
+    """
+    response = client.get(f"{demo_url}/echo/{quote(message)}")
+
+    assert response.status_code == HTTPStatus.OK
+    body = response.json()
+    assert body["echo"] == message
+    assert body["metadata"] is None
+    received_at = datetime.fromisoformat(body["received_at"])
+    assert received_at.tzinfo is not None
+    assert received_at <= datetime.now(UTC)
+
+
+def test_when_echo_path_message_is_over_the_limit_then_422_names_the_parameter(
+    client, demo_url
+):
+    """when the path message exceeds the limit, validation rejects it.
+
+    Validates app.api.v1.endpoints.test.echo_get().
+    """
+    response = client.get(f"{demo_url}/echo/{'a' * (ECHO_MESSAGE_MAX_LENGTH + 1)}")
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert [d["field"] for d in response.json()["error"]["details"]] == ["message"]
+
+
+def test_when_echo_post_is_called_then_message_and_metadata_are_echoed(
+    client, demo_url
+):
+    """when POST /test/echo is called, the body's message and labels come back.
+
+    Validates app.api.v1.endpoints.test.echo_post().
+    """
+    response = client.post(
+        f"{demo_url}/echo", json={"message": "world", "metadata": {"source": "docs"}}
     )
-    assert created.status_code == 201
-    item_id = created.json()["id"]
-    assert item_id
 
-    # GET by id — read back from the DB in a separate request (persistence)
-    fetched = client.get(f"{API}/items/{item_id}")
-    assert fetched.status_code == 200
-    assert fetched.json()["name"] == "Widget"
+    assert response.status_code == HTTPStatus.OK
+    assert response.json()["echo"] == "world"
+    assert response.json()["metadata"] == {"source": "docs"}
 
-    # LIST — the created item is present
-    listed = client.get(f"{API}/items")
-    assert listed.status_code == 200
-    body = listed.json()
-    assert body["total"] >= 1
-    assert any(it["id"] == item_id for it in body["items"])
 
-    # UPDATE — fields change
-    updated = client.put(
-        f"{API}/items/{item_id}", json={"name": "Renamed", "price": 1.0}
+@pytest.mark.parametrize("message", ["", "a" * ECHO_MESSAGE_MAX_LENGTH])
+def test_when_echo_post_message_is_on_a_boundary_then_it_is_accepted(
+    client, demo_url, message
+):
+    """when the body message is empty or at the limit, it is echoed.
+
+    Validates app.api.schemas.demo.EchoRequest.
+    """
+    response = client.post(f"{demo_url}/echo", json={"message": message})
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json()["echo"] == message
+
+
+def test_when_echo_post_message_is_over_the_limit_then_422_names_the_field(
+    client, demo_url
+):
+    """when the body message is one character too long, validation rejects it.
+
+    Validates app.api.schemas.demo.EchoRequest.
+    """
+    response = client.post(
+        f"{demo_url}/echo", json={"message": "a" * (ECHO_MESSAGE_MAX_LENGTH + 1)}
     )
-    assert updated.status_code == 200
-    assert updated.json()["name"] == "Renamed"
-    assert updated.json()["price"] == 1.0
 
-    # DELETE (204, no body) then follow-up GET → 404
-    assert client.delete(f"{API}/items/{item_id}").status_code == 204
-    assert client.get(f"{API}/items/{item_id}").status_code == 404
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert [d["field"] for d in response.json()["error"]["details"]] == ["message"]
+
+
+def test_when_echo_post_has_no_message_then_422_is_returned(client, demo_url):
+    """when the body has no message, validation rejects it.
+
+    Validates app.api.schemas.demo.EchoRequest.
+    """
+    response = client.post(f"{demo_url}/echo", json={})
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+
+
+@pytest.mark.parametrize("metadata", ACCEPTED_METADATA)
+def test_when_echo_metadata_is_on_a_boundary_then_it_is_echoed(
+    client, demo_url, metadata
+):
+    """when metadata sits on a size boundary, it is accepted and echoed.
+
+    Validates app.api.schemas.demo.EchoRequest.
+    """
+    response = client.post(
+        f"{demo_url}/echo", json={"message": "m", "metadata": metadata}
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json()["metadata"] == metadata
+
+
+@pytest.mark.parametrize("metadata", REJECTED_METADATA)
+def test_when_echo_metadata_breaks_a_bound_then_422_is_returned(
+    client, demo_url, metadata
+):
+    """when metadata has too many items, a long key or value, or a non-text value, 422.
+
+    Validates app.api.schemas.demo.EchoRequest.
+    """
+    response = client.post(
+        f"{demo_url}/echo", json={"message": "m", "metadata": metadata}
+    )
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert "metadata" in response.json()["error"]["details"][0]["field"]
+
+
+def test_when_caller_has_no_principal_then_the_demo_routes_are_still_public(
+    unauthenticated_client, demo_url
+):
+    """when no principal is resolved, ping and echo still answer 200.
+
+    Validates app.api.v1.router.api_router.
+    """
+    ping = unauthenticated_client.get(f"{demo_url}/ping")
+    echo = unauthenticated_client.post(f"{demo_url}/echo", json={"message": "m"})
+
+    assert (ping.status_code, echo.status_code) == (200, 200)
