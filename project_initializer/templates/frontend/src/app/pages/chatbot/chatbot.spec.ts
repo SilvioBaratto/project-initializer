@@ -13,7 +13,7 @@ import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { MatButtonHarness } from '@angular/material/button/testing';
 import { MatFormFieldHarness } from '@angular/material/form-field/testing';
 import { MatInputHarness } from '@angular/material/input/testing';
-import { Subject } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import { vi } from 'vitest';
 import { ICON_PROVIDER } from '../../icons';
 import { ChatResponse } from '../../models/chat';
@@ -137,6 +137,48 @@ describe('ChatbotComponent', () => {
       expect(bubble?.querySelector('.message-text')?.textContent).toBe('Hello');
       expect(await (await input()).getValue()).toBe('');
       expect(el.querySelector('h2')).toBeNull();
+    });
+
+    it('sends only the 20 most recent messages once the conversation grows long', async () => {
+      sendMessage.mockImplementation(() => of({ answer: 'ok' }));
+      for (let turn = 1; turn <= 11; turn++) {
+        await type(`q${turn}`);
+        await (await sendButton()).click();
+        await fixture.whenStable();
+      }
+
+      const history = sendMessage.mock.calls.at(-1)![1] as string[];
+      expect(history).toHaveLength(20);
+      expect(history[0]).toBe('assistant: ok');
+      expect(history.at(-1)).toBe('user: q11');
+    });
+
+    it('clips a history entry to the length the API accepts so one long reply cannot block the chat', async () => {
+      sendMessage.mockImplementationOnce(() => of({ answer: 'x'.repeat(9000) }));
+      await type('first');
+      await (await sendButton()).click();
+      await fixture.whenStable();
+      await type('second');
+      await (await sendButton()).click();
+
+      const history = sendMessage.mock.calls.at(-1)![1] as string[];
+      expect(history[0]).toBe('user: first');
+      expect(history[1]).toHaveLength(8000);
+      expect(history[1].startsWith('assistant: xxx')).toBe(true);
+      expect(history[2]).toBe('user: second');
+    });
+
+    it('does not cut a surrogate pair in half when it clips a history entry', async () => {
+      sendMessage.mockImplementationOnce(() => of({ answer: '😀'.repeat(5000) }));
+      await type('first');
+      await (await sendButton()).click();
+      await fixture.whenStable();
+      await type('second');
+      await (await sendButton()).click();
+
+      const entry = (sendMessage.mock.calls.at(-1)![1] as string[])[1];
+      expect(entry).toHaveLength(7999);
+      expect(entry.endsWith('😀')).toBe(true);
     });
 
     it('labels each message with its sender for assistive technology', async () => {

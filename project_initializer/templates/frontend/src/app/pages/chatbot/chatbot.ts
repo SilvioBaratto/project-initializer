@@ -28,6 +28,21 @@ const ERROR_MESSAGE = "Couldn't get a response. Send your message again.";
 const MAX_HISTORY_MESSAGES = 20;
 
 /**
+ * Longest history entry the API accepts (both backends cap one at 8000 characters). A reply longer
+ * than that is clipped, because a single oversized entry would make every later send of the
+ * conversation fail validation.
+ */
+const MAX_HISTORY_ENTRY_LENGTH = 8000;
+
+/** Clips `text` to `max` UTF-16 units, never leaving half of a surrogate pair at the cut. */
+function clip(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const last = cut.charCodeAt(cut.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut;
+}
+
+/**
  * Chat view. A message log that scrolls on its own above an outlined Material
  * composer; the composer stays at the bottom of the view, so it sits directly
  * above the shell's compact navigation bar (which the shell renders outside main).
@@ -90,7 +105,7 @@ export class ChatbotComponent {
 
     const history = this.messages()
       .slice(-MAX_HISTORY_MESSAGES)
-      .map((m) => `${m.role}: ${m.content}`);
+      .map((m) => clip(`${m.role}: ${m.content}`, MAX_HISTORY_ENTRY_LENGTH));
 
     this.chatService
       .sendMessage(question, history)
