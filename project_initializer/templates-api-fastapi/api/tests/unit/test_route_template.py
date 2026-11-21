@@ -3,9 +3,10 @@
 import logging
 
 import pytest
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, FastAPI, Request
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
+from starlette.responses import PlainTextResponse
 
 from app.api.errors import UNMATCHED_ROUTE, route_template
 from app.api.middleware.logging import REQUEST_LOG_MESSAGE, RequestLoggingMiddleware
@@ -15,6 +16,8 @@ pytestmark = pytest.mark.unit
 LOGGING_LOGGER = "app.api.middleware.logging"
 VERSION_PREFIX = "/api/v1"
 LATE_PREFIX = "/late"
+PLAIN_TEMPLATE = "/plain/{name}"
+MOUNT_PATH = "/assets"
 
 
 def paths_logged_for(caplog: pytest.LogCaptureFixture) -> list[str]:
@@ -22,6 +25,19 @@ def paths_logged_for(caplog: pytest.LogCaptureFixture) -> list[str]:
     return [
         item.path for item in caplog.records if item.getMessage() == REQUEST_LOG_MESSAGE
     ]
+
+
+async def serve_plain(request: Request) -> PlainTextResponse:
+    """Answer 200 from a plain Starlette route, which FastAPI does not wrap."""
+    return PlainTextResponse("plain")
+
+
+def plain_route_application(**route_options) -> FastAPI:
+    """Application with the request-logging middleware and one plain route."""
+    application = FastAPI()
+    application.add_middleware(RequestLoggingMiddleware)
+    application.add_route(PLAIN_TEMPLATE, serve_plain, **route_options)
+    return application
 
 
 def probe_application() -> FastAPI:
@@ -114,3 +130,71 @@ def test_when_the_scope_holds_no_route_then_the_fixed_label_is_returned():
     Validates app.api.errors.route_template().
     """
     assert route_template({"app": FastAPI()}) == UNMATCHED_ROUTE
+
+
+def test_when_a_plain_route_answers_then_the_template_is_its_declared_path(caplog):
+    """when a plain Starlette route serves the request, the log names its path.
+
+    FastAPI 0.137 no longer puts such a route in ``scope["route"]``, which left
+    the label at ``unmatched`` for them, ``/openapi.json`` included.
+
+    Validates app.api.errors.route_template().
+    """
+    with caplog.at_level(logging.INFO, logger=LOGGING_LOGGER):
+        TestClient(plain_route_application()).get("/plain/any-name")
+
+    assert paths_logged_for(caplog) == [PLAIN_TEMPLATE]
+
+
+def test_when_a_plain_route_refuses_the_method_then_the_template_is_still_its_path(
+    caplog,
+):
+    """when a plain route answers 405, the log still names its path.
+
+    Validates app.api.errors.route_template().
+    """
+    application = plain_route_application(methods=["GET"])
+
+    with caplog.at_level(logging.INFO, logger=LOGGING_LOGGER):
+        TestClient(application).post("/plain/any-name")
+
+    assert paths_logged_for(caplog) == [PLAIN_TEMPLATE]
+
+
+def test_when_a_mounted_application_answers_then_the_template_is_the_mount_path(
+    caplog,
+):
+    """when a mounted application serves the request, the log names the mount path.
+
+    The rest of the path is chosen by the caller and stays out of the log.
+
+    Validates app.api.errors.route_template().
+    """
+    application = FastAPI()
+    application.add_middleware(RequestLoggingMiddleware)
+    application.mount(MOUNT_PATH, PlainTextResponse("asset"))
+
+    with caplog.at_level(logging.INFO, logger=LOGGING_LOGGER):
+        TestClient(application).get(f"{MOUNT_PATH}/secret-file-name.png")
+
+    assert paths_logged_for(caplog) == [MOUNT_PATH]
+
+
+def test_when_the_scope_holds_the_endpoint_of_a_plain_route_then_its_path_is_returned():
+    """when only the endpoint is in the scope, the plain route that owns it is named.
+
+    Validates app.api.errors.route_template().
+    """
+    scope = {"app": plain_route_application(), "endpoint": serve_plain}
+
+    assert route_template(scope) == PLAIN_TEMPLATE
+
+
+def test_when_no_route_owns_the_endpoint_then_the_fixed_label_is_returned():
+    """when no route of the application owns the endpoint, the fixed label is returned.
+
+    Validates app.api.errors.route_template().
+    """
+    scope = {"app": FastAPI(), "endpoint": serve_plain}
+
+    assert route_template(scope) == UNMATCHED_ROUTE

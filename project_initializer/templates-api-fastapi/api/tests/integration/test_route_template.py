@@ -4,7 +4,9 @@ FastAPI 0.137 keeps the prefix handed to ``include_router`` out of
 ``scope["route"].path``, so a log line written from that attribute alone names
 ``/items/{item_id}`` instead of ``/api/v1/items/{item_id}``. The unit tests use
 probe applications with direct routes and cannot see it; these requests go
-through the routers exactly as ``create_application`` includes them.
+through the routers exactly as ``create_application`` includes them. It also
+stopped setting ``scope["route"]`` for plain Starlette routes, such as the
+``/openapi.json`` route FastAPI registers itself.
 """
 
 import logging
@@ -14,6 +16,7 @@ from http import HTTPStatus
 import pytest
 from fastapi.testclient import TestClient
 
+from app.api.docs import DOCS_PATHS
 from app.api.errors import UNMATCHED_ROUTE
 from app.api.middleware.logging import REQUEST_LOG_MESSAGE
 
@@ -88,3 +91,24 @@ def test_when_no_route_matches_the_real_application_then_the_log_uses_the_fixed_
         item for item in caplog.records if item.getMessage() == REQUEST_LOG_MESSAGE
     ]
     assert record.path == UNMATCHED_ROUTE
+
+
+@pytest.mark.parametrize("docs_path", sorted(DOCS_PATHS))
+def test_when_a_docs_route_answers_then_the_request_log_names_that_route(
+    client: TestClient, docs_path: str, caplog
+):
+    """when the docs are enabled, each docs route is logged under its own path.
+
+    ``/openapi.json`` is a plain Starlette route that FastAPI registers itself;
+    the two pages are routes of the application.
+
+    Validates app.api.errors.route_template().
+    """
+    with caplog.at_level(logging.INFO, logger=LOGGING_LOGGER):
+        response = client.get(docs_path)
+
+    assert response.status_code == HTTPStatus.OK
+    (record,) = [
+        item for item in caplog.records if item.getMessage() == REQUEST_LOG_MESSAGE
+    ]
+    assert record.path == docs_path
