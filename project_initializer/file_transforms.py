@@ -112,11 +112,13 @@ def generate_frontend_compose() -> str:
 _ASYNC_DEPENDENCIES = (
     "\n"
     "    # Async DB path (--async-db): opt-in asyncpg driver + asyncio extras\n"
-    '    "asyncpg==0.31.0",\n'
+    '    "asyncpg==0.32.0",\n'
     '    "sqlalchemy[asyncio]==2.0.50",\n'
 )
-# aiosqlite runs the async unit tests on in-memory SQLite.
-_ASYNC_DEV_DEPENDENCIES = '    "aiosqlite==0.20.0",\n'
+# aiosqlite runs the async unit tests on in-memory SQLite. 0.22.1 is the floor:
+# it adds the synchronous ``stop()`` that SQLAlchemy's aiosqlite dialect calls
+# when it terminates a connection, which earlier releases lack.
+_ASYNC_DEV_DEPENDENCIES = '    "aiosqlite==0.22.1",\n'
 
 
 def _extend_toml_array(text: str, key: str, entries: str) -> str:

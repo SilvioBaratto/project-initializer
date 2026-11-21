@@ -895,7 +895,7 @@ _FASTAPI_TEST_TRACEABILITY_SECTION = [
     "Each test names the code it validates, and a test that covers a requirement also names the requirement, so a reviewer can walk from a requirement to its tests and on to the code:",
     "",
     "- **Code**: a docstring line, `Validates app.application.services.item_service.ItemService.create_item().`",
-    '- **Requirement**: the `requirement` pytest marker, `@pytest.mark.requirement("<id>")`. It is registered in `pytest.ini`, which runs with `--strict-markers`, so a misspelled marker fails the run.',
+    '- **Requirement**: the `requirement` pytest marker, `@pytest.mark.requirement("<id>")`. It is registered in `pytest.ini`, which sets `strict_markers = true`, so a misspelled marker fails the run.',
     "",
     "The requirement IDs come from your project's own requirements source. The template ships none, because it has no requirements of its own, and you should not invent them. List the tests that carry a requirement with `pytest --collect-only -q -m requirement`, and a requirement's tests with `grep -rn 'requirement(\"<id>\")' tests`.",
 ]

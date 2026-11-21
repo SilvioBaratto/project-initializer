@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--help` now shows a `<bool>` type column beside flag options such as `--force` and `--yes`. This comes from typer 0.29; the options behave as before.
 - The package classifiers list Python 3.11 to 3.15 and no longer list 3.10.
 - The `dev` extra now asks for `ruff>=0.17.6,<0.18`, `pytest>=9.2.0`, `hypothesis>=6.170.17` and `pyyaml>=6.0.4`. `[tool.ruff.lint]` selects `E4`, `E7`, `E9` and `F` explicitly, because ruff 0.16 enlarged its default rule set from 59 to 413 rules and `ruff check . tests` would otherwise start reporting 205 findings the repo never enforced.
+- Newly scaffolded FastAPI projects pin `psycopg2-binary==2.9.13`, `alembic==1.20.1`, `pytest==9.2.0` and `pytest-asyncio==1.5.0`, the supabase variant `supabase==2.34.1`, and `--async-db` adds `asyncpg==0.32.0` and `aiosqlite==0.22.1` (the floor that has the `stop()` SQLAlchemy's aiosqlite dialect calls on terminate).
+- Token scaffolds run on `bcrypt==5.0.0` instead of 4.0.1. Password hashes written by bcrypt 4 keep verifying, and the API still refuses a password over 72 bytes: bcrypt 5 raises on one instead of ignoring the excess, and the hasher checks the length first. The generated `tests/unit/test_security.py` verifies four hashes made by bcrypt 4.0.1.
+- The generated `pytest.ini` sets `strict_markers = true` with `minversion = 9.0` in place of `--strict-markers` in `addopts`, which pytest 9.0.3 ignored. A test that carries a misspelled or unregistered marker now fails at collection instead of passing with a warning and silently never matching `-m`. The markers the templates use (`unit`, `integration`, `e2e`, `requirement`) are registered.
 
 ### Repo tests
 
@@ -24,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The class-scoped `manifest` fixture of `tests/test_entra_fastapi_overlay.py` is a `classmethod`, which avoids the pytest 9.1 deprecation of class-scoped fixtures defined as instance methods (an error in pytest 10).
 - `st.characters(...)` calls use `categories`, `exclude_categories` and `include_characters` instead of the deprecated `whitelist_*` and `blacklist_*` arguments.
 - `tests/test_python_metadata_single_source.py` pins `requires-python = ">=3.11"` and the 3.11 to 3.15 classifiers.
+- `tests/test_async_db_flag.py` checks that `sqlalchemy[asyncio]` in an `--async-db` scaffold carries the version of the manifest's `SQLAlchemy` pin, so a bump of one cannot leave the other behind.
 
 ## [0.6.0] - 2026-11-21
 

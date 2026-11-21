@@ -28,7 +28,7 @@ _REQUIREMENTS_PATTERN = "requirements*.txt"
 _FASTAPI_TEMPLATES_PATTERN = "templates*fastapi*"
 _SKIPPED_DIRECTORIES = frozenset({"node_modules", "__pycache__", ".angular"})
 
-# Whole-string match: a pin such as "asyncpg==0.31.0" or an address such as "0.0.0.0"
+# Whole-string match: a pin such as "asyncpg==0.32.0" or an address such as "0.0.0.0"
 # is not a version, and must not trip the guards.
 _BARE_VERSION = re.compile(r"\d+\.\d+\.\d+(?:(?:a|b|rc)\d+|-[0-9A-Za-z.]+)?")
 _REQUIREMENT_NAME = re.compile(r"[A-Za-z0-9_.-]+")

@@ -52,6 +52,7 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_when_pyproject_already_has_asyncpg_then_transform_returns_it_unchanged",
             "test_when_pyproject_lacks_an_array_then_transform_raises_value_error",
             "test_when_scaffolded_with_async_db_then_pyproject_declares_async_deps",
+            "test_when_async_dependencies_are_appended_then_the_sqlalchemy_extra_matches_the_base_pin",
             "test_when_scaffolded_with_async_db_then_no_requirements_txt_exists",
             "test_when_supabase_scaffolded_with_async_db_then_pyproject_gains_async_deps",
             "test_when_scaffolded_with_async_db_async_files_exist",
