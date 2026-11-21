@@ -5,7 +5,9 @@
  * outlined form field with an autosizing textarea; Send is disabled only while the
  * message is empty or a reply is pending, and activating it moves focus to the
  * composer so focus is not lost when Send turns disabled; Enter sends and
- * Shift+Enter does not; replies, errors and the typing status render in the log.
+ * Shift+Enter does not; replies, errors and the typing status render in the log; the history
+ * sent with each message is capped at the 20 most recent messages and each entry is clipped to
+ * 8000 characters, the limits the API enforces.
  */
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HarnessLoader } from '@angular/cdk/testing';
@@ -166,6 +168,22 @@ describe('ChatbotComponent', () => {
       expect(history[1]).toHaveLength(8000);
       expect(history[1].startsWith('assistant: xxx')).toBe(true);
       expect(history[2]).toBe('user: second');
+    });
+
+    it('keeps an entry of exactly 8000 characters and a history just under the cap whole', async () => {
+      // 'assistant: ' is 11 characters, so this reply makes the entry exactly 8000 long.
+      sendMessage.mockImplementation(() => of({ answer: 'y'.repeat(8000 - 'assistant: '.length) }));
+      for (let turn = 1; turn <= 10; turn++) {
+        await type(`q${turn}`);
+        await (await sendButton()).click();
+        await fixture.whenStable();
+      }
+
+      const history = sendMessage.mock.calls.at(-1)![1] as string[];
+      expect(history).toHaveLength(19);
+      expect(history[0]).toBe('user: q1');
+      expect(history[1]).toHaveLength(8000);
+      expect(history[1].endsWith('y')).toBe(true);
     });
 
     it('does not cut a surrogate pair in half when it clips a history entry', async () => {

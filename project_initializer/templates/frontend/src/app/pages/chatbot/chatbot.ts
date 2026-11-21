@@ -34,12 +34,17 @@ const MAX_HISTORY_MESSAGES = 20;
  */
 const MAX_HISTORY_ENTRY_LENGTH = 8000;
 
+/** UTF-16 range of the first half of a surrogate pair (the second half follows it in the text). */
+const HIGH_SURROGATE_FIRST = 0xd800;
+const HIGH_SURROGATE_LAST = 0xdbff;
+
 /** Clips `text` to `max` UTF-16 units, never leaving half of a surrogate pair at the cut. */
 function clip(text: string, max: number): string {
   if (text.length <= max) return text;
   const cut = text.slice(0, max);
   const last = cut.charCodeAt(cut.length - 1);
-  return last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut;
+  const splitsPair = last >= HIGH_SURROGATE_FIRST && last <= HIGH_SURROGATE_LAST;
+  return splitsPair ? cut.slice(0, -1) : cut;
 }
 
 /**
