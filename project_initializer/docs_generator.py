@@ -216,7 +216,7 @@ def _backend_dev_block(framework: str) -> list[str]:
             "",
             "```bash",
             "cd api",
-            "pip install -r requirements.txt",
+            'pip install ".[dev]"                   # Dependencies come from pyproject.toml',
             "uvicorn app.main:app --reload          # Runs on :8000",
             "",
             "# Database",
@@ -449,9 +449,13 @@ def generate_root_readme(
         ]
     sections += ["", "## Getting Started", "", "```bash"]
     if auth == "entra":
-        sections.append("# Edit .env with your Entra credentials (scaffolding already wrote it)")
+        sections.append(
+            "# Edit .env with your Entra credentials (scaffolding already wrote it)"
+        )
     elif auth == "supabase":
-        direct_url_key = "DIRECT_DATABASE_URL" if framework == "fastapi" else "DIRECT_URL"
+        direct_url_key = (
+            "DIRECT_DATABASE_URL" if framework == "fastapi" else "DIRECT_URL"
+        )
         database_keys = f"DATABASE_URL, {direct_url_key}"
         sections += [
             "# Edit .env with your Supabase credentials:",
@@ -508,11 +512,11 @@ def _fastapi_root_claude(auth: str | None) -> list[str]:
         "",
         "**Sync vs async**: DB endpoints are sync `def` (offloaded to a threadpool with the sync `Session`); `async def` is reserved for real async I/O. See `api/.claude/CLAUDE.md` for the full rule.",
         "",
-        "**Request pipeline** (outermost first): CORS, request logging (assigns `X-Request-ID`), security headers, the catch-all that answers an unhandled exception with the generic 500 envelope, rate limiting (only when `ENVIRONMENT` is `staging` or `production`). Every error response is one JSON envelope, `{\"error\": {\"code\", \"message\", \"timestamp\", \"request_id\"}}`.",
+        '**Request pipeline** (outermost first): CORS, request logging (assigns `X-Request-ID`), security headers, the catch-all that answers an unhandled exception with the generic 500 envelope, rate limiting (only when `ENVIRONMENT` is `staging` or `production`). Every error response is one JSON envelope, `{"error": {"code", "message", "timestamp", "request_id"}}`.',
         "",
         "### Mapping from the FastAPI tutorial",
         "",
-        "The official FastAPI \"Bigger Applications\" tutorial organizes path operations into a `routers/` package where each router file also holds inline DB queries and business logic. This scaffold keeps the routers at `app/api/v1/endpoints/` (aggregated by `app/api/v1/router.py`, all under the `/api/v1` prefix) and splits what the tutorial keeps inline across the four hexagonal layers: router (`app/api/v1/endpoints/`) → application service (`app/application/services/`) → domain port (`app/domain/ports/`) implemented by an infrastructure repository (`app/infrastructure/repositories/`) → ORM model (`app/infrastructure/orm/`) → Pydantic schema (`app/api/schemas/`).",
+        'The official FastAPI "Bigger Applications" tutorial organizes path operations into a `routers/` package where each router file also holds inline DB queries and business logic. This scaffold keeps the routers at `app/api/v1/endpoints/` (aggregated by `app/api/v1/router.py`, all under the `/api/v1` prefix) and splits what the tutorial keeps inline across the four hexagonal layers: router (`app/api/v1/endpoints/`) → application service (`app/application/services/`) → domain port (`app/domain/ports/`) implemented by an infrastructure repository (`app/infrastructure/repositories/`) → ORM model (`app/infrastructure/orm/`) → Pydantic schema (`app/api/schemas/`).',
         "",
         "Unlike the tutorial's flat layout, **this is a real restructure — the code is physically split across `domain`/`application`/`infrastructure`/`api`, not just conceptually.**",
     ]
@@ -521,7 +525,7 @@ def _fastapi_root_claude(auth: str | None) -> list[str]:
             "",
             "## Token auth (`--auth token`)",
             "",
-            "`POST /auth/validate` is a validity **probe**: it returns **HTTP 200 with `authenticated=false`** for an invalid token, because both outcomes are successful *answers* to \"is this token valid?\". **401 is reserved for guarded endpoints that refuse access** (`/auth/me`, item writes), never for the probe. The supabase variant has **no** `/auth/validate` endpoint; token validity is resolved server-side through Supabase Auth (`get_user()` on the bearer JWT) instead.",
+            '`POST /auth/validate` is a validity **probe**: it returns **HTTP 200 with `authenticated=false`** for an invalid token, because both outcomes are successful *answers* to "is this token valid?". **401 is reserved for guarded endpoints that refuse access** (`/auth/me`, item writes), never for the probe. The supabase variant has **no** `/auth/validate` endpoint; token validity is resolved server-side through Supabase Auth (`get_user()` on the bearer JWT) instead.',
             "",
             "Two modes live side by side. The shared `AUTH_TOKEN` guards item writes and `GET /auth/me`. JWT login (`POST /auth/register`, `POST /auth/token`, `GET /auth/me/jwt`) identifies individual users. Scaffolding generates `AUTH_TOKEN` and `JWT_SECRET_KEY` into `.env` and leaves them empty in `.env.example`; at every stage the API refuses a placeholder or a non-empty secret shorter than 16 and 32 characters, and outside development it refuses an empty one too. `POST /auth/token` and `GET /auth/me/jwt` answer 503 while `JWT_SECRET_KEY` is empty. A successful registration and a successful login write the audit actions `user.register` and `user.login`, which name the account by id and never by email or username.",
         ]
@@ -667,7 +671,7 @@ def generate_api_readme(
                 "## Quick Start",
                 "",
                 "```bash",
-                "pip install -r requirements.txt",
+                'pip install ".[dev]"             # Dependencies come from pyproject.toml',
                 "uvicorn app.main:app --reload    # http://localhost:8000",
                 "```",
                 "",
@@ -837,7 +841,7 @@ _FASTAPI_REQUEST_LOGGING_SECTION = [
     "- Logs are one JSON object per line (`timestamp`, `level`, `logger`, `message`, `request_id`, plus any `extra=` fields). Set `LOG_FORMAT=text` for a readable terminal format; `LOG_LEVEL` sets the threshold.",
     "- Each request writes one `http.request` line: method, path, status and duration in milliseconds. The `path` is the matched route template (`/api/v1/items/{item_id}`), never the raw URL, because a path parameter can hold user text. Request and response bodies, query strings and client addresses are never logged, because they carry tokens, emails and other personal data. Keep it that way, and log ids rather than usernames or emails.",
     "- Middleware order, outermost first: CORS, request logging, security headers, `UnhandledErrorMiddleware`, rate limiting. CORS is outermost so its headers also appear on 429 and 500 responses and preflight requests never use rate-limit quota; the catch-all sits inside the logging, security and CORS layers so its 500 carries their headers, and outside the limiter so a failure there is answered too. Starlette adds each middleware at the front, so `main.py` adds them in the reverse order. CORS never allows credentials, because the API authenticates with a bearer header.",
-    "- Uvicorn's own access log is off (`--no-access-log` in the Dockerfile, the compose files and `python -m app.main`). `configure_logging` also routes the `uvicorn` error loggers through the same formatter, so server errors come out as JSON too. `set_log_level(\"debug\")` in `app/infrastructure/structured_logging.py` changes the level of a running process without a restart; no HTTP route exposes it.",
+    '- Uvicorn\'s own access log is off (`--no-access-log` in the Dockerfile, the compose files and `python -m app.main`). `configure_logging` also routes the `uvicorn` error loggers through the same formatter, so server errors come out as JSON too. `set_log_level("debug")` in `app/infrastructure/structured_logging.py` changes the level of a running process without a restart; no HTTP route exposes it.',
     "- **SIGHUP reloads `LOG_LEVEL`.** The lifespan installs `reload_log_level_on_sighup` (`app/infrastructure/log_level.py`), so `kill -HUP <pid>`, or `docker kill --signal=HUP <container>`, makes the process re-read the level without a restart. On a reload the value in the project `.env` file wins over the one in the process environment (the reverse of start-up, where the environment wins), and the environment is the fallback when the file has none; letter case is free, as at start-up. An invalid value is ignored: the level stays and one `log_level.reload_rejected` warning records the length of the rejected text and the accepted names, never the text. An applied reload logs `log_level.reloaded`, an unexpected failure logs `log_level.reload_failed` with the error class only, and nothing but the level changes (`os.environ` and every other setting stay as they were). The previous SIGHUP handler is restored on shutdown, and nothing is installed on Windows or outside the main thread. Two caveats: a terminal hang-up also sends SIGHUP, so a server started from a terminal that closes keeps running instead of exiting; and without a `.env` file, as in a Docker container where compose passes the variables, the environment cannot change, so a reload re-applies the start-up value.",
     "- `write_audit_log` (`app/infrastructure/audit.py`) records state-changing actions as the event `audit.action` on the logger `app.audit`, with `action`, `resource_id` and `actor_id` fields. `configure_logging` pins that logger to INFO, so a high `LOG_LEVEL` does not switch the trail off. Pass an opaque actor id, never an email or a username. The item routes write `item.create`, `item.update` and `item.delete` as background tasks, so the log write never delays the response.",
 ]
@@ -852,10 +856,11 @@ _FASTAPI_RESILIENCE_SECTION = [
     "- Only connectivity failures count: a pool timeout, a dropped connection, a PostgreSQL SQLSTATE of class 08, 53, 57P or 58. A constraint violation, a bad query, a deadlock, a serialization failure or a lock timeout does not trip the breaker (the last three answer 409). A request that never reached the database, such as one refused by validation, frees its slot without a vote. `DATABASE_CONNECT_TIMEOUT` and `DATABASE_POOL_TIMEOUT` bound how long a request can wait on the database.",
     "- The fallback is deliberate and simple: a fast, uniform 503 with the standard envelope. There is no cache or read-only mode.",
     "",
-    "`GET /health` is the liveness probe: it checks nothing, so a database outage never gets the container restarted. `GET /health/ready` is the readiness probe: it answers `200 {\"status\": \"ok\", \"database\": \"up\", \"circuit\": \"closed\", \"additional_databases\": {}}`, or `503` with `\"status\": \"degraded\"` while the database is down or the circuit is open, without touching the database in the open case. A database outage at start-up is logged and never aborts the process.",
+    '`GET /health` is the liveness probe: it checks nothing, so a database outage never gets the container restarted. `GET /health/ready` is the readiness probe: it answers `200 {"status": "ok", "database": "up", "circuit": "closed", "additional_databases": {}}`, or `503` with `"status": "degraded"` while the database is down or the circuit is open, without touching the database in the open case. A database outage at start-up is logged and never aborts the process.',
     "",
     "A component that owns a second database or other resources hooks into the lifecycle through `app/infrastructure/database.py`, so `main.py` never learns about it: `register_shutdown_hook(hook)` adds a callable (sync or `async`) that the lifespan runs last-registered-first when the app stops, and a failing hook is logged without stopping the others; `register_readiness_probe(name, probe)` adds a coroutine that returns a `DatabaseHealth`, which `/health/ready` reports under `additional_databases` and counts towards `status`. The async overlay registers both when its module is imported.",
 ]
+
 
 def _fastapi_test_database_section(auth: str | None) -> list[str]:
     """The test-database section of the FastAPI api CLAUDE.md.
@@ -878,7 +883,9 @@ def _fastapi_test_database_section(auth: str | None) -> list[str]:
         "- `conftest.py` pins `ENVIRONMENT=test`, `DEBUG=false` and `LOG_LEVEL=warning` before it imports the app, so a developer's `.env` cannot change a result. The `client` fixture does not run the lifespan, so nothing touches a real database.",
         "- External services are stubbed, never called: `tests/fakes.py` has an in-memory item repository, unit of work and token verifier, and each auth variant stubs its identity provider.",
         "- Levels are pytest markers (`unit`, `integration`, `e2e`). `pytest.ini` enforces a coverage gate: line and branch coverage of `app/` over the whole suite must stay at or above 75% (`--cov-fail-under=75`), or the run fails. A subset cannot reach it, so run one level or one file with `--no-cov`: `pytest -m unit --no-cov`. Add tests; do not lower the threshold.",
-        "- SQLite cannot prove PostgreSQL-only behaviour. `tests/integration/test_migrations.py` compares the migrated schema with the ORM models, but run `alembic upgrade head` against " + real_database + " before you deploy.",
+        "- SQLite cannot prove PostgreSQL-only behaviour. `tests/integration/test_migrations.py` compares the migrated schema with the ORM models, but run `alembic upgrade head` against "
+        + real_database
+        + " before you deploy.",
     ]
 
 
@@ -888,10 +895,11 @@ _FASTAPI_TEST_TRACEABILITY_SECTION = [
     "Each test names the code it validates, and a test that covers a requirement also names the requirement, so a reviewer can walk from a requirement to its tests and on to the code:",
     "",
     "- **Code**: a docstring line, `Validates app.application.services.item_service.ItemService.create_item().`",
-    "- **Requirement**: the `requirement` pytest marker, `@pytest.mark.requirement(\"<id>\")`. It is registered in `pytest.ini`, which runs with `--strict-markers`, so a misspelled marker fails the run.",
+    '- **Requirement**: the `requirement` pytest marker, `@pytest.mark.requirement("<id>")`. It is registered in `pytest.ini`, which runs with `--strict-markers`, so a misspelled marker fails the run.',
     "",
     "The requirement IDs come from your project's own requirements source. The template ships none, because it has no requirements of its own, and you should not invent them. List the tests that carry a requirement with `pytest --collect-only -q -m requirement`, and a requirement's tests with `grep -rn 'requirement(\"<id>\")' tests`.",
 ]
+
 
 def _fastapi_auth_section(auth: str | None) -> list[str]:
     """The authentication section of the FastAPI api CLAUDE.md for one auth mode."""
@@ -969,7 +977,7 @@ def _fastapi_migrations_section(auth: str | None) -> list[str]:
         "alembic upgrade head                                                             # apply it",
         "```",
         "",
-        "`alembic.ini` sets `file_template = %%(rev)s`, so the revision id is the file name: pass `--rev-id <NNNN>_<slug>` (sequence number and slug, at most 32 characters, the width of `alembic_version.version_num`) or the id will be random. `alembic/env.py` reads the database URL from the settings and logs through the application's structured logger, from `LOG_LEVEL` and `LOG_FORMAT`, not through Alembic's `fileConfig`. A caller that embeds the migrations, such as the test suite, sets `config.attributes[\"embedded\"] = True` to keep its own environment and logging, and may pass an open connection as `config.attributes[\"connection\"]`.",
+        '`alembic.ini` sets `file_template = %%(rev)s`, so the revision id is the file name: pass `--rev-id <NNNN>_<slug>` (sequence number and slug, at most 32 characters, the width of `alembic_version.version_num`) or the id will be random. `alembic/env.py` reads the database URL from the settings and logs through the application\'s structured logger, from `LOG_LEVEL` and `LOG_FORMAT`, not through Alembic\'s `fileConfig`. A caller that embeds the migrations, such as the test suite, sets `config.attributes["embedded"] = True` to keep its own environment and logging, and may pass an open connection as `config.attributes["connection"]`.',
         "",
         "Review the draft before you commit it. Autogenerate compares types and server defaults but cannot see everything (renames look like a drop plus a create), and it renders an empty `downgrade()` as `raise NotImplementedError`, so a missing rollback cannot ship by accident. Keep literal column lengths in the migration, not imports from `app.domain.constants`: a migration is a snapshot of the schema at its revision. The first migration creates `idx_items_created_at`, which serves the newest-first item listing.",
         "",
@@ -979,9 +987,9 @@ def _fastapi_migrations_section(auth: str | None) -> list[str]:
         "alembic downgrade -1",
         "```",
         "",
-        "- A downgrade that drops a table calls `preserve_and_drop_table(\"<table>\", indexes=(...))`, and one that drops a column calls `preserve_and_drop_column(\"<table>\", \"<column>\", key_columns=(\"id\",))` (`app/infrastructure/migration_safety.py`). Autogenerate writes the table call for you: a `process_revision_directives` hook rewrites every drafted `op.drop_table` in a downgrade; a column drop you write by hand. Both copy the rows aside first, so a rollback does not destroy data.",
+        '- A downgrade that drops a table calls `preserve_and_drop_table("<table>", indexes=(...))`, and one that drops a column calls `preserve_and_drop_column("<table>", "<column>", key_columns=("id",))` (`app/infrastructure/migration_safety.py`). Autogenerate writes the table call for you: a `process_revision_directives` hook rewrites every drafted `op.drop_table` in a downgrade; a column drop you write by hand. Both copy the rows aside first, so a rollback does not destroy data.',
         "- On PostgreSQL the copy goes to `migration_backup.<table>__rollback_<UTC YYYYmmddHHMMSSffffff>`. The schema `migration_backup` is created closed, so the Supabase Data API and the application role cannot read it (keep it out of the exposed schemas), and the migration role needs the `CREATE` privilege on the database. The microsecond suffix keeps two rollbacks inside one second apart. SQLite has no schemas, so there the copy sits next to the table under the same name. The log records `migration.preserved` with `table=` and `backup=`.",
-        "- Restore after `alembic upgrade head`: `psql \"$DIRECT_DATABASE_URL\" -c \"INSERT INTO <table> SELECT * FROM migration_backup.<table>__rollback_<timestamp>\"`. The copy carries rows only, no constraints or indexes, so upgrading again does not collide with them.",
+        '- Restore after `alembic upgrade head`: `psql "$DIRECT_DATABASE_URL" -c "INSERT INTO <table> SELECT * FROM migration_backup.<table>__rollback_<timestamp>"`. The copy carries rows only, no constraints or indexes, so upgrading again does not collide with them.',
         "- Alembic ignores the backup tables (`include_object`), so autogenerate neither reports nor drops them. Drop them yourself, and `DROP SCHEMA migration_backup` once it is empty, when you no longer need them.",
         "- Try a rollback on a staging database before you rely on it in production. `tests/integration/test_migrations.py` upgrades, compares the result with the ORM models, downgrades to base and checks that the rows survive.",
         "- `alembic upgrade head --sql` prints the SQL without connecting, for review.",
@@ -1054,7 +1062,7 @@ def _fastapi_api_claude(auth: str | None, async_db: bool) -> str:
         "## Build & Run Commands",
         "",
         "```bash",
-        "pip install -r requirements.txt",
+        'pip install ".[dev]"                     # Dependencies come from pyproject.toml',
         "uvicorn app.main:app --reload            # Run dev server (:8000)",
         "pytest                                   # Run tests (fails below 75% branch coverage of app/)",
         "pytest -m unit --no-cov                  # One level or one file: add --no-cov, the gate needs the whole suite",
@@ -1062,6 +1070,10 @@ def _fastapi_api_claude(auth: str | None, async_db: bool) -> str:
         "alembic downgrade -1                     # Roll the newest migration back (rows are kept)",
         'alembic revision --autogenerate --rev-id 0003_add_widget -m "add widget"',
         "```",
+        "",
+        "## Dependencies and version",
+        "",
+        '`pyproject.toml` is the only place that declares them: `[project] dependencies` for the application, the `dev` extra for the test tooling, `[project] version` for the application version. There is no `requirements.txt`, and no module repeats the version: `Settings.version` reads it from the installed project\'s metadata, so run `pip install ".[dev]"` again after changing `pyproject.toml`.',
         "",
         "## Architecture: clean / hexagonal — four layers",
         "",
@@ -1118,7 +1130,7 @@ _NESTJS_AUTH_SECTIONS = {
         "",
         "Every holder of the secret is the same identity (`token-client`, role `service`), so this mode is for service-to-service calls, not for end users. `GET /auth/me` returns the caller's identity.",
         "",
-        "`POST /auth/validate` is a public validity probe, limited to 5 requests per minute: a wrong token gets **HTTP 200 with `authenticated: false`**, because both outcomes are successful answers to \"is this token valid?\". 401 is reserved for guarded routes.",
+        '`POST /auth/validate` is a public validity probe, limited to 5 requests per minute: a wrong token gets **HTTP 200 with `authenticated: false`**, because both outcomes are successful answers to "is this token valid?". 401 is reserved for guarded routes.',
     ],
     "supabase": [
         "## Authentication (Supabase)",
@@ -1197,6 +1209,7 @@ _NESTJS_ROLE_SOURCES = {
     "entra": "The roles are the `roles` claim of the access token (the app roles assigned in Entra). A token without that claim has no role, so it never passes a `@Roles` route.",
 }
 
+
 def _nestjs_roles_section(auth: str | None) -> list[str]:
     """The role-based access control section of the NestJS api CLAUDE.md.
 
@@ -1264,7 +1277,7 @@ def _nestjs_migrations_section(auth: str | None) -> list[str]:
         "npx prisma db execute --file prisma/migrations/<dir>/down.sql",
         "```",
         "",
-        "- `down.sql` copies the table into `migration_backup.\"<table>__rollback_<UTC YYYYMMDDHHMMSSuuuuuu>\"` before dropping it, so a rollback does not destroy data. Restore with `INSERT INTO \"<table>\" SELECT * FROM migration_backup.\"<table>__rollback_<timestamp>\"`. The suffix has microsecond resolution (from `clock_timestamp()`), so back-to-back rollbacks never collide.",
+        '- `down.sql` copies the table into `migration_backup."<table>__rollback_<UTC YYYYMMDDHHMMSSuuuuuu>"` before dropping it, so a rollback does not destroy data. Restore with `INSERT INTO "<table>" SELECT * FROM migration_backup."<table>__rollback_<timestamp>"`. The suffix has microsecond resolution (from `clock_timestamp()`), so back-to-back rollbacks never collide.',
         "- The backup goes to the schema `migration_backup`, never to `public`: the Supabase Data API serves `public` with a publishable key that ships in the browser, so a backup table there would expose its rows. The script creates the schema and revokes it from `PUBLIC`; the copy carries rows only, no constraints or indexes.",
         "- `down.sql` also deletes the migration's own row from `_prisma_migrations` as its last statement, so `npx prisma migrate deploy` applies the migration again. Do not use `prisma migrate resolve --rolled-back`: Prisma rejects it for a migration that finished successfully (P3012).",
         "- Prisma inspects only the schema named in the datasource, so `prisma migrate diff` ignores the backups. Drop them once the restore is verified.",
@@ -1468,7 +1481,7 @@ def generate_frontend_claude() -> str:
             "- `ThemeService` (`src/app/services/theme.ts`) stores the chosen mode (system, light or dark, picked from the rail's Change theme menu, the compact actions sheet or the Settings page) and puts exactly one of `.light` / `.dark` on `<html>`",
             "- `.light` and `.dark` only set `color-scheme`, which picks the light or dark value of every `--mat-sys-*` token. There is no dark stylesheet or dark variant to maintain",
             "- A stored Light or Dark choice paints from the first frame: a script in `src/index.html` reads the same `app-theme` key and sets an inline `color-scheme` on `<html>` before Angular boots (the inlined critical CSS has no `.light` / `.dark` rule), and `ThemeService` removes that inline `color-scheme` when it applies the class",
-            "- A region that forces a scheme (`class=\"dark\"` on a subtree) must paint its own `background` and `color` from `--mat-sys-*` tokens",
+            '- A region that forces a scheme (`class="dark"` on a subtree) must paint its own `background` and `color` from `--mat-sys-*` tokens',
             "",
             "## Overlay panels",
             "",
@@ -1486,19 +1499,19 @@ def generate_frontend_claude() -> str:
             "",
             "## Icons",
             "",
-            "- Icons come from `lucide-angular`, registered by PascalCase name in `src/app/icons.ts`. Register an icon there before using it: an unregistered name throws `The \"<name>\" icon has not been provided by any available icon providers.` when the icon's inputs are set",
-            "- Icons default to 24px. Inside a text, filled, outlined or tonal Material button, add `matButtonIcon` (plus `iconPositionEnd` when the icon trails) and `[size]=\"18\"`. `matIconButton` sizes its icon to 24px itself",
+            '- Icons come from `lucide-angular`, registered by PascalCase name in `src/app/icons.ts`. Register an icon there before using it: an unregistered name throws `The "<name>" icon has not been provided by any available icon providers.` when the icon\'s inputs are set',
+            '- Icons default to 24px. Inside a text, filled, outlined or tonal Material button, add `matButtonIcon` (plus `iconPositionEnd` when the icon trails) and `[size]="18"`. `matIconButton` sizes its icon to 24px itself',
             "- Material's button icon margins target `.mat-icon` only, so give a `lucide-icon` host inside such a button `display: flex`, `flex-shrink: 0` and `margin-inline: -8px 8px` when it leads (`8px -8px` when it trails; -4px instead of -8px on text buttons)",
-            "- Lucide hides icons from assistive technology, so name the action on the control instead (`aria-label` on icon buttons, without role words such as \"button\")",
+            '- Lucide hides icons from assistive technology, so name the action on the control instead (`aria-label` on icon buttons, without role words such as "button")',
             "",
             "## Accessibility and copy",
             "",
             "- Interactive targets are at least 48×48px; text contrast is at least 4.5:1 (3:1 for large text, icons and component boundaries) in both schemes",
-            "- One `h1` per routed view with no skipped heading levels. When a landmark role repeats (for example two `nav` elements, or a `nav` beside a `mat-nav-list`, which renders `role=\"navigation\"`), give each a distinct `aria-label`; a single `main` needs none",
+            '- One `h1` per routed view with no skipped heading levels. When a landmark role repeats (for example two `nav` elements, or a `nav` beside a `mat-nav-list`, which renders `role="navigation"`), give each a distinct `aria-label`; a single `main` needs none',
             "- Every pointer interaction has a keyboard path; Esc closes modal surfaces and focus returns to the trigger",
             "- `src/styles.scss` honours `prefers-reduced-motion` for every animation and transition, including the router's view transitions (`::view-transition-*`). Material's indeterminate progress indicators keep their slowed animation",
             "- Screen-reader-only text uses `.cdk-visually-hidden`",
-            "- Buttons and menu items use a specific verb (\"Delete item\", not \"OK\"), and all UI text uses sentence case",
+            '- Buttons and menu items use a specific verb ("Delete item", not "OK"), and all UI text uses sentence case',
             "- No trailing period on labels, tooltips, list items, links, dialog body text or any single-sentence message; use periods only when there are several sentences",
             "",
             "## Testing",
@@ -1512,8 +1525,8 @@ def generate_frontend_claude() -> str:
             "",
             "- Never use `bypassSecurityTrust*` APIs or bind untrusted data to `[innerHTML]`; "
             "Angular's built-in sanitization is the only safe path",
-            "- `src/index.html` puts `ngCspNonce=\"CSP_NONCE\"` on `<app-root>`. `nginx.conf` replaces `CSP_NONCE` with `$request_id`, a fresh random value on every request, through `sub_filter`, and allows that nonce in the `script-src` and `style-src` of its `Content-Security-Policy`; any other server for `index.html` must do the same. The build copies the nonce onto inline `<script>` and `<style>` tags (including the critical-CSS loader), and Angular adds it to every component style it injects",
-            "- That policy blocks a static `style=\"…\"` attribute in a template, because Angular writes it with `setAttribute`: bind `[style.<property>]` or use the component's CSS instead",
+            '- `src/index.html` puts `ngCspNonce="CSP_NONCE"` on `<app-root>`. `nginx.conf` replaces `CSP_NONCE` with `$request_id`, a fresh random value on every request, through `sub_filter`, and allows that nonce in the `script-src` and `style-src` of its `Content-Security-Policy`; any other server for `index.html` must do the same. The build copies the nonce onto inline `<script>` and `<style>` tags (including the critical-CSS loader), and Angular adds it to every component style it injects',
+            '- That policy blocks a static `style="…"` attribute in a template, because Angular writes it with `setAttribute`: bind `[style.<property>]` or use the component\'s CSS instead',
             "",
         ]
     )

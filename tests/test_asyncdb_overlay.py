@@ -14,7 +14,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from project_initializer.file_transforms import append_async_requirements
+from project_initializer.file_transforms import append_async_dependencies
+from tests.toml_support import tomllib
 
 _ROOT = Path(__file__).resolve().parent.parent
 _TEMPLATES = _ROOT / "project_initializer"
@@ -46,22 +47,32 @@ def test_when_base_template_inspected_async_modules_are_absent():
 
 
 def _merge(dest: Path) -> Path:
-    """Copy base API then the async overlay on top, applying async requirements transform.
+    """Copy base API then the async overlay on top, applying the async dependency transform.
 
-    Mirrors the copy_tree merge in cli.py with the _requirements_handler applied.
+    Mirrors the copy_tree merge in cli.py with the _dependencies_handler applied.
     """
     shutil.copytree(BASE_API, dest, dirs_exist_ok=True)
     shutil.copytree(OVERLAY_API, dest, dirs_exist_ok=True)
 
-    # Apply the async requirements transformation to the merged requirements.txt
-    req_file = dest / "requirements.txt"
-    if req_file.exists():
-        req_file.write_text(
-            append_async_requirements(req_file.read_text(encoding="utf-8")),
-            encoding="utf-8",
-        )
-
+    pyproject = dest / "pyproject.toml"
+    pyproject.write_text(
+        append_async_dependencies(pyproject.read_text(encoding="utf-8")),
+        encoding="utf-8",
+    )
     return dest
+
+
+def _declared_requirements(api: Path) -> list[str]:
+    """Runtime and dev pins declared by the merged pyproject.toml.
+
+    Installing the project itself (``pip install .[dev]``) would register a stray
+    ``api`` distribution in the interpreter running this suite; the pins are all
+    the overlay test needs.
+    """
+    project = tomllib.loads((api / "pyproject.toml").read_text(encoding="utf-8"))[
+        "project"
+    ]
+    return [*project["dependencies"], *project["optional-dependencies"]["dev"]]
 
 
 def _run_python_module(api: Path, *module_args: str) -> subprocess.CompletedProcess:
@@ -79,9 +90,11 @@ def test_when_async_overlay_test_run_async_crud_passes(tmp_path):
     Validates project_initializer/templates-asyncdb-fastapi/api/tests/unit/test_async_db.py.
     """
     api = _merge(tmp_path / "api")
-    # Install dependencies from the merged requirements.txt (which includes asyncpg)
-    # Use the current Python's site-packages by running in the same environment
-    install_result = _run_python_module(api, "pip", "install", "-r", "requirements.txt")
+    # Same environment as the suite: the pins are already present on a prepared
+    # machine, so pip only fetches what is missing.
+    install_result = _run_python_module(
+        api, "pip", "install", *_declared_requirements(api)
+    )
     if install_result.returncode != 0:
         raise RuntimeError(f"pip install failed: {install_result.stderr}")
     # The base pytest.ini enforces a coverage gate for the whole suite; one test

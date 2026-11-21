@@ -23,7 +23,7 @@ project-initializer [name] [--framework fastapi|nestjs] [--fastapi | --nestjs] [
 - `--scope fullstack` (default) — scaffold both halves (`api/` + `frontend/`)
 - `--scope api` — backend only: skips the `frontend/` subtree and drops the `frontend` service from `docker-compose.yml`
 - `--scope frontend` — frontend only: base layer only, strips the `/api/` proxy block from `nginx.conf`; **cannot be combined with `--framework`/`--fastapi`/`--nestjs`/`--auth`/`--async-db`** (those are api concerns)
-- `--async-db` — add the opt-in async SQLAlchemy path (FastAPI only): merges the `templates-asyncdb-fastapi` overlay and appends `asyncpg` + `sqlalchemy[asyncio]` to `api/requirements.txt`. The sync path stays the default. **Cannot be combined with `--nestjs` or `--scope frontend`** (it is an api concern).
+- `--async-db` — add the opt-in async SQLAlchemy path (FastAPI only): merges the `templates-asyncdb-fastapi` overlay and adds `asyncpg` + `sqlalchemy[asyncio]` to `api/pyproject.toml` (`aiosqlite` joins its `dev` extra). The sync path stays the default. **Cannot be combined with `--nestjs` or `--scope frontend`** (it is an api concern).
 - `--force` / `-f` — overwrite existing files without prompting
 - `--yes` / `-y` — non-interactive: skip all prompts, apply defaults for unset options
 - `--verbose` / `-V` — list every file created, in addition to the summary tree
@@ -114,7 +114,7 @@ project_initializer/
 ├── wizard.py                       # Interactive questionary prompts
 ├── docs_generator.py               # Builds README.md / CLAUDE.md from the flags
 ├── env_generator.py                # Generates the root .env (with secrets) and .env.example (blank secrets)
-├── file_transforms.py              # Compose/nginx/requirements text transforms
+├── file_transforms.py              # Compose/nginx/pyproject text transforms
 ├── env_defaults.env                # Default values for env generation
 └── __init__.py
 ```
@@ -138,9 +138,9 @@ Layers carry an optional transform applied to file text during the copy:
 - `filter_compose(text, scope)` — drops the `frontend` service from `docker-compose.yml` for `--scope api`
 - `generate_frontend_compose()` — emits the minimal frontend-only compose for `--scope frontend`
 - `strip_nginx_proxy_block(text)` — removes the `/api/` proxy block from `nginx.conf` for `--scope frontend`
-- `append_async_requirements(text)` — appends `asyncpg` + `sqlalchemy[asyncio]` to `requirements.txt` for `--async-db`
+- `append_async_dependencies(text)` — adds `asyncpg` + `sqlalchemy[asyncio]` to the `dependencies` array of `pyproject.toml` (and `aiosqlite` to its `dev` extra) for `--async-db`
 
-Because the async overlay ships no `requirements.txt`, the requirements transform is composed (via `_combine()`) onto whichever earlier layers do carry one.
+Because the async overlay ships no `pyproject.toml`, the dependencies transform is composed (via `_combine()`) onto whichever earlier layers do carry one.
 
 #### Scope-based layer selection
 
@@ -189,7 +189,7 @@ project-initializer/
 │   ├── wizard.py                   # Interactive questionary prompts
 │   ├── docs_generator.py           # README.md / CLAUDE.md generation
 │   ├── env_generator.py            # Variant-specific .env generation
-│   ├── file_transforms.py          # Compose/nginx/requirements transforms
+│   ├── file_transforms.py          # Compose/nginx/pyproject transforms
 │   ├── env_defaults.env            # Default env values
 │   ├── py.typed                    # PEP 561 type marker
 │   └── templates*/                 # 13 template overlay directories (see above)
@@ -270,7 +270,7 @@ alembic revision --autogenerate --rev-id 0003_add_widget -m "add widget"  # Crea
 
 `pytest.ini` of the template enforces the coverage gate (`--cov-fail-under=75`, branch coverage). `tests/test_asyncdb_overlay.py` runs a single scaffolded test file in a subprocess, so it passes `--no-cov`.
 
-To verify a FastAPI change, scaffold all five variants (none, token, supabase, entra, `--async-db`) and run `pip install -r requirements.txt && pytest -q` in each `api/`. CI does the same in `test-variant-suites`.
+To verify a FastAPI change, scaffold all five variants (none, token, supabase, entra, `--async-db`) and run `pip install ".[dev]" && pytest -q` in each `api/`. CI does the same in `test-variant-suites`.
 
 ### The auth seam: overlays replace by path, never copy a base file
 
@@ -280,7 +280,7 @@ Layers overwrite by path, so an overlay file that duplicates a base file forks i
 - `app/infrastructure/auth_settings.py` (an `AuthSettings` mixin that `Settings` inherits, with `validate_auth_secrets(production_like=...)`)
 - `tests/auth_test_env.py` (the variables the tests need) and `tests/integration/test_auth.py`
 
-and adds its own files: **token** adds `domain/entities/user.py`, the user and credential ports, `AuthService` (login, access-token use) and `RegistrationService` (`registration.py`, account creation, needs no signing key), `infrastructure/auth/static_token.py`, `security.py`, `repositories/user.py` and its routes in `v1/endpoints/auth.py` (the one base route file it replaces, to keep `/me`); **supabase** adds `infrastructure/auth/supabase.py`, replaces `orm/user.py` with a `profiles` model plus the matching migration, and ships its own `requirements.txt`, `entrypoint.sh` (no local db to wait for) and `docker-compose.yml`; **entra** adds `infrastructure/auth/entra.py`, `entra_jwks.py` (`CooldownSigningKeyResolver`: unknown-`kid` reloads of the key set at most once per `ENTRA_JWKS_REFRESH_COOLDOWN`), `tests/entra_tokens.py` and `PyJWT[crypto]==2.15.1`, and inherits the base compose and entrypoint because it uses the local Postgres. An overlay must not ship `deps.py`, `settings.py`, `v1/router.py` or a `.env.example`: `tests/test_entra_fastapi_overlay.py` fails if one appears.
+and adds its own files: **token** adds `domain/entities/user.py`, the user and credential ports, `AuthService` (login, access-token use) and `RegistrationService` (`registration.py`, account creation, needs no signing key), `infrastructure/auth/static_token.py`, `security.py`, `repositories/user.py` and its routes in `v1/endpoints/auth.py` (the one base route file it replaces, to keep `/me`); **supabase** adds `infrastructure/auth/supabase.py`, replaces `orm/user.py` with a `profiles` model plus the matching migration, and ships its own `pyproject.toml`, `entrypoint.sh` (no local db to wait for) and `docker-compose.yml`; **entra** adds `infrastructure/auth/entra.py`, `entra_jwks.py` (`CooldownSigningKeyResolver`: unknown-`kid` reloads of the key set at most once per `ENTRA_JWKS_REFRESH_COOLDOWN`), `tests/entra_tokens.py` and `PyJWT[crypto]==2.15.1`, and inherits the base compose and entrypoint because it uses the local Postgres. An overlay must not ship `deps.py`, `settings.py`, `v1/router.py` or a `.env.example`: `tests/test_entra_fastapi_overlay.py` fails if one appears.
 
 Everything an overlay must keep stable is a contract in the base: routes import only `CurrentUser`; verifiers implement `TokenVerifierPort` and raise `AuthenticationError` (401), `AuthorizationError` (403) or `ExternalServiceError` (503); the base tests override `get_current_user`, so they pass unchanged in every variant.
 
@@ -293,6 +293,16 @@ Which layer owns a migration follows its ORM model: the base carries `0001_creat
 The supabase layer also ships `0003_enable_row_level_security.py`, which has no base counterpart. It enables row level security on `items`, `profiles` and `alembic_version` without a policy (the Data API roles can touch nothing, the table-owner connection of the API is unaffected) and does nothing on SQLite. A table added to a supabase project needs its own `ENABLE ROW LEVEL SECURITY` statement.
 
 Every downgrade that drops a table goes through `preserve_and_drop_table`, and one that drops a column through `preserve_and_drop_column`. On PostgreSQL the rows are copied to `migration_backup.<table>__rollback_<UTC YYYYmmddHHMMSSffffff>` (a schema the Supabase Data API does not expose, created closed; the microsecond suffix keeps two rollbacks inside one second apart), on SQLite next to the table. The shared `alembic/script.py.mako` renders an empty downgrade as `raise NotImplementedError`, and `process_revision_directives` in `env.py` rewrites a drafted `op.drop_table` into `preserve_and_drop_table`. `alembic.ini` sets `file_template = %%(rev)s`, so create revisions with `--rev-id <NNNN>_<slug>` (at most 32 characters). `env.py` logs through the application's structured logger and, when `config.attributes["embedded"]` is set, leaves the environment and logging to the caller; the first migration creates `idx_items_created_at`. Roll back with `alembic downgrade -1`, newest first. `tests/test_fastapi_migrations.py` asserts each variant's merged `alembic/versions` creates exactly the tables its ORM maps to (`users` + `items`, or `profiles` + `items` and no `users`), that every migration has a `downgrade()` that preserves rows, that the supabase 0002 file replaces the base one by name, that 0003 exists only in the supabase layer and secures every table, and that backups go to the `migration_backup` schema.
+
+### Python metadata: `pyproject.toml` only
+
+For Python projects, dependencies and the version live in `pyproject.toml` and nowhere else. There is no `requirements.txt` in this repo or in any scaffold, and no `__version__` or version literal in `__init__.py` or any other module.
+
+- **This CLI**: `[project] version` of the root `pyproject.toml`. `--version` reads the installed package metadata (`_installed_version()` in `cli.py`). After a bump, `pip install -e .` again, or `--version` keeps the old number.
+- **FastAPI scaffolds**: `api/pyproject.toml` in `templates-api-fastapi` (also used by the token overlay), `templates-supabase-fastapi` and `templates-entra-fastapi`. Runtime dependencies in `dependencies`, test tooling in the `dev` extra, `[tool.setuptools] packages = []` so the install adds metadata and dependencies but never the code. `Settings.version` reads the installed metadata under `DISTRIBUTION_NAME`, which must equal `[project] name` (`tests/unit/test_version_source.py` checks it). The Dockerfile runs `pip install .`; developers and CI run `pip install ".[dev]"`.
+- `--async-db` edits the arrays of `pyproject.toml` through `append_async_dependencies()`, which raises when an array is missing instead of dropping the dependencies silently.
+- NestJS keeps its version in `package.json`; the rule does not apply there.
+- `tests/test_python_metadata_single_source.py` guards all of this.
 
 ### Settings, async path and traceability
 

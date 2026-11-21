@@ -23,6 +23,7 @@ from tests.fastapi_entra_sources import (
     entra_verifier_text,
     generated_entra_env_example,
 )
+from tests.toml_support import tomllib
 
 # ---------------------------------------------------------------------------
 # Paths — all computed from repo root.
@@ -33,7 +34,7 @@ _PACKAGE_ROOT = _REPO_ROOT / "project_initializer"
 _CLI_PY = _PACKAGE_ROOT / "cli.py"
 _OVERLAY_ROOT = _PACKAGE_ROOT / "templates-entra-fastapi"
 _API_ROOT = _OVERLAY_ROOT / "api"
-_REQUIREMENTS_TXT = _API_ROOT / "requirements.txt"
+_PYPROJECT_TOML = _API_ROOT / "pyproject.toml"
 _BASE_APP_ROOT = _PACKAGE_ROOT / "templates-api-fastapi" / "api" / "app"
 _BASE_SETTINGS_PY = _BASE_APP_ROOT / "infrastructure" / "settings.py"
 _BASE_AUTH_PY = _BASE_APP_ROOT / "api" / "v1" / "endpoints" / "auth.py"
@@ -87,7 +88,7 @@ def test_when_cli_py_is_read_then_entra_is_in_auth_modes():
         "api/app/api/auth_deps.py",
         "api/app/infrastructure/auth_settings.py",
         "api/app/infrastructure/auth/entra.py",
-        "api/requirements.txt",
+        "api/pyproject.toml",
         "api/tests/auth_test_env.py",
         "api/tests/entra_tokens.py",
         "api/tests/integration/test_auth.py",
@@ -96,7 +97,7 @@ def test_when_cli_py_is_read_then_entra_is_in_auth_modes():
 def test_when_overlay_is_present_then_required_file_exists(relative_path: str):
     """The overlay ships the seam, the settings, the verifier and its own tests.
 
-    Validates project_initializer/templates-entra-fastapi/api (seam, settings, verifier, requirements and test helpers).
+    Validates project_initializer/templates-entra-fastapi/api (seam, settings, verifier, pyproject.toml and test helpers).
     """
     assert (_OVERLAY_ROOT / relative_path).exists(), (
         f"Required overlay file missing: {relative_path}"
@@ -128,52 +129,65 @@ def test_when_overlay_is_present_then_a_base_file_is_not_forked(relative_path: s
 
 
 # ===========================================================================
-# Criterion: requirements.txt declares PyJWT[crypto] and httpx; no supabase
+# Criterion: pyproject.toml declares PyJWT[crypto] and httpx; no supabase
 # ===========================================================================
 
 
-class TestRequirementsTxt:
+def _dependency_names(entries: list[str]) -> set[str]:
+    """Return the lower-cased distribution names of PEP 508 requirement strings."""
+    return {
+        re.split(r"[\[=<>!~;\s]", entry, maxsplit=1)[0].lower() for entry in entries
+    }
+
+
+class TestPyprojectDependencies:
     """Dependency declarations of the entra overlay."""
 
     @pytest.fixture(scope="class")
-    def content(self) -> str:
-        """Text of the overlay's requirements.txt."""
-        return _REQUIREMENTS_TXT.read_text(encoding="utf-8")
+    def manifest(self) -> dict:
+        """Parsed pyproject.toml of the overlay."""
+        with _PYPROJECT_TOML.open("rb") as handle:
+            return tomllib.load(handle)
 
-    def test_when_requirements_are_read_then_pyjwt_crypto_is_declared(
-        self, content: str
+    def test_when_dependencies_are_read_then_pyjwt_crypto_is_declared(
+        self, manifest: dict
     ):
         """PyJWT with the crypto extra verifies RS256 signatures.
 
-        Validates project_initializer/templates-entra-fastapi/api/requirements.txt.
+        Validates project_initializer/templates-entra-fastapi/api/pyproject.toml.
         """
-        assert "pyjwt[crypto]" in content.lower(), (
-            "PyJWT[crypto] must be declared in requirements.txt for in-process JWKS validation"
+        runtime = [entry.lower() for entry in manifest["project"]["dependencies"]]
+        assert any(entry.startswith("pyjwt[crypto]") for entry in runtime), (
+            "PyJWT[crypto] must be declared in pyproject.toml for in-process JWKS validation"
         )
 
-    def test_when_requirements_are_read_then_pyjwt_is_pinned_to_the_audited_release(
-        self, content: str
+    def test_when_dependencies_are_read_then_pyjwt_is_pinned_to_the_audited_release(
+        self, manifest: dict
     ):
         """PyJWT stays on 2.15.1: a failed key-set reload there keeps the cached keys.
 
-        Validates project_initializer/templates-entra-fastapi/api/requirements.txt.
+        Validates project_initializer/templates-entra-fastapi/api/pyproject.toml.
         """
-        assert "PyJWT[crypto]==2.15.1" in content
+        assert "PyJWT[crypto]==2.15.1" in manifest["project"]["dependencies"]
 
-    def test_when_requirements_are_read_then_httpx_is_declared(self, content: str):
+    def test_when_dependencies_are_read_then_httpx_is_declared(self, manifest: dict):
         """httpx is the HTTP client the template and its tests rely on.
 
-        Validates project_initializer/templates-entra-fastapi/api/requirements.txt.
+        Validates project_initializer/templates-entra-fastapi/api/pyproject.toml.
         """
-        assert "httpx" in content.lower()
+        assert "httpx" in _dependency_names(manifest["project"]["dependencies"])
 
-    def test_when_requirements_are_read_then_supabase_is_absent(self, content: str):
+    def test_when_dependencies_are_read_then_supabase_is_absent(self, manifest: dict):
         """The entra variant must not pull in the Supabase client.
 
-        Validates project_initializer/templates-entra-fastapi/api/requirements.txt.
+        Validates project_initializer/templates-entra-fastapi/api/pyproject.toml.
         """
-        assert "supabase" not in content.lower(), (
-            "supabase must not appear in requirements.txt — entra overlay uses PyJWT, not supabase-py"
+        declared = (
+            manifest["project"]["dependencies"]
+            + manifest["project"]["optional-dependencies"]["dev"]
+        )
+        assert not any("supabase" in name for name in _dependency_names(declared)), (
+            "supabase must not appear in pyproject.toml — entra overlay uses PyJWT, not supabase-py"
         )
 
 
@@ -188,7 +202,7 @@ _CLIENT_SECRET_SOURCES = {
     "auth_deps.py": entra_auth_deps_text,
     "entra.py": entra_verifier_text,
     "generated .env.example": generated_entra_env_example,
-    "requirements.txt": lambda: _REQUIREMENTS_TXT.read_text(encoding="utf-8"),
+    "pyproject.toml": lambda: _PYPROJECT_TOML.read_text(encoding="utf-8"),
     "base auth.py": lambda: _BASE_AUTH_PY.read_text(encoding="utf-8"),
 }
 

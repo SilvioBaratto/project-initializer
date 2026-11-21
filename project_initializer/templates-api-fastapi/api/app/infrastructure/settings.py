@@ -7,6 +7,7 @@ read ``os.environ`` only, and constructing them with an empty environment must
 succeed so tools that import the module without a ``.env`` keep working.
 """
 
+from importlib.metadata import version as installed_version
 from typing import Annotated, Literal, Self, get_args
 
 from pydantic import BeforeValidator, Field, model_validator
@@ -37,6 +38,10 @@ LogLevel = Annotated[LogLevelName, BeforeValidator(_lowercase_text)]
 DEFAULT_DATABASE_URL = "postgresql://localhost:5433/app_db"
 
 WILDCARD_ORIGIN = "*"
+
+# The ``[project] name`` of pyproject.toml, which is the key the installed
+# metadata is stored under.
+DISTRIBUTION_NAME = "api"
 
 # The libpq modes that never fall back to a clear-text connection.
 ENCRYPTED_SSL_MODES = frozenset({"require", "verify-ca", "verify-full"})
@@ -125,7 +130,6 @@ class Settings(AuthSettings):
     )
 
     project_name: str = "FastAPI Template"
-    version: str = "1.0.0"
     api_v1_str: str = "/api/v1"
 
     environment: Environment = "development"
@@ -193,6 +197,20 @@ class Settings(AuthSettings):
         if self.database_migration_url:
             urls.append((MIGRATION_URL_VARIABLE, self.database_migration_url))
         return urls
+
+    @property
+    def version(self) -> str:
+        """The application version, as declared in ``pyproject.toml``.
+
+        Read from the installed project's metadata, which ``pip install`` fills
+        from ``[project] version``. A property and not a field, so no environment
+        variable can override it.
+
+        Raises:
+            importlib.metadata.PackageNotFoundError: The project is not installed;
+                run ``pip install ".[dev]"`` from the ``api`` directory.
+        """
+        return installed_version(DISTRIBUTION_NAME)
 
     @property
     def is_production(self) -> bool:

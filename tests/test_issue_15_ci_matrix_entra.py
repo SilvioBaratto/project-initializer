@@ -16,6 +16,8 @@ WORKFLOW = (
     / "test-package.yml"
 )
 
+_FASTAPI_INSTALL_CMD = 'pip install "/tmp/test-project/api[dev]"'
+
 
 def _text() -> str:
     return WORKFLOW.read_text(encoding="utf-8")
@@ -30,13 +32,14 @@ def _matrix_entries() -> list[dict]:
     ):
         flags_m = re.search(r'flags:\s*"([^"]*)"', rest)
         scope_m = re.search(r'scope:\s*"?(\w+)"?', rest)
-        install_m = re.search(r'install_cmd:\s*"([^"]*)"', rest)
+        # The fastapi rows are single-quoted because their command holds double quotes.
+        install_m = re.search(r"""install_cmd:\s*(['"])(.*?)\1""", rest)
         entries.append(
             {
                 "variant": variant,
                 "flags": flags_m.group(1) if flags_m else None,
                 "scope": scope_m.group(1) if scope_m else None,
-                "install_cmd": install_m.group(1) if install_m else None,
+                "install_cmd": install_m.group(2) if install_m else None,
             }
         )
     return entries
@@ -49,7 +52,7 @@ def _entry_for(variant: str) -> dict | None:
 # ---------------------------------------------------------------------------
 # fastapi-entra row (criterion: matrix includes a fastapi-entra row with
 # flags "--fastapi --auth entra", scope "fullstack",
-# install_cmd "pip install -r /tmp/test-project/api/requirements.txt")
+# install_cmd 'pip install "/tmp/test-project/api[dev]"')
 # ---------------------------------------------------------------------------
 
 
@@ -70,16 +73,14 @@ def test_when_fastapi_entra_row_scope_is_fullstack():
     assert entry["scope"] == "fullstack"
 
 
-def test_when_fastapi_entra_row_install_cmd_is_pip_install_requirements():
-    """The fastapi-entra row installs the scaffolded API's requirements file.
+def test_when_fastapi_entra_row_install_cmd_is_pip_install_of_the_api_extras():
+    """The fastapi-entra row installs the scaffolded API from its pyproject.toml, dev extra included.
 
     Validates .github/workflows/test-package.yml fastapi-entra matrix row.
     """
     entry = _entry_for("fastapi-entra")
     assert entry is not None, "fastapi-entra row missing"
-    assert (
-        entry["install_cmd"] == "pip install -r /tmp/test-project/api/requirements.txt"
-    )
+    assert entry["install_cmd"] == _FASTAPI_INSTALL_CMD
 
 
 # ---------------------------------------------------------------------------

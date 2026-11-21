@@ -16,6 +16,7 @@ from tests.fastapi_entra_sources import (
     auth_failure_statuses_are_wired,
     entra_verifier_text,
 )
+from tests.toml_support import tomllib
 
 OVERLAY_FASTAPI = pathlib.Path("project_initializer/templates-entra-fastapi")
 OVERLAY_NESTJS = pathlib.Path("project_initializer/templates-entra-nestjs")
@@ -31,15 +32,20 @@ def _fastapi_deps_text() -> str:
     return entra_verifier_text()
 
 
-def _fastapi_requirements_text() -> str:
-    req = OVERLAY_FASTAPI / "api" / "requirements.txt"
-    return req.read_text(encoding="utf-8")
+def _fastapi_runtime_dependencies() -> list[str]:
+    manifest_path = OVERLAY_FASTAPI / "api" / "pyproject.toml"
+    with manifest_path.open("rb") as handle:
+        return tomllib.load(handle)["project"]["dependencies"]
 
 
 def test_when_fastapi_overlay_dependencies_are_read_then_pyjwt_crypto_is_declared():
-    text = _fastapi_requirements_text()
-    assert "PyJWT" in text or "pyjwt" in text, (
-        "requirements.txt must declare PyJWT[crypto] for in-process JWKS validation"
+    """The in-process verifier needs PyJWT with the crypto extra for RS256.
+
+    Validates project_initializer/templates-entra-fastapi/api/pyproject.toml.
+    """
+    dependencies = _fastapi_runtime_dependencies()
+    assert any(entry.lower().startswith("pyjwt[crypto]") for entry in dependencies), (
+        "pyproject.toml must declare PyJWT[crypto] for in-process JWKS validation"
     )
 
 

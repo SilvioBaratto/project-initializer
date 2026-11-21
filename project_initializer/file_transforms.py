@@ -107,23 +107,45 @@ def generate_frontend_compose() -> str:
     return _FRONTEND_COMPOSE
 
 
-# Pinned to match SQLAlchemy==2.0.50 already in the base requirements; the
+# Pinned to match SQLAlchemy==2.0.50 already in the base dependencies; the
 # extras form pulls greenlet for the async path. asyncpg is the async driver.
-# aiosqlite is used for unit testing with in-memory SQLite.
-_ASYNC_REQUIREMENTS = (
-    "\n# Async DB path (--async-db) — opt-in asyncpg driver + asyncio extras\n"
-    "asyncpg==0.31.0\n"
-    "sqlalchemy[asyncio]==2.0.50\n"
-    "aiosqlite==0.20.0\n"
+_ASYNC_DEPENDENCIES = (
+    "\n"
+    "    # Async DB path (--async-db): opt-in asyncpg driver + asyncio extras\n"
+    '    "asyncpg==0.31.0",\n'
+    '    "sqlalchemy[asyncio]==2.0.50",\n'
 )
+# aiosqlite runs the async unit tests on in-memory SQLite.
+_ASYNC_DEV_DEPENDENCIES = '    "aiosqlite==0.20.0",\n'
 
 
-def append_async_requirements(text: str) -> str:
-    """Append the async DB deps to a requirements.txt body (pure, idempotent).
+def _extend_toml_array(text: str, key: str, entries: str) -> str:
+    """Insert ``entries`` before the closing bracket of the ``key = [`` array.
 
-    Returns ``text`` unchanged when ``asyncpg`` is already present so a re-run
-    over an already-async requirements file never double-appends.
+    Raises:
+        ValueError: ``text`` has no such array, so the dependencies would be
+            dropped silently if the transform returned the text unchanged.
+    """
+    array = re.search(
+        rf"^{re.escape(key)} = \[\n.*?^\]$", text, re.DOTALL | re.MULTILINE
+    )
+    if array is None:
+        raise ValueError(f"pyproject.toml has no `{key} = [` array to extend")
+    closing_bracket = array.end() - 1
+    return text[:closing_bracket] + entries + text[closing_bracket:]
+
+
+def append_async_dependencies(text: str) -> str:
+    """Add the async DB dependencies to a ``pyproject.toml`` body (pure, idempotent).
+
+    The driver and the asyncio extra join ``[project] dependencies``; the SQLite
+    test driver joins the ``dev`` extra. Returns ``text`` unchanged when
+    ``asyncpg`` is already present, so a re-run never adds them twice.
+
+    Raises:
+        ValueError: ``text`` lacks the ``dependencies`` or ``dev`` array.
     """
     if "asyncpg" in text:
         return text
-    return text + _ASYNC_REQUIREMENTS
+    with_runtime = _extend_toml_array(text, "dependencies", _ASYNC_DEPENDENCIES)
+    return _extend_toml_array(with_runtime, "dev", _ASYNC_DEV_DEPENDENCIES)

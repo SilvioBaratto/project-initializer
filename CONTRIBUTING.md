@@ -67,7 +67,7 @@ INTEGRATION_BUILD=1 pytest tests/test_integration_build.py   # Heavy NestJS buil
 
 In a git worktree run `PYTHONPATH=<worktree> pytest`: the `project-initializer` console script imports the checkout that `pip install -e .` points at, so without it the tests that call the script exercise the old templates.
 
-The repo suite does not run the tests a scaffolded project ships. CI does, in the `test-variant-suites` job; locally, scaffold the variant and run `pip install -r requirements.txt && pytest -q` in its `api/` (FastAPI) or `npm ci && npm run test:cov && npm run test:e2e` (NestJS). A FastAPI project enforces 75% branch coverage of `app/`, so a single file or marker needs `pytest --no-cov`.
+The repo suite does not run the tests a scaffolded project ships. CI does, in the `test-variant-suites` job; locally, scaffold the variant and run `pip install ".[dev]" && pytest -q` in its `api/` (FastAPI) or `npm ci && npm run test:cov && npm run test:e2e` (NestJS). A FastAPI project enforces 75% branch coverage of `app/`, so a single file or marker needs `pytest --no-cov`.
 
 ### Test traceability (repo suite)
 

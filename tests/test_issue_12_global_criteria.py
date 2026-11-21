@@ -17,13 +17,15 @@ import re
 from pathlib import Path
 
 import pytest
-from hypothesis import given, strategies as st
+from hypothesis import given
+from hypothesis import strategies as st
 
 from tests.fastapi_entra_sources import (
     auth_failure_statuses_are_wired,
     entra_verifier_text,
     generated_entra_env_example,
 )
+from tests.toml_support import tomllib
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -117,16 +119,20 @@ class TestFastapiOverlayJwtValidation:
     def _verifier(self) -> str:
         return entra_verifier_text()
 
-    def test_when_fastapi_overlay_present_then_pyjwt_crypto_in_requirements(self):
-        """Criterion: RS256 validation uses PyJWT[crypto] (signature-only, in-process)."""
-        req_candidates = list((FASTAPI_OVERLAY / "api").rglob("requirements*.txt"))
-        assert req_candidates, (
-            "No requirements*.txt found under templates-entra-fastapi/api/"
+    def test_when_fastapi_overlay_present_then_pyjwt_crypto_in_pyproject(self):
+        """Criterion: RS256 validation uses PyJWT[crypto] (signature-only, in-process).
+
+        Validates project_initializer/templates-entra-fastapi/api/pyproject.toml.
+        """
+        manifest_path = FASTAPI_OVERLAY / "api" / "pyproject.toml"
+        assert manifest_path.exists(), (
+            "No pyproject.toml found under templates-entra-fastapi/api/"
         )
-        text = "\n".join(_read(p) for p in req_candidates)
-        assert "PyJWT" in text or "pyjwt" in text.lower(), (
-            "PyJWT not declared in entra-fastapi requirements"
-        )
+        with manifest_path.open("rb") as handle:
+            dependencies = tomllib.load(handle)["project"]["dependencies"]
+        assert any(
+            entry.lower().startswith("pyjwt[crypto]") for entry in dependencies
+        ), "PyJWT[crypto] not declared in entra-fastapi pyproject.toml"
 
     def test_when_fastapi_verifier_present_then_rs256_algorithm_is_enforced(self):
         """Criterion: signature validated against cached JWKS using RS256.

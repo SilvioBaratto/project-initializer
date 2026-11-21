@@ -10,13 +10,14 @@ Criteria covered (oracle: all UNIT-verifiable):
   5. JWKS clients auto-refresh (PyJWKClient; jwks-rsa cache+rateLimit), no hard-coded schedule.
 """
 
-from pathlib import Path
 import re
+from pathlib import Path
 
 from tests.fastapi_entra_sources import (
     auth_failure_statuses_are_wired,
     entra_verifier_text,
 )
+from tests.toml_support import tomllib
 
 ROOT = Path(__file__).resolve().parent.parent
 PKG = ROOT / "project_initializer"
@@ -61,14 +62,22 @@ def test_when_env_generator_read_entra_branch_is_present():
 
 
 def test_when_fastapi_overlay_read_pyjwt_crypto_is_declared_as_dependency():
-    """requirements.txt must declare PyJWT[crypto] for in-process JWKS validation."""
-    req_file = ENTRA_FASTAPI / "api" / "requirements.txt"
-    assert req_file.exists(), "requirements.txt missing from templates-entra-fastapi"
-    content = req_file.read_text(encoding="utf-8")
-    assert "pyjwt" in content.lower(), "PyJWT not in requirements.txt"
+    """pyproject.toml must declare PyJWT[crypto] for in-process JWKS validation.
+
+    Validates project_initializer/templates-entra-fastapi/api/pyproject.toml.
+    """
+    manifest_path = ENTRA_FASTAPI / "api" / "pyproject.toml"
+    assert manifest_path.exists(), "pyproject.toml missing from templates-entra-fastapi"
+    with manifest_path.open("rb") as handle:
+        dependencies = [
+            entry.lower() for entry in tomllib.load(handle)["project"]["dependencies"]
+        ]
+    assert any(entry.startswith("pyjwt") for entry in dependencies), (
+        "PyJWT not in pyproject.toml"
+    )
     # The [crypto] extra is required for RS256 signature verification.
-    assert "crypto" in content.lower(), (
-        "PyJWT[crypto] extra missing from requirements.txt"
+    assert any(entry.startswith("pyjwt[crypto]") for entry in dependencies), (
+        "PyJWT[crypto] extra missing from pyproject.toml"
     )
 
 
