@@ -299,6 +299,7 @@ THIRD_PARTY_PACKAGES = (
     "pydantic",
     "pydantic_settings",
     "httpx",
+    "httpx2",
     "jose",
     "jwt",
     "bcrypt",

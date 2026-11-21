@@ -2,7 +2,7 @@
 
 from http import HTTPStatus
 
-from httpx import Response
+from httpx2 import Response
 
 BEARER_CHALLENGE = "Bearer"
 

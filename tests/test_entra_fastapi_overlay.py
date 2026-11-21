@@ -172,7 +172,10 @@ class TestPyprojectDependencies:
         assert "PyJWT[crypto]==2.15.1" in manifest["project"]["dependencies"]
 
     def test_when_dependencies_are_read_then_httpx_is_declared(self, manifest: dict):
-        """httpx is the HTTP client the template and its tests rely on.
+        """httpx stays a runtime dependency of the variant.
+
+        The TestClient transport, httpx2, is declared in the dev extra and checked
+        with the other manifests in ``tests/test_fastapi_dependencies.py``.
 
         Validates project_initializer/templates-entra-fastapi/api/pyproject.toml.
         """

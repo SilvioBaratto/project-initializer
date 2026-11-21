@@ -5,14 +5,24 @@ from datetime import UTC, datetime
 from http import HTTPStatus
 from types import MappingProxyType
 from typing import Any
+from weakref import WeakKeyDictionary
 
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
+from fastapi.routing import iter_route_contexts
+from starlette.applications import Starlette
 from starlette.types import Scope
 
 from app.api.schemas.errors import ErrorBody, ErrorEnvelope, FieldError
 
 UNMATCHED_ROUTE = "unmatched"
+
+# FastAPI puts the declared route in ``scope["route"]``, and that object has lost
+# the prefix given to ``include_router``. Only ``iter_route_contexts`` exposes the
+# whole template, and it walks every router on each call, so each application
+# keeps a lookup from a route's identity to its template instead. Routes may be
+# included after the first request, so a route missing from the lookup rebuilds it.
+_TEMPLATES_BY_APP: WeakKeyDictionary[Starlette, dict[int, str]] = WeakKeyDictionary()
 
 DEFAULT_ERROR_DESCRIPTIONS: Mapping[int, str] = MappingProxyType(
     {
@@ -106,21 +116,44 @@ Merge it with the route's own statuses, for example
 """
 
 
+def _templates_of(app: Starlette) -> dict[int, str]:
+    return {
+        id(context.original_route): context.path
+        for context in iter_route_contexts(app.routes)
+        if context.path is not None
+    }
+
+
 def route_template(scope: Scope) -> str:
     """Name the route that served a request, for logs.
 
     A path parameter can hold user text and an unmatched path is chosen by the
     caller, so neither is safe to log raw. The route template, such as
-    ``/items/{item_id}``, has a bounded set of values and no personal data.
+    ``/api/v1/items/{item_id}``, has a bounded set of values and no personal data.
+
+    The template includes the prefix given to ``include_router``. A router
+    included under two prefixes is one route object, so the two inclusions cannot
+    be told apart and the template of the later one is logged for both.
 
     Args:
         scope: ASGI scope of the request, as seen after routing.
 
     Returns:
         The matched route's path template, or ``UNMATCHED_ROUTE`` when no route
-        matched (or routing has not happened yet).
+        matched (or routing has not happened yet). Without an application in the
+        scope, or for a route it does not list, the route's own unprefixed path.
     """
-    return getattr(scope.get("route"), "path", UNMATCHED_ROUTE)
+    route = scope.get("route")
+    own_path = getattr(route, "path", None)
+    if own_path is None:
+        return UNMATCHED_ROUTE
+    app = scope.get("app")
+    if app is None:
+        return own_path
+    templates = _TEMPLATES_BY_APP.get(app)
+    if templates is None or id(route) not in templates:
+        templates = _TEMPLATES_BY_APP[app] = _templates_of(app)
+    return templates.get(id(route), own_path)
 
 
 def request_id_of(request: Request) -> str | None:
