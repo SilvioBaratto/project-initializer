@@ -8,11 +8,10 @@ carries.
 """
 
 import re
+import tomllib
 from pathlib import Path
 
 import pytest
-
-from tests.toml_support import tomllib
 
 _PACKAGE = Path(__file__).resolve().parent.parent / "project_initializer"
 _PYPROJECT_FILES = {

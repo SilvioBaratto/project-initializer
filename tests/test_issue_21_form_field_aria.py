@@ -543,9 +543,7 @@ def test_when_error_text_is_any_non_empty_string_then_aria_invalid_is_always_tru
 @given(
     control_id=st.text(
         min_size=1,
-        alphabet=st.characters(
-            whitelist_categories=("Ll", "Lu", "Nd"), whitelist_characters="-_"
-        ),
+        alphabet=st.characters(categories=("Ll", "Lu", "Nd"), include_characters="-_"),
     ),
     error_text=st.one_of(st.none(), st.text(min_size=1)),
     help_text=st.one_of(st.none(), st.text(min_size=1)),
@@ -570,9 +568,7 @@ def test_when_neither_error_nor_help_is_provided_then_aria_describedby_is_absent
 @given(
     control_id=st.text(
         min_size=1,
-        alphabet=st.characters(
-            whitelist_categories=("Ll", "Lu", "Nd"), whitelist_characters="-_"
-        ),
+        alphabet=st.characters(categories=("Ll", "Lu", "Nd"), include_characters="-_"),
     ),
     error_text=st.text(min_size=1),
 )
@@ -594,9 +590,7 @@ def test_when_error_text_is_provided_then_aria_describedby_references_error_elem
 @given(
     control_id=st.text(
         min_size=1,
-        alphabet=st.characters(
-            whitelist_categories=("Ll", "Lu", "Nd"), whitelist_characters="-_"
-        ),
+        alphabet=st.characters(categories=("Ll", "Lu", "Nd"), include_characters="-_"),
     ),
     help_text=st.text(min_size=1),
 )
@@ -618,9 +612,7 @@ def test_when_only_help_text_is_provided_then_aria_describedby_references_help_e
 @given(
     control_id=st.text(
         min_size=1,
-        alphabet=st.characters(
-            whitelist_categories=("Ll", "Lu", "Nd"), whitelist_characters="-_"
-        ),
+        alphabet=st.characters(categories=("Ll", "Lu", "Nd"), include_characters="-_"),
     ),
     error_text=st.text(min_size=1),
     help_text=st.text(min_size=1),

@@ -9,7 +9,7 @@ description = "CLI tool to scaffold full-stack projects with FastAPI or NestJS, 
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [
     {name = "Silvio Baratto"}
 ]
@@ -20,23 +20,25 @@ classifiers = [
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "Topic :: Software Development :: Code Generators",
 ]
 dependencies = [
-    "typer>=0.12",
-    "questionary>=2.0",
-    "rich>=13.0",
+    "typer>=0.29.2",
+    "questionary>=2.1.1",
+    "rich>=15.0.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "ruff>=0.15,<0.16",
-    "pytest>=9",
-    "hypothesis>=6",
-    "pyyaml>=6",
+    "ruff>=0.17.6,<0.18",
+    "pytest>=9.2.0",
+    "hypothesis>=6.170.17",
+    "pyyaml>=6.0.4",
 ]
 
 [project.scripts]
@@ -53,6 +55,12 @@ markers = [
     "integration: integration test",
     "e2e: end-to-end test",
 ]
+
+[tool.ruff.lint]
+# Ruff 0.16 raised its default rule set from 59 to 413 rules. Pinning these four
+# families keeps the rules the repo has always enforced, so `ruff check . tests`
+# (also run by the managed CI workflow) means the same thing on every ruff version.
+select = ["E4", "E7", "E9", "F"]
 
 [tool.setuptools]
 include-package-data = true

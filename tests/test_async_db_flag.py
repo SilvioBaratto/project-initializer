@@ -7,6 +7,7 @@ appended deps; flag-off byte-identical to today).
 """
 
 import hashlib
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -23,7 +24,6 @@ from project_initializer.cli import (
 )
 from project_initializer.env_generator import GENERATED_SECRET_KEYS
 from project_initializer.file_transforms import append_async_dependencies
-from tests.toml_support import tomllib
 
 runner = CliRunner()
 

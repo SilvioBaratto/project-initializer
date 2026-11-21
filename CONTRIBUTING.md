@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.11+
 - Node.js 20+
 - Docker and Docker Compose
 

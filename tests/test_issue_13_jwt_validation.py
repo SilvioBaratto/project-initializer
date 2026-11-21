@@ -11,12 +11,12 @@ scaffolded project will satisfy the security requirements.
 """
 
 import pathlib
+import tomllib
 
 from tests.fastapi_entra_sources import (
     auth_failure_statuses_are_wired,
     entra_verifier_text,
 )
-from tests.toml_support import tomllib
 
 OVERLAY_FASTAPI = pathlib.Path("project_initializer/templates-entra-fastapi")
 OVERLAY_NESTJS = pathlib.Path("project_initializer/templates-entra-nestjs")

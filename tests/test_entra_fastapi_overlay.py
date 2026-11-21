@@ -11,6 +11,7 @@ route, is inherited from the base layer and never forked.
 
 import ast
 import re
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -23,7 +24,6 @@ from tests.fastapi_entra_sources import (
     entra_verifier_text,
     generated_entra_env_example,
 )
-from tests.toml_support import tomllib
 
 # ---------------------------------------------------------------------------
 # Paths — all computed from repo root.
@@ -144,7 +144,8 @@ class TestPyprojectDependencies:
     """Dependency declarations of the entra overlay."""
 
     @pytest.fixture(scope="class")
-    def manifest(self) -> dict:
+    @classmethod
+    def manifest(cls) -> dict:
         """Parsed pyproject.toml of the overlay."""
         with _PYPROJECT_TOML.open("rb") as handle:
             return tomllib.load(handle)

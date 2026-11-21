@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking changes
+
+- **Python 3.10 is no longer supported: the CLI requires Python 3.11 or newer.** typer 0.29 needs 3.11, and 3.10 reached end of life in October 2026. `pip install project-initializer` on 3.10 keeps resolving 0.6.0.
+
+### Changed
+
+- Raised the dependency floors to `typer>=0.29.2` (it adds `pydantic` as a dependency), `questionary>=2.1.1` and `rich>=15.0.0`.
+- `--help` now shows a `<bool>` type column beside flag options such as `--force` and `--yes`. This comes from typer 0.29; the options behave as before.
+- The package classifiers list Python 3.11 to 3.15 and no longer list 3.10.
+- The `dev` extra now asks for `ruff>=0.17.6,<0.18`, `pytest>=9.2.0`, `hypothesis>=6.170.17` and `pyyaml>=6.0.4`. `[tool.ruff.lint]` selects `E4`, `E7`, `E9` and `F` explicitly, because ruff 0.16 enlarged its default rule set from 59 to 413 rules and `ruff check . tests` would otherwise start reporting 205 findings the repo never enforced.
+
+### Repo tests
+
+- `tests/toml_support.py` is gone: it only let the suite collect on Python 3.10. The tests import `tomllib` directly, including the three that used `pytest.importorskip("tomllib")`.
+- The class-scoped `manifest` fixture of `tests/test_entra_fastapi_overlay.py` is a `classmethod`, which avoids the pytest 9.1 deprecation of class-scoped fixtures defined as instance methods (an error in pytest 10).
+- `st.characters(...)` calls use `categories`, `exclude_categories` and `include_characters` instead of the deprecated `whitelist_*` and `blacklist_*` arguments.
+- `tests/test_python_metadata_single_source.py` pins `requires-python = ">=3.11"` and the 3.11 to 3.15 classifiers.
+
 ## [0.6.0] - 2026-11-21
 
 Python projects now keep their dependencies and their version in `pyproject.toml` and nowhere else. The first three changes below alter what a **newly scaffolded** FastAPI project contains; a project scaffolded earlier is not touched.
