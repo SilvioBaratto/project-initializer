@@ -10,17 +10,16 @@ from pathlib import Path
 
 TEMPLATES = Path(__file__).parent.parent / "project_initializer"
 
-TOKEN_APP_MODULE = (
-    TEMPLATES / "templates-token-nestjs" / "api" / "src" / "app.module.ts"
-)
+# One root module serves every variant; each overlay registers its global guard in `app.auth.ts`.
+TOKEN_APP_MODULE = TEMPLATES / "templates-token-nestjs" / "api" / "src" / "app.auth.ts"
 SUPABASE_APP_MODULE = (
-    TEMPLATES / "templates-supabase-nestjs" / "api" / "src" / "app.module.ts"
+    TEMPLATES / "templates-supabase-nestjs" / "api" / "src" / "app.auth.ts"
 )
 NESTJS_BASE_APP_MODULE = (
     TEMPLATES / "templates-api-nestjs" / "api" / "src" / "app.module.ts"
 )
 NESTJS_ENV_VALIDATION = (
-    TEMPLATES / "templates-api-nestjs" / "api" / "src" / "config" / "env.validation.ts"
+    TEMPLATES / "templates-api-nestjs" / "api" / "src" / "config" / "env.base.ts"
 )
 # api/.claude/CLAUDE.md is generated per-flag (docs_generator), not shipped
 # static — expose the generated NestJS api CLAUDE.md via a .read_text() shim.
@@ -37,16 +36,16 @@ class _GeneratedDoc:
 FILTER_DI_DOC = _GeneratedDoc()
 
 # Candidate paths for a response schema that proves field whitelisting (Zod).
-# The template's proof lives in the test module's item DTO; user/entity modules
+# The template's proof lives in the items module's DTO; user/entity modules
 # may also have their own response schemas.
 _RESPONSE_SCHEMA_CANDIDATES = [
-    # Primary: serialization-proof schema in the test module
+    # Primary: serialization-proof schema in the items module
     TEMPLATES
     / "templates-api-nestjs"
     / "api"
     / "src"
     / "modules"
-    / "test"
+    / "items"
     / "dto"
     / "item.dto.ts",
     # Secondary: user-specific response schemas (added by auth overlays or future issues)
@@ -73,38 +72,48 @@ _RESPONSE_SCHEMA_CANDIDATES = [
 
 
 def test_when_token_overlay_app_module_is_read_then_app_guard_is_imported():
-    """Token overlay app module must import the APP_GUARD injection token."""
+    """Token overlay app module must import the APP_GUARD injection token.
+
+    Validates project_initializer/templates-token-nestjs/api/src/app.auth.ts.
+    """
     content = TOKEN_APP_MODULE.read_text(encoding="utf-8")
     assert "APP_GUARD" in content
 
 
-def test_when_token_overlay_app_module_is_read_then_auth_guard_is_wired_as_app_guard():
+def test_when_token_overlay_app_auth_is_read_then_access_token_guard_is_wired_as_app_guard():
     """
-    Token overlay app module must register AuthGuard as the global APP_GUARD provider
+    Token overlay must register AccessTokenGuard as the global APP_GUARD provider
     so every route is protected by default without an explicit guard decorator.
+
+    Validates project_initializer/templates-token-nestjs/api/src/app.auth.ts.
     """
     content = TOKEN_APP_MODULE.read_text(encoding="utf-8")
     # Both tokens must co-appear; the provider pattern is
-    # { provide: APP_GUARD, useClass: AuthGuard }
-    assert "APP_GUARD" in content and "AuthGuard" in content
+    # { provide: APP_GUARD, useClass: AccessTokenGuard }
+    assert "APP_GUARD" in content and "AccessTokenGuard" in content
 
 
 # ── APP_GUARD in supabase overlay ────────────────────────────────────────────
 
 
 def test_when_supabase_overlay_app_module_is_read_then_app_guard_is_imported():
-    """Supabase overlay app module must import the APP_GUARD injection token."""
+    """Supabase overlay app module must import the APP_GUARD injection token.
+
+    Validates project_initializer/templates-supabase-nestjs/api/src/app.auth.ts.
+    """
     content = SUPABASE_APP_MODULE.read_text(encoding="utf-8")
     assert "APP_GUARD" in content
 
 
-def test_when_supabase_overlay_app_module_is_read_then_supabase_guard_is_wired_as_app_guard():
+def test_when_supabase_overlay_app_auth_is_read_then_access_token_guard_is_wired_as_app_guard():
     """
-    Supabase overlay app module must register SupabaseAuthGuard as the global APP_GUARD
+    Supabase overlay must register AccessTokenGuard as the global APP_GUARD
     provider so every route is protected by default without an explicit guard decorator.
+
+    Validates project_initializer/templates-supabase-nestjs/api/src/app.auth.ts.
     """
     content = SUPABASE_APP_MODULE.read_text(encoding="utf-8")
-    assert "APP_GUARD" in content and "SupabaseAuthGuard" in content
+    assert "APP_GUARD" in content and "AccessTokenGuard" in content
 
 
 # ── ConfigModule env validation ──────────────────────────────────────────────
@@ -125,8 +134,10 @@ def test_when_env_validation_module_is_read_then_database_url_is_required():
     The env validation schema must declare DATABASE_URL as a required field so a
     missing database secret causes validate() to throw before the app accepts traffic.
 
-    Assumption: env validation lives in src/config/env.validation.ts (the NestJS
-    ConfigModule convention); app.module.ts imports and wires it via validate:.
+    Assumption: the shared platform keys live in src/config/env.base.ts; each variant's
+    src/config/env.validation.ts extends that schema and app.module.ts wires it via validate:.
+
+    Validates project_initializer/templates-api-nestjs/api/src/config/env.base.ts.
     """
     content = NESTJS_ENV_VALIDATION.read_text(encoding="utf-8")
     assert "DATABASE_URL" in content
@@ -141,8 +152,10 @@ def test_when_response_schema_exists_then_password_field_is_absent():
     Whitelisting via an explicit z.object({...}) ensures Prisma rows cannot leak the
     password column through the ZodSerializerInterceptor.
 
-    The template ships ItemResponseSchema in test/dto/item.dto.ts as the canonical
+    The template ships ItemResponseSchema in items/dto/item.dto.ts as the canonical
     proof (verified by serialization.spec.ts). Auth overlays may add user schemas.
+
+    Validates project_initializer/templates-api-nestjs/api/src/modules/items/dto/item.dto.ts, or the response schemas under project_initializer/templates-api-nestjs/api/src/modules/users/dto when it is absent.
     """
     schema_file = next((p for p in _RESPONSE_SCHEMA_CANDIDATES if p.exists()), None)
     assert schema_file is not None, (

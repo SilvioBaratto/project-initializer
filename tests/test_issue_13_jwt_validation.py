@@ -12,6 +12,11 @@ scaffolded project will satisfy the security requirements.
 
 import pathlib
 
+from tests.fastapi_entra_sources import (
+    auth_failure_statuses_are_wired,
+    entra_verifier_text,
+)
+
 OVERLAY_FASTAPI = pathlib.Path("project_initializer/templates-entra-fastapi")
 OVERLAY_NESTJS = pathlib.Path("project_initializer/templates-entra-nestjs")
 
@@ -22,8 +27,8 @@ OVERLAY_NESTJS = pathlib.Path("project_initializer/templates-entra-nestjs")
 
 
 def _fastapi_deps_text() -> str:
-    deps = OVERLAY_FASTAPI / "api" / "app" / "api" / "deps.py"
-    return deps.read_text(encoding="utf-8")
+    """Source of the FastAPI verifier, where the token checks live."""
+    return entra_verifier_text()
 
 
 def _fastapi_requirements_text() -> str:
@@ -39,50 +44,75 @@ def test_when_fastapi_overlay_dependencies_are_read_then_pyjwt_crypto_is_declare
 
 
 def test_when_fastapi_overlay_dependencies_are_read_then_rs256_algorithm_is_enforced():
+    """The in-process verifier pins the RS256 signature algorithm.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+    """
     text = _fastapi_deps_text()
     assert "RS256" in text, "get_current_user must enforce RS256 algorithm"
 
 
-def test_when_fastapi_overlay_dependencies_are_read_then_jwks_client_is_used():
-    """PyJWKClient is the PyJWT v2 class that fetches and caches JWKS."""
+def test_when_fastapi_verifier_is_read_then_jwks_client_is_used():
+    """PyJWKClient is the PyJWT v2 class that fetches and caches JWKS.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+    """
     text = _fastapi_deps_text()
-    assert "PyJWKClient" in text, (
-        "dependencies.py must use PyJWKClient for JWKS retrieval"
-    )
+    assert "PyJWKClient" in text, "entra.py must use PyJWKClient for JWKS retrieval"
 
 
 def test_when_fastapi_overlay_dependencies_are_read_then_aud_is_validated():
+    """The in-process verifier validates the audience claim.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+    """
     text = _fastapi_deps_text()
     assert "aud" in text or "audience" in text, "audience (aud) claim must be validated"
 
 
 def test_when_fastapi_overlay_dependencies_are_read_then_iss_is_validated():
+    """The in-process verifier validates the issuer claim.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+    """
     text = _fastapi_deps_text()
     assert "iss" in text or "issuer" in text, "issuer (iss) claim must be validated"
 
 
-def test_when_fastapi_overlay_dependencies_are_read_then_tid_pinning_is_present():
+def test_when_fastapi_verifier_is_read_then_tid_pinning_is_present():
+    """The verifier pins the tenant through the tid claim.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+    """
     text = _fastapi_deps_text()
-    assert "tid" in text, "tenant id (tid) claim must be pinned in dependencies.py"
+    assert "tid" in text, "tenant id (tid) claim must be pinned in entra.py"
 
 
-def test_when_fastapi_overlay_dependencies_are_read_then_scp_scope_is_enforced():
+def test_when_fastapi_verifier_is_read_then_scp_scope_is_enforced():
+    """The verifier enforces the required scope through the scp claim.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+    """
     text = _fastapi_deps_text()
-    assert "scp" in text, "required scp scope must be enforced in dependencies.py"
+    assert "scp" in text, "required scp scope must be enforced in entra.py"
 
 
-def test_when_fastapi_overlay_dependencies_are_read_then_401_is_raised_on_auth_failure():
-    text = _fastapi_deps_text()
-    assert (
-        "401" in text or "HTTP_401" in text or "status.HTTP_401_UNAUTHORIZED" in text
-    ), "dependencies.py must raise 401 on authentication failure"
+def test_when_fastapi_verifier_and_handlers_are_read_then_401_is_raised_on_auth_failure():
+    """The verifier raises AuthenticationError, which handlers.py answers with 401.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py and project_initializer/templates-api-fastapi/api/app/api/handlers.py.
+    """
+    unauthorized, _ = auth_failure_statuses_are_wired()
+    assert unauthorized, "entra.py must raise AuthenticationError, mapped to 401"
 
 
-def test_when_fastapi_overlay_dependencies_are_read_then_403_is_raised_on_insufficient_scope():
-    text = _fastapi_deps_text()
-    assert "403" in text or "HTTP_403" in text or "status.HTTP_403_FORBIDDEN" in text, (
-        "dependencies.py must raise 403 on insufficient scope"
-    )
+def test_when_fastapi_verifier_and_handlers_are_read_then_403_is_raised_on_insufficient_scope():
+    """The verifier raises AuthorizationError, which handlers.py answers with 403.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py and project_initializer/templates-api-fastapi/api/app/api/handlers.py.
+    """
+    _, forbidden = auth_failure_statuses_are_wired()
+    assert forbidden, "entra.py must raise AuthorizationError, mapped to 403"
 
 
 # ---------------------------------------------------------------------------

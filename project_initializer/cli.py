@@ -27,7 +27,13 @@ from .docs_generator import (
     generate_root_claude,
     generate_root_readme,
 )
-from .env_generator import generate_env, parse_env
+from .env_generator import (
+    GENERATED_SECRET_KEYS,
+    LEGACY_PLACEHOLDER,
+    generate_env,
+    new_generated_secrets,
+    parse_env,
+)
 from .file_transforms import (
     append_async_requirements,
     filter_compose,
@@ -214,7 +220,7 @@ def _next_steps_lines(auth: str | None, framework: str) -> list[str]:
 
     Declarative data construction — exempt from the <10-line rule.
     """
-    lines = ["  # Edit .env with your real keys (ships with working dev defaults)"]
+    lines = ["  # Edit .env with your real keys (generated secrets are already filled in)"]
     if auth == "supabase":
         lines.append(
             "  # Configure SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in .env"
@@ -273,6 +279,67 @@ def _summary_tree(dest_dir: Path, created: dict[str, bool]) -> Tree:
     return tree
 
 
+def _secrets_for_env(env_path: Path) -> dict[str, str]:
+    """Create the secrets for a new ``.env``, keeping those an existing one already holds.
+
+    Re-scaffolding over a project (``--force`` or a confirmed prompt) must not
+    silently rotate credentials the running stack and its users depend on, so
+    every secret already present in ``env_path`` is reused. A blank value or the
+    legacy placeholder counts as absent and gets a fresh secret.
+
+    Args:
+        env_path: Where the ``.env`` will be written; may not exist yet.
+
+    Returns:
+        One value per key in ``GENERATED_SECRET_KEYS``.
+    """
+    secrets = new_generated_secrets()
+    existing = parse_env(env_path)
+    for key in GENERATED_SECRET_KEYS:
+        value = existing.get(key, "")
+        if value and value != LEGACY_PLACEHOLDER:
+            secrets[key] = value
+    return secrets
+
+
+def _write_env_files(
+    dest_dir: Path, framework: str, auth: str | None, *, frontend: bool
+) -> list[str]:
+    """Write the root ``.env`` and ``.env.example`` for the api layer.
+
+    The ``.env`` carries generated secrets (see :func:`_secrets_for_env`). The
+    ``.env.example`` is meant to be committed, so its secrets are blank: it
+    never holds a credential that works.
+
+    Args:
+        dest_dir: Project root the files are written into.
+        framework: ``"fastapi"`` or ``"nestjs"``.
+        auth: Auth mode, or None for an open API.
+        frontend: Whether the scope includes the frontend (adds its host port).
+
+    Returns:
+        The names of the files written, relative to ``dest_dir``.
+    """
+    defaults_path = TEMPLATES_ROOT / "env_defaults.env"
+    source = parse_env(defaults_path) if defaults_path.exists() else {}
+    env_path = dest_dir / ".env"
+    env_path.write_text(
+        generate_env(
+            framework,
+            auth,
+            source,
+            secrets=_secrets_for_env(env_path),
+            frontend=frontend,
+        ),
+        encoding="utf-8",
+    )
+    (dest_dir / ".env.example").write_text(
+        generate_env(framework, auth, source, use_placeholders=True, frontend=frontend),
+        encoding="utf-8",
+    )
+    return [".env", ".env.example"]
+
+
 def copy_template(
     dest_dir: Path,
     project_name: str | None = None,
@@ -287,6 +354,11 @@ def copy_template(
     Renders a leading config panel and a compact tree summary (top-level dirs
     with file counts) instead of a line per file. ``verbose=True`` additionally
     lists every distinct file created.
+
+    For the api scopes the root ``.env`` is written with freshly generated
+    secrets and ``.env.example`` with none. When a ``.env`` already exists
+    (``--force`` or a confirmed prompt), the secrets it holds are kept rather
+    than rotated, so re-scaffolding never invalidates a running stack.
     """
     skip_patterns = {
         "__pycache__",
@@ -297,7 +369,6 @@ def copy_template(
         "*.egg-info",
         "dist",
         "build",
-        "test-stubs",
     }
 
     def should_skip(name: str) -> bool:
@@ -345,20 +416,13 @@ def copy_template(
         copy_tree(src, dest_dir, skip, transform)
 
     # Generate the root .env + .env.example (single source of truth, only when
-    # the api layer is present). Both files are byte-identical: the placeholder
-    # values double as working dev defaults so `docker compose up` runs as-is.
-    # The root location lets docker-compose (env_file) and every subtree share
-    # one file — FastAPI walks up to it (infrastructure/config), NestJS points
-    # ConfigModule/Prisma at it.
+    # the api layer is present). The root location lets docker-compose
+    # (env_file) and every subtree share one file — FastAPI walks up to it
+    # (infrastructure/config), NestJS points ConfigModule/Prisma at it.
     if scope in ("fullstack", "api"):
-        env_example_path = TEMPLATES_ROOT / "env_defaults.env"
-        source = parse_env(env_example_path) if env_example_path.exists() else {}
-        env_content = generate_env(
-            framework, auth, source, frontend=(scope == "fullstack")
-        )
-        for filename in (".env", ".env.example"):
-            env_path = dest_dir / filename
-            env_path.write_text(env_content, encoding="utf-8")
+        for filename in _write_env_files(
+            dest_dir, framework, auth, frontend=(scope == "fullstack")
+        ):
             created[filename] = True
 
     if scope == "frontend":
@@ -381,7 +445,7 @@ def copy_template(
         ),
     }
     if include_api:
-        docs["api/README.md"] = generate_api_readme(framework, async_db=async_db)
+        docs["api/README.md"] = generate_api_readme(framework, async_db=async_db, auth=auth)
         docs["api/.claude/CLAUDE.md"] = generate_api_claude(
             framework, auth, async_db=async_db
         )

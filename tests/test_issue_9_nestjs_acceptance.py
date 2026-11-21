@@ -17,8 +17,9 @@ _TOKEN = Path("project_initializer/templates-token-nestjs/api/src")
 _SUPABASE = Path("project_initializer/templates-supabase-nestjs/api/src")
 
 _BASE_APP_MODULE = _BASE / "app.module.ts"
-_TOKEN_APP_MODULE = _TOKEN / "app.module.ts"
-_SUPABASE_APP_MODULE = _SUPABASE / "app.module.ts"
+# The root module is shared; each overlay's `app.auth.ts` registers the global guard.
+_TOKEN_APP_AUTH = _TOKEN / "app.auth.ts"
+_SUPABASE_APP_AUTH = _SUPABASE / "app.auth.ts"
 _CHATBOT_MODULE = _BASE / "modules/chatbot/chatbot.module.ts"
 _CHAT_PROCESSOR = _BASE / "modules/chatbot/chat.processor.ts"
 _CHAT_PROCESSOR_SPEC = _BASE / "modules/chatbot/chat.processor.spec.ts"
@@ -28,31 +29,35 @@ _CHAT_DTO = _BASE / "modules/chatbot/dto/chat.dto.ts"
 # ── Global criterion: Auth guard registered as APP_GUARD in token overlay ──
 
 
-def test_when_token_app_module_is_inspected_auth_guard_is_registered_as_app_guard():
+def test_when_token_app_auth_is_inspected_auth_guard_is_registered_as_app_guard():
     """
     Criterion: The auth guard is confirmed registered as APP_GUARD in the
     token overlay so routes are protected by default.
+
+    Validates project_initializer/templates-token-nestjs/api/src/app.auth.ts.
     """
-    content = _TOKEN_APP_MODULE.read_text(encoding="utf-8")
+    content = _TOKEN_APP_AUTH.read_text(encoding="utf-8")
     assert re.search(r"provide\s*:\s*APP_GUARD", content), (
-        "token overlay app.module.ts must declare a provider with provide: APP_GUARD"
+        "token overlay app.auth.ts must declare a provider with provide: APP_GUARD"
     )
-    assert re.search(r"useClass\s*:\s*AuthGuard", content), (
-        "token overlay APP_GUARD provider must use AuthGuard"
+    assert re.search(r"useClass\s*:\s*AccessTokenGuard", content), (
+        "token overlay APP_GUARD provider must use AccessTokenGuard"
     )
 
 
-def test_when_supabase_app_module_is_inspected_auth_guard_is_registered_as_app_guard():
+def test_when_supabase_app_auth_is_inspected_auth_guard_is_registered_as_app_guard():
     """
     Criterion: The auth guard is confirmed registered as APP_GUARD in the
     supabase overlay so routes are protected by default.
+
+    Validates project_initializer/templates-supabase-nestjs/api/src/app.auth.ts.
     """
-    content = _SUPABASE_APP_MODULE.read_text(encoding="utf-8")
+    content = _SUPABASE_APP_AUTH.read_text(encoding="utf-8")
     assert re.search(r"provide\s*:\s*APP_GUARD", content), (
-        "supabase overlay app.module.ts must declare a provider with provide: APP_GUARD"
+        "supabase overlay app.auth.ts must declare a provider with provide: APP_GUARD"
     )
-    assert re.search(r"useClass\s*:\s*SupabaseAuthGuard", content), (
-        "supabase overlay APP_GUARD provider must use SupabaseAuthGuard"
+    assert re.search(r"useClass\s*:\s*AccessTokenGuard", content), (
+        "supabase overlay APP_GUARD provider must use AccessTokenGuard"
     )
 
 

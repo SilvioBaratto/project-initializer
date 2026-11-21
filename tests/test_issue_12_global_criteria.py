@@ -19,6 +19,12 @@ from pathlib import Path
 import pytest
 from hypothesis import given, strategies as st
 
+from tests.fastapi_entra_sources import (
+    auth_failure_statuses_are_wired,
+    entra_verifier_text,
+    generated_entra_env_example,
+)
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -108,10 +114,8 @@ def test_when_scope_combinations_enumerated_then_all_prior_scopes_still_valid():
 class TestFastapiOverlayJwtValidation:
     """Tests against the template source files — not a running server."""
 
-    def _deps(self) -> str:
-        path = FASTAPI_OVERLAY / "api" / "app" / "api" / "deps.py"
-        assert path.exists(), f"dependencies.py not found at {path}"
-        return _read(path)
+    def _verifier(self) -> str:
+        return entra_verifier_text()
 
     def test_when_fastapi_overlay_present_then_pyjwt_crypto_in_requirements(self):
         """Criterion: RS256 validation uses PyJWT[crypto] (signature-only, in-process)."""
@@ -124,44 +128,67 @@ class TestFastapiOverlayJwtValidation:
             "PyJWT not declared in entra-fastapi requirements"
         )
 
-    def test_when_fastapi_dependencies_present_then_rs256_algorithm_is_enforced(self):
-        """Criterion: signature validated against cached JWKS using RS256."""
-        src = self._deps()
-        assert "RS256" in src, "RS256 algorithm not referenced in dependencies.py"
+    def test_when_fastapi_verifier_present_then_rs256_algorithm_is_enforced(self):
+        """Criterion: signature validated against cached JWKS using RS256.
 
-    def test_when_fastapi_dependencies_present_then_audience_is_validated(self):
-        """Criterion: `aud` claim is explicitly checked."""
-        src = self._deps()
-        assert "aud" in src, "Audience ('aud') check not present in dependencies.py"
+        Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+        """
+        src = self._verifier()
+        assert "RS256" in src, "RS256 algorithm not referenced in entra.py"
 
-    def test_when_fastapi_dependencies_present_then_issuer_is_validated(self):
-        """Criterion: `iss` claim is explicitly checked (v2 issuer)."""
-        src = self._deps()
-        assert "iss" in src, "Issuer ('iss') check not present in dependencies.py"
+    def test_when_fastapi_verifier_present_then_audience_is_validated(self):
+        """Criterion: `aud` claim is explicitly checked.
 
-    def test_when_fastapi_dependencies_present_then_tid_pinning_present(self):
-        """Criterion: tenant ID (`tid`) is pinned."""
-        src = self._deps()
-        assert "tid" in src, "Tenant pinning ('tid') not found in dependencies.py"
+        Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+        """
+        src = self._verifier()
+        assert "aud" in src, "Audience ('aud') check not present in entra.py"
 
-    def test_when_fastapi_dependencies_present_then_scp_scope_enforced(self):
-        """Criterion: required `scp` scope is enforced."""
-        src = self._deps()
-        assert "scp" in src, "Scope ('scp') enforcement not found in dependencies.py"
+    def test_when_fastapi_verifier_present_then_issuer_is_validated(self):
+        """Criterion: `iss` claim is explicitly checked (v2 issuer).
 
-    def test_when_fastapi_dependencies_present_then_401_on_auth_failure(self):
-        """Criterion: authentication failure raises HTTP 401."""
-        src = self._deps()
-        assert "401" in src or "HTTP_401" in src or "status.HTTP_401" in src, (
-            "HTTP 401 response not found in dependencies.py"
-        )
+        Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+        """
+        src = self._verifier()
+        assert "iss" in src, "Issuer ('iss') check not present in entra.py"
 
-    def test_when_fastapi_dependencies_present_then_403_on_insufficient_scope(self):
-        """Criterion: insufficient scope raises HTTP 403."""
-        src = self._deps()
-        assert "403" in src or "HTTP_403" in src or "status.HTTP_403" in src, (
-            "HTTP 403 response not found in dependencies.py"
-        )
+    def test_when_fastapi_verifier_present_then_tid_pinning_present(self):
+        """Criterion: tenant ID (`tid`) is pinned.
+
+        Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+        """
+        src = self._verifier()
+        assert "tid" in src, "Tenant pinning ('tid') not found in entra.py"
+
+    def test_when_fastapi_verifier_present_then_scp_scope_enforced(self):
+        """Criterion: required `scp` scope is enforced.
+
+        Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
+        """
+        src = self._verifier()
+        assert "scp" in src, "Scope ('scp') enforcement not found in entra.py"
+
+    def test_when_fastapi_verifier_and_handlers_present_then_401_on_auth_failure(self):
+        """Criterion: authentication failure is answered with HTTP 401.
+
+        The verifier raises AuthenticationError and handlers.py maps it to 401.
+
+        Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py and project_initializer/templates-api-fastapi/api/app/api/handlers.py.
+        """
+        unauthorized, _ = auth_failure_statuses_are_wired()
+        assert unauthorized, "AuthenticationError is not wired to HTTP 401"
+
+    def test_when_fastapi_verifier_and_handlers_present_then_403_on_insufficient_scope(
+        self,
+    ):
+        """Criterion: insufficient scope is answered with HTTP 403.
+
+        The verifier raises AuthorizationError and handlers.py maps it to 403.
+
+        Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py and project_initializer/templates-api-fastapi/api/app/api/handlers.py.
+        """
+        _, forbidden = auth_failure_statuses_are_wired()
+        assert forbidden, "AuthorizationError is not wired to HTTP 403"
 
 
 # ---------------------------------------------------------------------------
@@ -240,10 +267,11 @@ _BACKEND_SECRET_SENSITIVE = re.compile(
 
 
 def test_when_fastapi_env_example_present_then_no_client_secret_key():
-    """Criterion: FastAPI backend holds no client secret — .env.example must not declare one."""
-    env_example = FASTAPI_OVERLAY / "api" / ".env.example"
-    assert env_example.exists(), f".env.example not found at {env_example}"
-    text = _read(env_example)
+    """Criterion: FastAPI backend holds no client secret — the generated .env.example must not declare one.
+
+    Validates project_initializer/env_generator.py generate_env().
+    """
+    text = generated_entra_env_example()
     assert not _BACKEND_SECRET_SENSITIVE.search(text), (
         "Client secret found in FastAPI .env.example — backend must be secret-free"
     )
@@ -381,15 +409,18 @@ _HARD_CODED_REFRESH = re.compile(
 def test_when_fastapi_overlay_present_then_pyjwks_client_used():
     """
     Criterion: FastAPI uses PyJWKClient (auto-refreshes on key rotation; no schedule).
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py.
     """
-    deps_path = FASTAPI_OVERLAY / "api" / "app" / "api" / "deps.py"
-    assert deps_path.exists(), f"dependencies.py not found at {deps_path}"
-    src = _read(deps_path)
-    assert "PyJWKClient" in src, "PyJWKClient not found in FastAPI dependencies.py"
+    src = entra_verifier_text()
+    assert "PyJWKClient" in src, "PyJWKClient not found in FastAPI entra.py"
 
 
 def test_when_fastapi_overlay_present_then_no_hard_coded_refresh_schedule():
-    """Criterion: no hard-coded refresh schedule (no sleep / setInterval)."""
+    """Criterion: no hard-coded refresh schedule (no sleep / setInterval).
+
+    Validates project_initializer/templates-entra-fastapi/**/*.py.
+    """
     for py_file in FASTAPI_OVERLAY.rglob("*.py"):
         src = _read(py_file)
         assert not _HARD_CODED_REFRESH.search(src), (
@@ -413,7 +444,10 @@ def test_when_nestjs_overlay_present_then_jwks_rsa_cache_enabled():
 
 
 def test_when_nestjs_overlay_present_then_no_hard_coded_refresh_schedule():
-    """Criterion: no hard-coded refresh schedule (no setInterval / setTimeout)."""
+    """Criterion: no hard-coded refresh schedule (no setInterval / setTimeout).
+
+    Validates project_initializer/templates-entra-nestjs/**/*.ts.
+    """
     for ts_file in NESTJS_OVERLAY.rglob("*.ts"):
         src = _read(ts_file)
         assert not _HARD_CODED_REFRESH.search(src), (
@@ -442,6 +476,8 @@ def test_when_any_entra_overlay_dir_checked_then_it_contains_at_least_one_file(
     """
     Invariant (never-empty): every entra overlay directory packages real template
     files — an empty overlay would silently produce a broken scaffold.
+
+    Validates the file trees of project_initializer/templates-entra-fastapi, project_initializer/templates-entra-nestjs and project_initializer/templates-entra-frontend.
     """
     overlay_dir = PKG_DIR / overlay_name
     assert overlay_dir.exists(), f"Overlay dir '{overlay_name}' does not exist"

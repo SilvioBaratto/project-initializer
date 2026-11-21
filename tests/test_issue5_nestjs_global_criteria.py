@@ -19,18 +19,23 @@ from hypothesis import given, strategies as st
 REPO_ROOT = pathlib.Path(__file__).parent.parent
 PI = REPO_ROOT / "project_initializer"
 
-# Auth overlay app-module files
+# The root module is a single file in the base layer. Each auth overlay replaces only
+# `src/app.auth.ts`, which lists the global guard the base module spreads into its providers.
 AUTH_APP_MODULES = [
-    PI / "templates-token-nestjs" / "api" / "src" / "app.module.ts",
-    PI / "templates-supabase-nestjs" / "api" / "src" / "app.module.ts",
+    PI / "templates-token-nestjs" / "api" / "src" / "app.auth.ts",
+    PI / "templates-supabase-nestjs" / "api" / "src" / "app.auth.ts",
 ]
 
-# ConfigModule definition — base or overlays share the config setup
+# ConfigModule definition — one base module serves every variant
 CONFIG_MODULE_FILES = [
     PI / "templates-api-nestjs" / "api" / "src" / "app.module.ts",
-    PI / "templates-token-nestjs" / "api" / "src" / "app.module.ts",
-    PI / "templates-supabase-nestjs" / "api" / "src" / "app.module.ts",
 ]
+
+# Shared platform environment keys (DATABASE_URL, ...) live in the base env module.
+BASE_ENV_FILE = PI / "templates-api-nestjs" / "api" / "src" / "config" / "env.base.ts"
+SUPABASE_ENV_FILE = (
+    PI / "templates-supabase-nestjs" / "api" / "src" / "config" / "env.validation.ts"
+)
 
 # Response DTO files (contain Zod schemas wrapping Prisma model data).
 # NestJS templates use *.dto.ts (not *.schema.ts) for DTO/schema definitions.
@@ -58,13 +63,15 @@ def read_text(path: pathlib.Path) -> str:
 
 
 @pytest.mark.parametrize("module_path", AUTH_APP_MODULES, ids=lambda p: p.parts[-4])
-def test_when_auth_overlay_app_module_is_read_then_app_guard_provider_is_present(
+def test_when_auth_overlay_app_auth_is_read_then_app_guard_provider_is_present(
     module_path,
 ):
-    """Criterion: token and supabase overlay app modules register their auth guard as APP_GUARD.
+    """Criterion: token and supabase overlays register their auth guard as APP_GUARD.
 
     Assumption: 'registered as APP_GUARD' means the providers array contains an object
     with `provide: APP_GUARD` (the standard NestJS global-guard pattern).
+
+    Validates project_initializer/templates-{token,supabase}-nestjs/api/src/app.auth.ts.
     """
     source = read_text(module_path)
     assert "APP_GUARD" in source, (
@@ -73,13 +80,15 @@ def test_when_auth_overlay_app_module_is_read_then_app_guard_provider_is_present
 
 
 @pytest.mark.parametrize("module_path", AUTH_APP_MODULES, ids=lambda p: p.parts[-4])
-def test_when_auth_overlay_app_module_is_read_then_auth_guard_class_is_provided_as_app_guard(
+def test_when_auth_overlay_app_auth_is_read_then_auth_guard_class_is_provided_as_app_guard(
     module_path,
 ):
-    """Criterion: the guard class wired to APP_GUARD is the variant's auth guard, not a different class.
+    """Criterion: the guard class wired to APP_GUARD is the shared access-token guard.
 
-    Assumption: the useClass value in the APP_GUARD provider must reference a class whose name
-    contains 'AuthGuard' or 'Guard' (both 'AuthGuard' and 'SupabaseAuthGuard' qualify).
+    Every auth variant registers the same `AccessTokenGuard`; what differs is the verifier it
+    calls, which the overlay binds to `ACCESS_TOKEN_VERIFIER`.
+
+    Validates project_initializer/templates-{token,supabase}-nestjs/api/src/app.auth.ts.
     """
     source = read_text(module_path)
     # Look for { provide: APP_GUARD, useClass: <SomethingGuard> } (whitespace-tolerant)
@@ -90,6 +99,9 @@ def test_when_auth_overlay_app_module_is_read_then_auth_guard_class_is_provided_
     match = pattern.search(source)
     assert match is not None, (
         f"No '{{ provide: APP_GUARD, useClass: <...Guard> }}' pattern found in {module_path}"
+    )
+    assert match.group(1) == "AccessTokenGuard", (
+        f"{module_path} wires {match.group(1)} instead of AccessTokenGuard as APP_GUARD"
     )
 
 
@@ -104,6 +116,8 @@ def test_when_app_module_is_read_then_config_module_uses_validate_option(module_
 
     Assumption: NestJS ConfigModule accepts a `validate` option (or a `validationSchema`
     in older patterns). We accept either `validate:` or `validationSchema:` as evidence.
+
+    Validates project_initializer/templates-api-nestjs/api/src/app.module.ts.
     """
     source = read_text(module_path)
     has_validate = "validate:" in source or "validationSchema:" in source
@@ -119,51 +133,31 @@ def test_when_app_module_is_read_then_database_url_is_required_in_env_validation
 ):
     """Criterion: the env validation schema requires DATABASE_URL.
 
-    Assumption: the validation schema (Zod or Joi) declares DATABASE_URL as a required field.
-    We check either the app.module.ts directly or expect a co-located env.validation.ts file.
+    The shared platform keys are declared once in `config/env.base.ts`; the module wires the
+    validator built from it.
+
+    Validates project_initializer/templates-api-nestjs/api/src/app.module.ts and project_initializer/templates-api-nestjs/api/src/config/env.base.ts.
     """
     source = read_text(module_path)
+    assert "validate" in source, f"{module_path} does not wire an env validator"
 
-    # Check inline or look for an adjacent validation file
-    validation_file = module_path.parent / "config" / "env.validation.ts"
-    alt_validation_file = module_path.parent / "env.validation.ts"
-
-    combined = source
-    for candidate in (validation_file, alt_validation_file):
-        if candidate.exists():
-            combined += candidate.read_text(encoding="utf-8")
-
-    assert "DATABASE_URL" in combined, (
-        f"DATABASE_URL not referenced in env validation in {module_path} or its siblings"
-    )
+    base_env = read_text(BASE_ENV_FILE)
+    assert "DATABASE_URL" in base_env, "DATABASE_URL not referenced in env.base.ts"
 
 
-@pytest.mark.parametrize(
-    "module_path",
-    [
-        PI / "templates-supabase-nestjs" / "api" / "src" / "app.module.ts",
-    ],
-    ids=["supabase"],
-)
-def test_when_supabase_app_module_is_read_then_supabase_secrets_are_required_in_env_validation(
-    module_path,
-):
+def test_when_supabase_env_validation_is_read_then_supabase_secrets_are_required():
     """Criterion: supabase variant env validation requires SUPABASE_* secrets.
 
     Assumption: at least SUPABASE_URL is named in the validation schema.
+
+    Validates project_initializer/templates-supabase-nestjs/api/src/config/env.validation.ts.
     """
-    source = read_text(module_path)
-
-    validation_file = module_path.parent / "config" / "env.validation.ts"
-    alt_validation_file = module_path.parent / "env.validation.ts"
-
-    combined = source
-    for candidate in (validation_file, alt_validation_file):
-        if candidate.exists():
-            combined += candidate.read_text(encoding="utf-8")
-
-    assert "SUPABASE_URL" in combined, (
-        f"SUPABASE_URL not referenced in env validation in {module_path} or siblings"
+    source = read_text(SUPABASE_ENV_FILE)
+    assert "SUPABASE_URL" in source, (
+        f"SUPABASE_URL not referenced in {SUPABASE_ENV_FILE}"
+    )
+    assert "SUPABASE_PUBLISHABLE_KEY" in source, (
+        f"SUPABASE_PUBLISHABLE_KEY not referenced in {SUPABASE_ENV_FILE}"
     )
 
 

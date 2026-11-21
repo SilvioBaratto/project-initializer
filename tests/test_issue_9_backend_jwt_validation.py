@@ -19,6 +19,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.fastapi_entra_sources import auth_failure_statuses_are_wired
+
 _PKG = Path(__file__).parent.parent / "project_initializer"
 _FASTAPI_OVERLAY = _PKG / "templates-entra-fastapi"
 _NESTJS_OVERLAY = _PKG / "templates-entra-nestjs"
@@ -55,7 +57,10 @@ def _combined_ts_source(root: Path) -> str:
 
 
 def test_when_fastapi_overlay_present_then_rs256_algorithm_is_declared():
-    """FastAPI overlay must specify RS256 as the accepted signing algorithm."""
+    """FastAPI overlay must specify RS256 as the accepted signing algorithm.
+
+    Validates project_initializer/templates-entra-fastapi/**/*.py.
+    """
     if not _FASTAPI_OVERLAY.is_dir():
         pytest.fail("templates-entra-fastapi/ does not exist yet (Red phase expected)")
     source = _combined_python_source(_FASTAPI_OVERLAY)
@@ -71,7 +76,10 @@ def test_when_fastapi_overlay_present_then_rs256_algorithm_is_declared():
 
 @pytest.mark.parametrize("claim", ["aud", "iss", "tid", "scp"])
 def test_when_fastapi_overlay_present_then_claim_is_validated(claim):
-    """FastAPI overlay must validate each required JWT claim."""
+    """FastAPI overlay must validate each required JWT claim.
+
+    Validates project_initializer/templates-entra-fastapi/**/*.py.
+    """
     if not _FASTAPI_OVERLAY.is_dir():
         pytest.fail("templates-entra-fastapi/ does not exist yet (Red phase expected)")
     source = _combined_python_source(_FASTAPI_OVERLAY)
@@ -86,21 +94,30 @@ def test_when_fastapi_overlay_present_then_claim_is_validated(claim):
 
 
 def test_when_fastapi_overlay_present_then_401_status_is_returned_on_auth_failure():
-    """FastAPI overlay must return HTTP 401 when JWT validation fails."""
+    """FastAPI overlay must return HTTP 401 when JWT validation fails.
+
+    The verifier raises AuthenticationError and the base handlers answer it with 401,
+    so the check reads those two sources rather than any "401" in the overlay's tests.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py and project_initializer/templates-api-fastapi/api/app/api/handlers.py.
+    """
     if not _FASTAPI_OVERLAY.is_dir():
         pytest.fail("templates-entra-fastapi/ does not exist yet (Red phase expected)")
-    source = _combined_python_source(_FASTAPI_OVERLAY)
-    assert "401" in source, (
-        "FastAPI overlay must emit HTTP 401 on authentication failure"
-    )
+    unauthorized, _ = auth_failure_statuses_are_wired()
+    assert unauthorized, "FastAPI overlay must emit HTTP 401 on authentication failure"
 
 
 def test_when_fastapi_overlay_present_then_403_status_is_returned_on_insufficient_scope():
-    """FastAPI overlay must return HTTP 403 when the required scope is missing."""
+    """FastAPI overlay must return HTTP 403 when the required scope is missing.
+
+    The verifier raises AuthorizationError and the base handlers answer it with 403.
+
+    Validates project_initializer/templates-entra-fastapi/api/app/infrastructure/auth/entra.py and project_initializer/templates-api-fastapi/api/app/api/handlers.py.
+    """
     if not _FASTAPI_OVERLAY.is_dir():
         pytest.fail("templates-entra-fastapi/ does not exist yet (Red phase expected)")
-    source = _combined_python_source(_FASTAPI_OVERLAY)
-    assert "403" in source, "FastAPI overlay must emit HTTP 403 on insufficient scope"
+    _, forbidden = auth_failure_statuses_are_wired()
+    assert forbidden, "FastAPI overlay must emit HTTP 403 on insufficient scope"
 
 
 # ---------------------------------------------------------------------------
@@ -109,7 +126,10 @@ def test_when_fastapi_overlay_present_then_403_status_is_returned_on_insufficien
 
 
 def test_when_nestjs_overlay_present_then_rs256_algorithm_is_declared():
-    """NestJS overlay must specify RS256 as the accepted signing algorithm."""
+    """NestJS overlay must specify RS256 as the accepted signing algorithm.
+
+    Validates project_initializer/templates-entra-nestjs/**/*.ts.
+    """
     if not _NESTJS_OVERLAY.is_dir():
         pytest.fail("templates-entra-nestjs/ does not exist yet (Red phase expected)")
     source = _combined_ts_source(_NESTJS_OVERLAY)
@@ -125,7 +145,10 @@ def test_when_nestjs_overlay_present_then_rs256_algorithm_is_declared():
 
 @pytest.mark.parametrize("claim", ["aud", "iss", "tid", "scp"])
 def test_when_nestjs_overlay_present_then_claim_is_validated(claim):
-    """NestJS overlay must validate each required JWT claim."""
+    """NestJS overlay must validate each required JWT claim.
+
+    Validates project_initializer/templates-entra-nestjs/**/*.ts.
+    """
     if not _NESTJS_OVERLAY.is_dir():
         pytest.fail("templates-entra-nestjs/ does not exist yet (Red phase expected)")
     source = _combined_ts_source(_NESTJS_OVERLAY)
@@ -140,7 +163,10 @@ def test_when_nestjs_overlay_present_then_claim_is_validated(claim):
 
 
 def test_when_nestjs_overlay_present_then_401_status_is_returned_on_auth_failure():
-    """NestJS overlay must return HTTP 401 when JWT validation fails."""
+    """NestJS overlay must return HTTP 401 when JWT validation fails.
+
+    Validates project_initializer/templates-entra-nestjs/**/*.ts.
+    """
     if not _NESTJS_OVERLAY.is_dir():
         pytest.fail("templates-entra-nestjs/ does not exist yet (Red phase expected)")
     source = _combined_ts_source(_NESTJS_OVERLAY)
@@ -150,7 +176,10 @@ def test_when_nestjs_overlay_present_then_401_status_is_returned_on_auth_failure
 
 
 def test_when_nestjs_overlay_present_then_403_status_is_returned_on_insufficient_scope():
-    """NestJS overlay must return HTTP 403 when the required scope is missing."""
+    """NestJS overlay must return HTTP 403 when the required scope is missing.
+
+    Validates project_initializer/templates-entra-nestjs/**/*.ts.
+    """
     if not _NESTJS_OVERLAY.is_dir():
         pytest.fail("templates-entra-nestjs/ does not exist yet (Red phase expected)")
     source = _combined_ts_source(_NESTJS_OVERLAY)
@@ -163,7 +192,10 @@ def test_when_nestjs_overlay_present_then_403_status_is_returned_on_insufficient
 
 
 def test_when_fastapi_overlay_present_then_pyjwkclient_is_used_for_jwks():
-    """FastAPI overlay must use PyJWKClient so key rotation is handled without hard-coding."""
+    """FastAPI overlay must use PyJWKClient so key rotation is handled without hard-coding.
+
+    Validates project_initializer/templates-entra-fastapi/**/*.py.
+    """
     if not _FASTAPI_OVERLAY.is_dir():
         pytest.fail("templates-entra-fastapi/ does not exist yet (Red phase expected)")
     source = _combined_python_source(_FASTAPI_OVERLAY)
@@ -173,7 +205,10 @@ def test_when_fastapi_overlay_present_then_pyjwkclient_is_used_for_jwks():
 
 
 def test_when_fastapi_overlay_present_then_no_hard_coded_refresh_interval_is_present():
-    """FastAPI overlay must not hard-code a JWKS refresh schedule (e.g. sleep or timer)."""
+    """FastAPI overlay must not hard-code a JWKS refresh schedule (e.g. sleep or timer).
+
+    Validates project_initializer/templates-entra-fastapi/**/*.py.
+    """
     if not _FASTAPI_OVERLAY.is_dir():
         pytest.fail("templates-entra-fastapi/ does not exist yet (Red phase expected)")
     source = _combined_python_source(_FASTAPI_OVERLAY)
@@ -191,7 +226,10 @@ def test_when_fastapi_overlay_present_then_no_hard_coded_refresh_interval_is_pre
 
 
 def test_when_nestjs_overlay_present_then_jwks_rsa_cache_is_enabled():
-    """NestJS overlay must pass cache: true to jwks-rsa so keys are cached on rotation."""
+    """NestJS overlay must pass cache: true to jwks-rsa so keys are cached on rotation.
+
+    Validates project_initializer/templates-entra-nestjs/**/*.ts.
+    """
     if not _NESTJS_OVERLAY.is_dir():
         pytest.fail("templates-entra-nestjs/ does not exist yet (Red phase expected)")
     source = _combined_ts_source(_NESTJS_OVERLAY)
@@ -205,7 +243,10 @@ def test_when_nestjs_overlay_present_then_jwks_rsa_cache_is_enabled():
 
 
 def test_when_nestjs_overlay_present_then_jwks_rsa_rate_limit_is_enabled():
-    """NestJS overlay must pass rateLimit: true to jwks-rsa to prevent JWKS flooding."""
+    """NestJS overlay must pass rateLimit: true to jwks-rsa to prevent JWKS flooding.
+
+    Validates project_initializer/templates-entra-nestjs/**/*.ts.
+    """
     if not _NESTJS_OVERLAY.is_dir():
         pytest.fail("templates-entra-nestjs/ does not exist yet (Red phase expected)")
     source = _combined_ts_source(_NESTJS_OVERLAY)

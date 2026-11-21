@@ -22,21 +22,27 @@ BASE_API = _TEMPLATES / "templates-api-fastapi" / "api"
 OVERLAY_API = _TEMPLATES / "templates-asyncdb-fastapi" / "api"
 
 DATABASE_ASYNC = "app/infrastructure/database_async.py"
-BASE_ASYNC = "app/infrastructure/repositories/base_async.py"
+ITEM_ASYNC = "app/infrastructure/repositories/item_async.py"
 OVERLAY_TEST = "tests/unit/test_async_db.py"
 
 
 def test_when_overlay_listed_async_modules_exist():
-    """when the overlay is listed, database_async + base_async modules exist."""
+    """when the overlay is listed, database_async + item_async modules exist.
+
+    Validates project_initializer/templates-asyncdb-fastapi/api/app/infrastructure/database_async.py, project_initializer/templates-asyncdb-fastapi/api/app/infrastructure/repositories/item_async.py and project_initializer/templates-asyncdb-fastapi/api/tests/unit/test_async_db.py.
+    """
     assert (OVERLAY_API / DATABASE_ASYNC).is_file()
-    assert (OVERLAY_API / BASE_ASYNC).is_file()
+    assert (OVERLAY_API / ITEM_ASYNC).is_file()
     assert (OVERLAY_API / OVERLAY_TEST).is_file()
 
 
 def test_when_base_template_inspected_async_modules_are_absent():
-    """when the base template is inspected, the async modules are NOT present (isolated)."""
+    """when the base template is inspected, the async modules are NOT present (isolated).
+
+    Validates project_initializer/templates-api-fastapi/api/app/infrastructure, which must hold neither database_async.py nor repositories/item_async.py.
+    """
     assert not (BASE_API / DATABASE_ASYNC).exists()
-    assert not (BASE_API / BASE_ASYNC).exists()
+    assert not (BASE_API / ITEM_ASYNC).exists()
 
 
 def _merge(dest: Path) -> Path:
@@ -58,23 +64,29 @@ def _merge(dest: Path) -> Path:
     return dest
 
 
-def test_when_async_overlay_test_run_async_crud_passes(tmp_path):
-    """when the overlay's async test is run on a merged tree, async CRUD passes."""
-    api = _merge(tmp_path / "api")
-    # Install dependencies from the merged requirements.txt (which includes asyncpg)
-    # Use the current Python's site-packages by running in the same environment
-    install_result = subprocess.run(
-        [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"],
+def _run_python_module(api: Path, *module_args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [sys.executable, "-m", *module_args],
         cwd=api,
         capture_output=True,
         text=True,
     )
+
+
+def test_when_async_overlay_test_run_async_crud_passes(tmp_path):
+    """when the overlay's async test is run on a merged tree, async CRUD passes.
+
+    Validates project_initializer/templates-asyncdb-fastapi/api/tests/unit/test_async_db.py.
+    """
+    api = _merge(tmp_path / "api")
+    # Install dependencies from the merged requirements.txt (which includes asyncpg)
+    # Use the current Python's site-packages by running in the same environment
+    install_result = _run_python_module(api, "pip", "install", "-r", "requirements.txt")
     if install_result.returncode != 0:
         raise RuntimeError(f"pip install failed: {install_result.stderr}")
-    result = subprocess.run(
-        [sys.executable, "-m", "pytest", OVERLAY_TEST, "--noconftest", "-q"],
-        cwd=api,
-        capture_output=True,
-        text=True,
+    # The base pytest.ini enforces a coverage gate for the whole suite; one test
+    # file cannot reach it.
+    result = _run_python_module(
+        api, "pytest", OVERLAY_TEST, "--noconftest", "-q", "--no-cov"
     )
     assert result.returncode == 0, result.stdout + result.stderr

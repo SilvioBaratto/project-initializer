@@ -67,50 +67,61 @@ def _read(path: Path) -> str:
 # ── [UNIT-1] APP_GUARD: token overlay ─────────────────────────────────────────
 
 
-def test_when_token_app_module_is_read_then_app_guard_is_registered():
+def test_when_token_app_auth_is_read_then_app_guard_is_registered():
     """
     Criterion: the token overlay registers its auth guard as APP_GUARD so routes
     are protected by default; missing this is the biggest security risk.
-    Assumption: the overlay provides an app.module.ts under templates-token-nestjs/api/.
+    Assumption: the root module is shared by all variants, so the overlay supplies its guard
+    through `app.auth.ts`, which `app.module.ts` spreads into its providers.
+
+    Validates project_initializer/templates-token-nestjs/api/src/app.auth.ts and project_initializer/templates-api-nestjs/api/src/app.module.ts.
     """
     ts_files = _ts_files(NESTJS_TOKEN_API)
     assert ts_files, "No .ts files found in templates-token-nestjs/api/"
 
-    app_modules = [f for f in ts_files if f.name.lower() in ("app.module.ts",)]
-    assert app_modules, (
-        "No app.module.ts found in templates-token-nestjs/api/; "
-        "the token overlay must provide an app module that registers APP_GUARD"
+    app_auth = [f for f in ts_files if f.name.lower() == "app.auth.ts"]
+    assert app_auth, (
+        "No app.auth.ts found in templates-token-nestjs/api/; "
+        "the token overlay must provide the seam that registers APP_GUARD"
     )
 
-    content = _read(app_modules[0])
+    content = _read(app_auth[0])
     assert "APP_GUARD" in content, (
-        f"APP_GUARD not registered in {app_modules[0]}; "
+        f"APP_GUARD not registered in {app_auth[0]}; "
         "the token auth guard must be a global APP_GUARD provider so all routes are protected"
+    )
+    assert "...AUTH_GUARDS" in _read(NESTJS_BASE_API / "src" / "app.module.ts"), (
+        "base app.module.ts must spread AUTH_GUARDS, or the overlay's guard is never registered"
     )
 
 
 # ── [UNIT-1] APP_GUARD: supabase overlay ─────────────────────────────────────
 
 
-def test_when_supabase_app_module_is_read_then_app_guard_is_registered():
+def test_when_supabase_app_auth_is_read_then_app_guard_is_registered():
     """
     Criterion: the supabase overlay registers its auth guard as APP_GUARD so routes
     are protected by default.
-    Assumption: the overlay provides an app.module.ts under templates-supabase-nestjs/api/.
+    Assumption: same seam as the token overlay: `app.auth.ts` supplies the guard provider.
+
+    Validates project_initializer/templates-supabase-nestjs/api/src/app.auth.ts and project_initializer/templates-api-nestjs/api/src/app.module.ts.
     """
     ts_files = _ts_files(NESTJS_SUPABASE_API)
     assert ts_files, "No .ts files found in templates-supabase-nestjs/api/"
 
-    app_modules = [f for f in ts_files if f.name.lower() in ("app.module.ts",)]
-    assert app_modules, (
-        "No app.module.ts found in templates-supabase-nestjs/api/; "
-        "the supabase overlay must provide an app module that registers APP_GUARD"
+    app_auth = [f for f in ts_files if f.name.lower() == "app.auth.ts"]
+    assert app_auth, (
+        "No app.auth.ts found in templates-supabase-nestjs/api/; "
+        "the supabase overlay must provide the seam that registers APP_GUARD"
     )
 
-    content = _read(app_modules[0])
+    content = _read(app_auth[0])
     assert "APP_GUARD" in content, (
-        f"APP_GUARD not registered in {app_modules[0]}; "
+        f"APP_GUARD not registered in {app_auth[0]}; "
         "the supabase auth guard must be a global APP_GUARD provider so all routes are protected"
+    )
+    assert "...AUTH_GUARDS" in _read(NESTJS_BASE_API / "src" / "app.module.ts"), (
+        "base app.module.ts must spread AUTH_GUARDS, or the overlay's guard is never registered"
     )
 
 
@@ -124,6 +135,8 @@ def test_when_config_module_setup_is_read_then_validate_option_is_present():
     ConfigModule.forRoot so startup aborts when required vars are absent.
     Assumption: the validate option appears in a .ts file in the base or any
     auth overlay.
+
+    Validates project_initializer/templates-api-nestjs/api/src/app.module.ts, found among the **/*.ts files of project_initializer/templates-{api,token,supabase}-nestjs/api.
     """
     ts_files = _ts_files(NESTJS_BASE_API, NESTJS_TOKEN_API, NESTJS_SUPABASE_API)
     validate_present = any(
@@ -141,6 +154,8 @@ def test_when_env_validation_schema_is_read_then_required_secrets_are_declared()
     Criterion: the env validation schema declares DATABASE_URL and SUPABASE_* as
     required so the app fails fast on missing secrets.
     Assumption: required var names appear in the same file as the validate logic.
+
+    Validates project_initializer/templates-api-nestjs/api/src/config/env.base.ts and project_initializer/templates-supabase-nestjs/api/src/config/env.validation.ts.
     """
     ts_files = _ts_files(NESTJS_BASE_API, NESTJS_TOKEN_API, NESTJS_SUPABASE_API)
 
@@ -168,6 +183,8 @@ def test_when_user_response_schema_is_read_then_password_field_is_not_exposed():
     sensitive columns (e.g. password) through the ZodSerializerInterceptor.
     Assumption: at least one response schema or DTO file exists for the User
     entity; it must not expose a `password` field.
+
+    Validates project_initializer/templates-api-nestjs/api/src/common/auth/user-info.dto.ts, found among the user schema and DTO files of project_initializer/templates-{api,token,supabase}-nestjs/api.
     """
     ts_files = _ts_files(NESTJS_BASE_API, NESTJS_TOKEN_API, NESTJS_SUPABASE_API)
     user_schemas = [
@@ -196,10 +213,13 @@ def test_when_user_response_schema_is_read_then_password_field_is_not_exposed():
 
 
 def _collect_response_schema_files() -> list[Path]:
+    # Specs are excluded: they define no schema, and the serialization spec has to name a
+    # `password` field to prove that the response schemas strip it.
     return [
         f
         for f in _ts_files(NESTJS_BASE_API, NESTJS_TOKEN_API, NESTJS_SUPABASE_API)
         if re.search(r"schema|dto|response", f.name, re.IGNORECASE)
+        and not f.name.endswith(".spec.ts")
     ]
 
 
@@ -216,6 +236,8 @@ if _SCHEMA_FILES:
         none expose a 'password' field.
         Derived from the criterion: "response schemas whitelist fields so Prisma rows
         cannot leak secret columns through the serializer."
+
+        Validates the schema, DTO and response .ts files, specs excluded, of project_initializer/templates-{api,token,supabase}-nestjs/api.
         """
         content = _read(schema_file)
         assert not re.search(r"\bpassword\b", content, re.IGNORECASE), (
@@ -234,37 +256,50 @@ else:
 # ── [UNIT-4] CLAUDE.md: BAML call flow documentation ─────────────────────────
 
 
+_BAML_CALL_FLOW_TERMS = (
+    (
+        "ChatbotService",
+        "ChatbotService",
+        "the doc must document controller → ChatbotService.chat / streamChat",
+    ),
+    (
+        "streamChat",
+        r"\bstreamChat\b",
+        "the call flow must document both chat and streamChat methods",
+    ),
+    (
+        "ChatProcessor",
+        "ChatProcessor",
+        "the BAML call flow must include the ChatProcessor worker",
+    ),
+    (
+        "baml_client",
+        "baml_client",
+        "the doc must state that the adapter calls the generated baml_client",
+    ),
+    ("b.Chat", r"b\.Chat", "the call flow must document the b.Chat entry point"),
+    (
+        "b.stream.Chat",
+        r"b\.stream\.Chat\b",
+        "the call flow must document the streaming b.stream.Chat entry point",
+    ),
+)
+
+
 def test_when_claude_md_is_read_then_baml_call_flow_is_documented():
     """
     Criterion: templates-api-nestjs/api/.claude/CLAUDE.md documents the BAML call
     flow: controller → ChatbotService.chat / streamChat and the ChatProcessor worker,
-    each dynamically importing baml_client and calling b.Chat / b.stream.StreamChat.
+    reaching baml_client through the chat-completion port and calling b.Chat / b.stream.Chat.
+
+    Validates project_initializer/docs_generator.py generate_api_claude().
     """
     content = _read(CLAUDE_MD_PATH)
 
-    assert "ChatbotService" in content, (
-        "CLAUDE.md does not mention ChatbotService; "
-        "the doc must document controller → ChatbotService.chat / streamChat"
-    )
-    assert re.search(r"\bstreamChat\b", content), (
-        "CLAUDE.md does not mention streamChat; "
-        "the call flow must document both chat and streamChat methods"
-    )
-    assert "ChatProcessor" in content, (
-        "CLAUDE.md does not mention ChatProcessor; "
-        "the BAML call flow must include the ChatProcessor worker"
-    )
-    assert "baml_client" in content, (
-        "CLAUDE.md does not mention baml_client; "
-        "the doc must state that each handler dynamically imports baml_client"
-    )
-    assert re.search(r"b\.Chat", content), (
-        "CLAUDE.md does not reference b.Chat; "
-        "the call flow must document the b.Chat entry point"
-    )
-    assert re.search(r"b\.stream\.StreamChat", content), (
-        "CLAUDE.md does not reference b.stream.StreamChat; "
-        "the call flow must document the streaming b.stream.StreamChat entry point"
+    for label, pattern, why in _BAML_CALL_FLOW_TERMS:
+        assert re.search(pattern, content), f"CLAUDE.md does not mention {label}; {why}"
+    assert "StreamChat" not in content, (
+        "CLAUDE.md still references the removed StreamChat BAML function"
     )
 
 

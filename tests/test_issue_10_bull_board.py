@@ -113,21 +113,39 @@ def test_when_monitoring_module_is_read_then_admin_queues_path_is_configured():
 # ---------------------------------------------------------------------------
 # Criterion [UNIT] S3:
 # The module is wired into app.module.ts for the base template and both
-# auth overlays (token, supabase).
+# auth overlays (token, supabase). There is one root module, shared by every
+# variant: it is only wired for the overlays while no overlay replaces it.
 # ---------------------------------------------------------------------------
 
-OVERLAY_APP_MODULES = [
-    pytest.param(NESTJS_BASE / "src" / "app.module.ts", id="base"),
-    pytest.param(NESTJS_TOKEN / "src" / "app.module.ts", id="token-overlay"),
-    pytest.param(NESTJS_SUPABASE / "src" / "app.module.ts", id="supabase-overlay"),
+BASE_APP_MODULE = NESTJS_BASE / "src" / "app.module.ts"
+OVERLAY_ROOTS = [
+    pytest.param(NESTJS_TOKEN, id="token-overlay"),
+    pytest.param(NESTJS_SUPABASE, id="supabase-overlay"),
 ]
 
 
-@pytest.mark.parametrize("app_module_path", OVERLAY_APP_MODULES)
-def test_when_app_module_is_read_then_monitoring_module_is_imported(app_module_path):
-    content = _read(app_module_path)
+def test_when_base_app_module_is_read_then_monitoring_module_is_imported():
+    """The shared root module wires the MonitoringModule that hosts the Bull Board.
+
+    Validates project_initializer/templates-api-nestjs/api/src/app.module.ts.
+    """
+    content = _read(BASE_APP_MODULE)
     assert "MonitoringModule" in content, (
-        f"MonitoringModule must appear in {app_module_path} imports"
+        f"MonitoringModule must appear in {BASE_APP_MODULE} imports"
+    )
+
+
+@pytest.mark.parametrize("overlay_root", OVERLAY_ROOTS)
+def test_when_overlay_is_listed_then_it_does_not_replace_the_shared_app_module(
+    overlay_root,
+):
+    """An overlay that shipped its own app.module.ts would silently drop MonitoringModule.
+
+    Validates project_initializer/templates-{token,supabase}-nestjs/api/src/app.module.ts absence.
+    """
+    assert not (overlay_root / "src" / "app.module.ts").exists(), (
+        f"{overlay_root} replaces app.module.ts; the monitoring module would not be wired "
+        "unless that copy imports it too. Wire auth through src/app.auth.ts instead."
     )
 
 
@@ -139,14 +157,18 @@ def test_when_app_module_is_read_then_monitoring_module_is_imported(app_module_p
 # ---------------------------------------------------------------------------
 
 
-def test_when_main_ts_is_read_then_global_prefix_api_v1_is_set():
+def test_when_app_setup_and_main_ts_are_read_then_global_prefix_api_v1_is_set():
     """
-    app.setGlobalPrefix('api/v1') must appear in main.ts so that
-    /admin/queues is reachable under /api/v1/admin/queues.
+    app.setGlobalPrefix('api/v1') must be applied at bootstrap so that
+    /admin/queues is reachable under /api/v1/admin/queues. The prefix is set in
+    configureApp (src/app.setup.ts), which main.ts calls before listening.
+
+    Validates project_initializer/templates-api-nestjs/api/src/app.setup.ts and project_initializer/templates-api-nestjs/api/src/main.ts.
     """
-    content = _read(NESTJS_BASE / "src" / "main.ts")
-    assert "setGlobalPrefix" in content
-    assert "api/v1" in content
+    setup = _read(NESTJS_BASE / "src" / "app.setup.ts")
+    assert "setGlobalPrefix" in setup
+    assert "api/v1" in setup
+    assert "configureApp(app)" in _read(NESTJS_BASE / "src" / "main.ts")
 
 
 def test_when_monitoring_module_is_read_then_guard_behavior_is_documented_inline():
@@ -206,18 +228,21 @@ def test_when_monitoring_spec_is_read_then_it_uses_create_testing_module():
 # ---------------------------------------------------------------------------
 
 AUTH_OVERLAY_APP_MODULES = [
-    pytest.param(NESTJS_TOKEN / "src" / "app.module.ts", id="token-overlay"),
-    pytest.param(NESTJS_SUPABASE / "src" / "app.module.ts", id="supabase-overlay"),
+    pytest.param(NESTJS_TOKEN / "src" / "app.auth.ts", id="token-overlay"),
+    pytest.param(NESTJS_SUPABASE / "src" / "app.auth.ts", id="supabase-overlay"),
 ]
 
 
 @pytest.mark.parametrize("app_module_path", AUTH_OVERLAY_APP_MODULES)
-def test_when_auth_overlay_app_module_is_read_then_app_guard_is_registered(
+def test_when_auth_overlay_app_auth_is_read_then_app_guard_is_registered(
     app_module_path,
 ):
     """
-    APP_GUARD must appear in the providers array so the guard fires on every
-    route by default. This is the biggest security risk if absent.
+    APP_GUARD must appear in the provider list the overlay hands to the shared root
+    module, so the guard fires on every route by default. This is the biggest
+    security risk if absent.
+
+    Validates project_initializer/templates-{token,supabase}-nestjs/api/src/app.auth.ts.
     """
     content = _read(app_module_path)
     assert "APP_GUARD" in content, (
@@ -248,6 +273,8 @@ def test_when_nestjs_src_is_scanned_then_database_url_appears_in_validation_sche
     """
     The validation schema must cover DATABASE_URL so the app fails fast when
     it is absent. At least one .ts file in the api/src tree must reference it.
+
+    Validates project_initializer/templates-api-nestjs/api/src/**/*.ts, where DATABASE_URL is declared in config/env.base.ts.
     """
     src_root = NESTJS_BASE / "src"
     ts_files = list(src_root.rglob("*.ts"))
@@ -279,11 +306,22 @@ def test_when_base_app_module_is_read_then_zod_serializer_interceptor_is_registe
 def test_when_response_schemas_are_scanned_then_password_field_is_absent_from_all():
     """
     Response schemas must not expose a 'password' field.
-    Assumption: response schemas are .ts files whose names contain 'response'
-    (NestJS convention). Each such file is checked independently.
+    Assumption: response schemas live in `dto/` directories or in .ts files whose
+    names contain 'response' (NestJS convention). Each such non-spec file is checked
+    independently, and the set must not be empty so the scan can never pass vacuously.
+
+    Validates project_initializer/templates-api-nestjs/api/src/**/dto/*.ts.
     """
     src_root = NESTJS_BASE / "src"
-    response_files = [f for f in src_root.rglob("*.ts") if "response" in f.name.lower()]
+    response_files = [
+        f
+        for f in src_root.rglob("*.ts")
+        if not f.name.endswith(".spec.ts")
+        and ("response" in f.name.lower() or f.parent.name == "dto")
+    ]
+    assert response_files, (
+        "no response schema file found under src/: the scan would be vacuous"
+    )
     for schema_file in response_files:
         content = _read(schema_file)
         assert "password" not in content, (

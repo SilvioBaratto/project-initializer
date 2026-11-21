@@ -30,6 +30,8 @@ NESTJS_TOKEN = PI / "templates-token-nestjs"
 NESTJS_SUPABASE = PI / "templates-supabase-nestjs"
 
 _APP_MODULE = Path("api/src/app.module.ts")
+# The root module is shared by all variants; an overlay registers its global guard in this seam.
+_APP_AUTH = Path("api/src/app.auth.ts")
 
 # Paths to the chatbot DTO and job-service spec within the base template.
 # Derived from criteria text: criteria mention ChatJobStatusSchema (a DTO), ChatJobStatusDto,
@@ -58,28 +60,32 @@ def _read_overlay(template_dir: Path, rel: Path) -> str:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def test_when_token_overlay_app_module_is_read_then_auth_guard_is_registered_as_app_guard():
+def test_when_token_overlay_app_auth_is_read_then_access_token_guard_is_registered_as_app_guard():
     """AuthGuard must be provided as APP_GUARD so every route is protected by default;
-    without it, token-auth routes are open to unauthenticated callers."""
-    content = _read_overlay(NESTJS_TOKEN, _APP_MODULE)
+    without it, token-auth routes are open to unauthenticated callers.
+
+    Validates project_initializer/templates-token-nestjs/api/src/app.auth.ts.
+    """
+    content = _read_overlay(NESTJS_TOKEN, _APP_AUTH)
     assert "APP_GUARD" in content, (
-        "token overlay app.module.ts must declare APP_GUARD — "
+        "token overlay app.auth.ts must declare APP_GUARD — "
         "without it routes are unprotected by default"
     )
-    assert "AuthGuard" in content, (
-        "token overlay app.module.ts must reference AuthGuard as the APP_GUARD useClass"
+    assert "AccessTokenGuard" in content, (
+        "token overlay app.auth.ts must reference AccessTokenGuard as the APP_GUARD useClass"
     )
 
 
-def test_when_supabase_overlay_app_module_is_read_then_supabase_auth_guard_is_registered_as_app_guard():
+def test_when_supabase_overlay_app_auth_is_read_then_access_token_guard_is_registered_as_app_guard():
     """SupabaseAuthGuard must be provided as APP_GUARD so every route is protected by
-    default in the Supabase variant."""
-    content = _read_overlay(NESTJS_SUPABASE, _APP_MODULE)
-    assert "APP_GUARD" in content, (
-        "supabase overlay app.module.ts must declare APP_GUARD"
-    )
-    assert "SupabaseAuthGuard" in content, (
-        "supabase overlay app.module.ts must reference SupabaseAuthGuard as the APP_GUARD useClass"
+    default in the Supabase variant.
+
+    Validates project_initializer/templates-supabase-nestjs/api/src/app.auth.ts.
+    """
+    content = _read_overlay(NESTJS_SUPABASE, _APP_AUTH)
+    assert "APP_GUARD" in content, "supabase overlay app.auth.ts must declare APP_GUARD"
+    assert "AccessTokenGuard" in content, (
+        "supabase overlay app.auth.ts must reference AccessTokenGuard as the APP_GUARD useClass"
     )
 
 
@@ -109,7 +115,10 @@ def test_when_base_app_module_is_read_then_config_module_receives_a_validate_fun
 def test_when_dto_files_are_scanned_then_no_dto_exposes_a_password_field():
     """All *.dto.ts files in the base NestJS template must not expose a 'password' field.
     The ZodSerializerInterceptor whitelists by the response schema, so any field declared
-    in a response schema can be serialised to the client — password must not appear."""
+    in a response schema can be serialised to the client — password must not appear.
+
+    Validates project_initializer/templates-api-nestjs/api/src/**/*.dto.ts.
+    """
     src_dir = NESTJS_BASE / "api" / "src"
     assert src_dir.exists(), f"Expected NestJS src dir not found: {src_dir}"
     dto_files = list(src_dir.rglob("*.dto.ts"))

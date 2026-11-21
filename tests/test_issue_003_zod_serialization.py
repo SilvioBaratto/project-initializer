@@ -20,11 +20,17 @@ from hypothesis import given, strategies as st
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TPL = REPO_ROOT / "project_initializer"
 
+# One root module serves every variant; an overlay registers its guard through `app.auth.ts`.
 BASE_APP_MODULE = TPL / "templates-api-nestjs/api/src/app.module.ts"
-TOKEN_APP_MODULE = TPL / "templates-token-nestjs/api/src/app.module.ts"
-SUPABASE_APP_MODULE = TPL / "templates-supabase-nestjs/api/src/app.module.ts"
+TOKEN_APP_MODULE = TPL / "templates-token-nestjs/api/src/app.auth.ts"
+SUPABASE_APP_MODULE = TPL / "templates-supabase-nestjs/api/src/app.auth.ts"
+OVERLAY_ROOT_MODULES = [
+    (TPL / "templates-token-nestjs/api/src/app.module.ts", "token"),
+    (TPL / "templates-supabase-nestjs/api/src/app.module.ts", "supabase"),
+]
 
-BASE_ENV_VALIDATION = TPL / "templates-api-nestjs/api/src/config/env.validation.ts"
+# The shared platform keys (DATABASE_URL, ...) are declared once, in the base env module.
+BASE_ENV_VALIDATION = TPL / "templates-api-nestjs/api/src/config/env.base.ts"
 SUPABASE_ENV_VALIDATION = (
     TPL / "templates-supabase-nestjs/api/src/config/env.validation.ts"
 )
@@ -84,8 +90,12 @@ def _has_passthrough(text: str) -> bool:
 
 
 def _has_zod_serializer_dto_decorator(text: str) -> bool:
-    """Criterion E: handler annotated with @ZodSerializerDto to enforce response schema."""
-    return "@ZodSerializerDto" in text
+    """Criterion E: handler annotated to enforce its response schema.
+
+    `@ZodResponse(...)` is the nestjs-zod decorator that bundles `@ZodSerializerDto`, the
+    status code and the OpenAPI response, so it enforces the schema the same way.
+    """
+    return "@ZodSerializerDto" in text or "@ZodResponse(" in text
 
 
 def _has_http_data_handler(text: str) -> bool:
@@ -105,20 +115,23 @@ def _has_http_data_handler(text: str) -> bool:
         (SUPABASE_APP_MODULE, "supabase"),
     ],
 )
-def test_when_auth_overlay_module_is_read_then_app_guard_is_registered(
+def test_when_auth_overlay_app_auth_is_read_then_app_guard_is_registered(
     module_path: Path, variant: str
 ) -> None:
     """
-    The token and supabase overlay app modules must register their auth guard as APP_GUARD
-    so every route is protected by default; opt-out is only possible via @Public().
+    The token and supabase overlays must register their auth guard as APP_GUARD (in
+    `app.auth.ts`, which the shared root module spreads in) so every route is protected by
+    default; opt-out is only possible via @Public().
     Derived from: 'auth guard registered as APP_GUARD in both the token and supabase overlays'.
+
+    Validates project_initializer/templates-{token,supabase}-nestjs/api/src/app.auth.ts.
     """
     assert module_path.exists(), (
-        f"[{variant}] app.module.ts not found: {module_path}. "
-        "The overlay must provide an app.module.ts that wires the auth guard."
+        f"[{variant}] app.auth.ts not found: {module_path}. "
+        "The overlay must provide an app.auth.ts that wires the auth guard."
     )
     assert _has_app_guard(_read(module_path)), (
-        f"[{variant}] app.module.ts must contain APP_GUARD. "
+        f"[{variant}] app.auth.ts must contain APP_GUARD. "
         "Without it the auth guard is not applied globally and all routes are unprotected."
     )
 
@@ -146,17 +159,19 @@ def test_when_base_app_module_is_read_then_config_module_declares_validate_optio
 
 def test_when_base_env_validation_is_read_then_database_url_is_required() -> None:
     """
-    The base env.validation.ts Zod schema must require DATABASE_URL so that a missing
+    The base env.base.ts Zod schema must require DATABASE_URL so that a missing
     database connection string causes a fast-fail at process startup.
     Derived from: 'fails fast on missing secrets (e.g. DATABASE_URL, SUPABASE_*)'.
     Note: validate() is imported into app.module.ts, so the effective validation lives
-    in config/env.validation.ts, not app.module.ts itself.
+    in config/env.base.ts (via config/env.validation.ts), not app.module.ts itself.
+
+    Validates project_initializer/templates-api-nestjs/api/src/config/env.base.ts.
     """
     assert BASE_ENV_VALIDATION.exists(), (
-        f"Base env.validation.ts not found: {BASE_ENV_VALIDATION}"
+        f"Base env.base.ts not found: {BASE_ENV_VALIDATION}"
     )
     assert "DATABASE_URL" in _read(BASE_ENV_VALIDATION), (
-        "Base env.validation.ts must declare DATABASE_URL in the Zod schema so a missing "
+        "Base env.base.ts must declare DATABASE_URL in the Zod schema so a missing "
         "DB connection string fails the process at startup."
     )
 
@@ -184,21 +199,33 @@ def test_when_supabase_env_validation_is_read_then_supabase_vars_are_required() 
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-@pytest.mark.parametrize(
-    "module_path,label",
-    [
-        (BASE_APP_MODULE, "base"),
-        (TOKEN_APP_MODULE, "token"),
-        (SUPABASE_APP_MODULE, "supabase"),
-    ],
-)
+@pytest.mark.parametrize("module_path,label", OVERLAY_ROOT_MODULES)
+def test_when_overlay_is_listed_then_it_does_not_replace_the_shared_app_module(
+    module_path: Path, label: str
+) -> None:
+    """
+    The pipe and the interceptor below are registered once, in the base app.module.ts, for
+    all three variants. An overlay that shipped its own app.module.ts would have to repeat
+    both registrations, so it must not.
+
+    Validates project_initializer/templates-{token,supabase}-nestjs/api/src/app.module.ts absence.
+    """
+    assert not module_path.exists(), (
+        f"[{label}] ships its own app.module.ts: {module_path}. "
+        "Wire authentication through app.auth.ts so the global pipe and interceptor stay shared."
+    )
+
+
+@pytest.mark.parametrize("module_path,label", [(BASE_APP_MODULE, "base")])
 def test_when_app_module_is_read_then_zod_validation_pipe_is_registered_as_app_pipe(
     module_path: Path, label: str
 ) -> None:
     """
-    Every app.module.ts variant must provide ZodValidationPipe as APP_PIPE so all incoming
+    The shared app.module.ts must provide ZodValidationPipe as APP_PIPE so all incoming
     request bodies are validated and unknown properties are stripped globally.
-    Derived from: 'ZodValidationPipe (APP_PIPE) … registered globally in all three app.module.ts files'.
+    Derived from: 'ZodValidationPipe (APP_PIPE) … registered globally in all three variants'.
+
+    Validates project_initializer/templates-api-nestjs/api/src/app.module.ts.
     """
     assert module_path.exists(), f"[{label}] app.module.ts not found: {module_path}"
     assert _has_app_pipe_zod(_read(module_path)), (
@@ -207,21 +234,16 @@ def test_when_app_module_is_read_then_zod_validation_pipe_is_registered_as_app_p
     )
 
 
-@pytest.mark.parametrize(
-    "module_path,label",
-    [
-        (BASE_APP_MODULE, "base"),
-        (TOKEN_APP_MODULE, "token"),
-        (SUPABASE_APP_MODULE, "supabase"),
-    ],
-)
+@pytest.mark.parametrize("module_path,label", [(BASE_APP_MODULE, "base")])
 def test_when_app_module_is_read_then_zod_serializer_interceptor_is_registered_as_app_interceptor(
     module_path: Path, label: str
 ) -> None:
     """
-    Every app.module.ts variant must provide ZodSerializerInterceptor as APP_INTERCEPTOR so
+    The shared app.module.ts must provide ZodSerializerInterceptor as APP_INTERCEPTOR so
     response schemas are enforced globally and unlisted fields are stripped before serialization.
-    Derived from: 'ZodSerializerInterceptor (APP_INTERCEPTOR) … registered globally in all three app.module.ts files'.
+    Derived from: 'ZodSerializerInterceptor (APP_INTERCEPTOR) … registered globally in all three variants'.
+
+    Validates project_initializer/templates-api-nestjs/api/src/app.module.ts.
     """
     assert module_path.exists(), f"[{label}] app.module.ts not found: {module_path}"
     assert _has_app_interceptor_zod(_read(module_path)), (
@@ -244,6 +266,8 @@ def test_when_all_dto_files_are_read_then_no_schema_calls_passthrough() -> None:
     unlisted fields (e.g. 'password') through the serializer unfiltered.
     Derived from: 'Every response schema is a plain z.object() (no .passthrough())' and
                   'Request DTO schemas are z.object() so unknown request properties are stripped'.
+
+    Validates project_initializer/templates-{api,token,supabase}-nestjs/api/src/**/*.dto.ts.
     """
     all_dto_files = [f for root in _ALL_TEMPLATE_ROOTS for f in _dto_files_under(root)]
     assert all_dto_files, (
@@ -276,8 +300,21 @@ def test_when_source_text_contains_passthrough_then_detector_returns_true(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Criterion E — every data-returning handler is decorated with @ZodSerializerDto
+# Criterion E — every data-returning handler is decorated with @ZodSerializerDto (or @ZodResponse)
 # ══════════════════════════════════════════════════════════════════════════════
+
+
+def _all_controller_files() -> list[Path]:
+    return [f for root in _ALL_TEMPLATE_ROOTS for f in _controller_files_under(root)]
+
+
+def _controllers_without_zod_serializer(controllers: list[Path]) -> list[str]:
+    return [
+        str(p)
+        for p in controllers
+        if _has_http_data_handler(_read(p))
+        and not _has_zod_serializer_dto_decorator(_read(p))
+    ]
 
 
 def test_when_all_controller_files_are_read_then_data_handlers_carry_zod_serializer_dto() -> (
@@ -285,7 +322,7 @@ def test_when_all_controller_files_are_read_then_data_handlers_carry_zod_seriali
 ):
     """
     Every controller file that declares at least one HTTP handler (GET/POST/PUT/PATCH/DELETE)
-    must contain at least one @ZodSerializerDto decorator so the Zod serializer enforces the
+    must contain at least one @ZodSerializerDto or @ZodResponse decorator so the Zod serializer enforces the
     response schema and strips unlisted fields per-handler.
 
     Assumption: a controller that declares standard HTTP-method handlers is considered to return
@@ -293,20 +330,15 @@ def test_when_all_controller_files_are_read_then_data_handlers_carry_zod_seriali
     implicitly excluded, consistent with the criterion text 'not a static literal or SSE stream'.
 
     Derived from: 'Every handler returning entity/data … is decorated with @ZodSerializerDto(<ResponseDto>)'.
+
+    Validates the *.controller.ts files under project_initializer/templates-api-nestjs/api/src, project_initializer/templates-token-nestjs/api/src and project_initializer/templates-supabase-nestjs/api/src.
     """
-    all_ctrl_files = [
-        f for root in _ALL_TEMPLATE_ROOTS for f in _controller_files_under(root)
-    ]
+    all_ctrl_files = _all_controller_files()
     assert all_ctrl_files, (
         "No controller files found under any NestJS template tree. "
         "At minimum chatbot.controller.ts must exist under templates-api-nestjs/."
     )
-    missing = [
-        str(p)
-        for p in all_ctrl_files
-        if _has_http_data_handler(_read(p))
-        and not _has_zod_serializer_dto_decorator(_read(p))
-    ]
+    missing = _controllers_without_zod_serializer(all_ctrl_files)
     assert not missing, (
         "These controller files declare HTTP handlers but are missing @ZodSerializerDto:\n"
         + "\n".join(f"  {m}" for m in missing)
@@ -332,6 +364,8 @@ def test_when_serialization_spec_is_searched_then_it_exists() -> None:
     serialization.spec.ts must exist somewhere under the NestJS API template source tree.
     Its absence means neither the password-stripping nor the SSE-metadata assertion is covered.
     Derived from: 'Existing serialization.spec.ts passes'.
+
+    Validates project_initializer/templates-api-nestjs/api/src/serialization.spec.ts.
     """
     spec = _find_serialization_spec()
     assert spec is not None and spec.exists(), (
@@ -346,6 +380,8 @@ def test_when_serialization_spec_is_read_then_it_asserts_password_is_stripped() 
     serialization.spec.ts must contain an assertion that verifies a 'password' field injected
     into a Prisma-like object is absent from the serialized response.
     Derived from: 'injected password stripped' in the serialization.spec.ts criterion.
+
+    Validates project_initializer/templates-api-nestjs/api/src/serialization.spec.ts.
     """
     spec = _find_serialization_spec()
     assert spec is not None and spec.exists(), (
@@ -364,6 +400,8 @@ def test_when_serialization_spec_is_read_then_it_asserts_sse_handler_has_no_seri
     serialization.spec.ts must reference the SSE handler and assert it carries no
     @ZodSerializerDto metadata, so SSE streams bypass the response schema enforcer.
     Derived from: 'SSE handler carries no serializer metadata' in the serialization.spec.ts criterion.
+
+    Validates project_initializer/templates-api-nestjs/api/src/serialization.spec.ts.
     """
     spec = _find_serialization_spec()
     assert spec is not None and spec.exists(), (

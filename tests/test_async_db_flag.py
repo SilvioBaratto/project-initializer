@@ -7,10 +7,12 @@ deps; flag-off byte-identical to today).
 """
 
 import hashlib
+from pathlib import Path
 
 import pytest
 
 import project_initializer.cli as cli
+from project_initializer.env_generator import GENERATED_SECRET_KEYS
 from project_initializer.cli import (
     app,
     copy_template,
@@ -41,9 +43,22 @@ def _srcs(layers):
     return [src for src, _skip, _t in layers]
 
 
+def _masked_env_bytes(env_path):
+    """The .env with generated secret values blanked: those differ on every scaffold."""
+    lines = []
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        key, _, _ = line.partition("=")
+        lines.append(f"{key}=" if key in GENERATED_SECRET_KEYS else line)
+    return "\n".join(lines).encode("utf-8")
+
+
 def _tree_hashes(root):
     return {
-        str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest()
+        str(p.relative_to(root)): hashlib.sha256(
+            _masked_env_bytes(p)
+            if p.relative_to(root) == Path(".env")
+            else p.read_bytes()
+        ).hexdigest()
         for p in sorted(root.rglob("*"))
         if p.is_file()
     }
@@ -125,11 +140,14 @@ def test_when_requirements_already_has_asyncpg_transform_is_idempotent():
 
 @pytest.mark.parametrize("scope", ["api", "fullstack"])
 def test_when_scaffolded_with_async_db_async_files_exist(tmp_path, scope):
-    """when scaffolded with --async-db, the async DB modules are present."""
+    """when scaffolded with --async-db, the async DB modules are present.
+
+    Validates project_initializer/cli.py copy_template() and project_initializer/templates-asyncdb-fastapi/api/app/infrastructure.
+    """
     copy_template(tmp_path, "app", framework="fastapi", scope=scope, async_db=True)
     assert (tmp_path / "api" / "app" / "infrastructure" / "database_async.py").exists()
     assert (
-        tmp_path / "api" / "app" / "infrastructure" / "repositories" / "base_async.py"
+        tmp_path / "api" / "app" / "infrastructure" / "repositories" / "item_async.py"
     ).exists()
 
 
@@ -164,7 +182,13 @@ def test_when_supabase_scaffolded_with_async_db_requirements_has_async_deps(tmp_
 def test_when_async_db_false_scaffold_is_byte_identical_to_default(
     tmp_path, scope, auth
 ):
-    """when async_db is False, the tree equals the no-flag default byte-for-byte."""
+    """when async_db is False, the tree equals the no-flag default byte-for-byte.
+
+    The root .env is compared with its generated secret values blanked, because
+    every scaffold draws fresh ones.
+
+    Validates project_initializer/cli.py copy_template().
+    """
     default = tmp_path / "default"
     explicit = tmp_path / "explicit"
     copy_template(default, "app", auth=auth, framework="fastapi", scope=scope)

@@ -25,16 +25,18 @@ _SUPABASE_OVERLAY = _PKG / "templates-supabase-nestjs" / "api"
 # ---------------------------------------------------------------------------
 
 
-def test_when_token_overlay_app_module_is_read_then_APP_GUARD_is_registered():
+def test_when_token_overlay_app_auth_is_read_then_APP_GUARD_is_registered():
     """
-    Assumption: NestJS convention — the app module in the overlay registers global
-    providers; APP_GUARD must appear in that file to protect routes by default.
+    Assumption: the root module is shared; the overlay's `src/app.auth.ts` supplies the
+    global providers, and APP_GUARD must appear there to protect routes by default.
+
+    Validates project_initializer/templates-token-nestjs/api/src/app.auth.ts.
     """
-    candidates = list((_TOKEN_OVERLAY / "src").rglob("app.module.ts"))
-    assert candidates, "token overlay must contain src/app.module.ts"
+    candidates = list((_TOKEN_OVERLAY / "src").rglob("app.auth.ts"))
+    assert candidates, "token overlay must contain src/app.auth.ts"
     content = candidates[0].read_text(encoding="utf-8")
     assert "APP_GUARD" in content, (
-        "token overlay app.module.ts must register the auth guard as APP_GUARD"
+        "token overlay app.auth.ts must register the auth guard as APP_GUARD"
     )
 
 
@@ -44,15 +46,17 @@ def test_when_token_overlay_app_module_is_read_then_APP_GUARD_is_registered():
 # ---------------------------------------------------------------------------
 
 
-def test_when_supabase_overlay_app_module_is_read_then_APP_GUARD_is_registered():
+def test_when_supabase_overlay_app_auth_is_read_then_APP_GUARD_is_registered():
     """
     Assumption: same convention as token overlay.
+
+    Validates project_initializer/templates-supabase-nestjs/api/src/app.auth.ts.
     """
-    candidates = list((_SUPABASE_OVERLAY / "src").rglob("app.module.ts"))
-    assert candidates, "supabase overlay must contain src/app.module.ts"
+    candidates = list((_SUPABASE_OVERLAY / "src").rglob("app.auth.ts"))
+    assert candidates, "supabase overlay must contain src/app.auth.ts"
     content = candidates[0].read_text(encoding="utf-8")
     assert "APP_GUARD" in content, (
-        "supabase overlay app.module.ts must register the auth guard as APP_GUARD"
+        "supabase overlay app.auth.ts must register the auth guard as APP_GUARD"
     )
 
 
@@ -82,6 +86,8 @@ def test_when_config_validation_is_read_then_DATABASE_URL_is_a_required_key():
     Criterion: fails fast on missing DATABASE_URL.
     Assumption: the env-validation schema (wherever defined under src/) names
     DATABASE_URL as a required field.
+
+    Validates project_initializer/templates-api-nestjs/api/src/**/*.ts, where DATABASE_URL is declared in config/env.base.ts.
     """
     src = _NESTJS_BASE / "src"
     hits = [
@@ -107,6 +113,8 @@ def test_when_response_schema_files_are_read_then_password_is_not_a_whitelisted_
     files under src/ (the template uses CreateZodDto/createZodDto pattern). Files
     whose names contain 'response' OR end in '.dto.ts' are considered response-schema
     candidates.
+
+    Validates project_initializer/templates-api-nestjs/api/src/**/*.dto.ts and **/*response*.ts.
     """
     src = _NESTJS_BASE / "src"
     response_schema_files = [
@@ -134,6 +142,8 @@ def test_when_src_tree_is_searched_then_at_least_one_service_spec_uses_TestingMo
     """
     Criterion: at least one service unit spec using Test.createTestingModule exists.
     Assumption: service specs follow NestJS naming convention *.service.spec.ts.
+
+    Validates project_initializer/templates-api-nestjs/api/src/**/*.service.spec.ts.
     """
     src = _NESTJS_BASE / "src"
     service_specs = [

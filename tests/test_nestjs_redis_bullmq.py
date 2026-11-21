@@ -22,7 +22,11 @@ NESTJS_TOKEN = TEMPLATES / "templates-token-nestjs"
 NESTJS_SUPABASE = TEMPLATES / "templates-supabase-nestjs"
 
 _APP_MODULE = Path("api/src/app.module.ts")
+# The root module is shared by all variants; an overlay registers its guard in this seam.
+_APP_AUTH = Path("api/src/app.auth.ts")
 _ENV_VALIDATION = Path("api/src/config/env.validation.ts")
+# The platform keys (DATABASE_URL, REDIS_*) are declared once, in the base env module.
+_BASE_ENV = Path("api/src/config/env.base.ts")
 _DOCKER_COMPOSE = Path("docker-compose.yml")
 
 
@@ -42,25 +46,31 @@ def _parse_compose(template_dir: Path) -> dict:
 # ── auth guard registered as APP_GUARD (biggest security risk if missing) ─────
 
 
-def test_when_token_overlay_app_module_is_read_then_auth_guard_is_registered_as_app_guard():
-    """AuthGuard must appear as the useClass of an APP_GUARD provider so every route is
-    protected by default; opt-out is only via @Public()."""
-    content = _read(NESTJS_TOKEN, _APP_MODULE)
-    assert "APP_GUARD" in content, "token overlay app.module.ts must register APP_GUARD"
-    assert "AuthGuard" in content, (
-        "token overlay app.module.ts must reference AuthGuard"
+def test_when_token_overlay_app_auth_is_read_then_access_token_guard_is_registered_as_app_guard():
+    """AccessTokenGuard must appear as the useClass of an APP_GUARD provider so every route
+    is protected by default; opt-out is only via @Public().
+
+    Validates project_initializer/templates-token-nestjs/api/src/app.auth.ts.
+    """
+    content = _read(NESTJS_TOKEN, _APP_AUTH)
+    assert "APP_GUARD" in content, "token overlay app.auth.ts must register APP_GUARD"
+    assert "AccessTokenGuard" in content, (
+        "token overlay app.auth.ts must reference AccessTokenGuard"
     )
 
 
-def test_when_supabase_overlay_app_module_is_read_then_supabase_auth_guard_is_registered_as_app_guard():
-    """SupabaseAuthGuard must appear as the useClass of an APP_GUARD provider so every
-    route is protected by default; opt-out is only via @Public()."""
-    content = _read(NESTJS_SUPABASE, _APP_MODULE)
+def test_when_supabase_overlay_app_auth_is_read_then_access_token_guard_is_registered_as_app_guard():
+    """AccessTokenGuard must appear as the useClass of an APP_GUARD provider so every
+    route is protected by default; opt-out is only via @Public().
+
+    Validates project_initializer/templates-supabase-nestjs/api/src/app.auth.ts.
+    """
+    content = _read(NESTJS_SUPABASE, _APP_AUTH)
     assert "APP_GUARD" in content, (
-        "supabase overlay app.module.ts must register APP_GUARD"
+        "supabase overlay app.auth.ts must register APP_GUARD"
     )
-    assert "SupabaseAuthGuard" in content, (
-        "supabase overlay app.module.ts must reference SupabaseAuthGuard"
+    assert "AccessTokenGuard" in content, (
+        "supabase overlay app.auth.ts must reference AccessTokenGuard"
     )
 
 
@@ -78,10 +88,13 @@ def test_when_base_app_module_is_read_then_config_module_receives_a_validate_fun
 
 
 def test_when_base_env_validation_file_is_read_then_database_url_is_a_required_field():
-    """env.validation must declare DATABASE_URL as required so a missing value is caught
-    at application startup."""
-    content = _read(NESTJS_BASE, _ENV_VALIDATION)
-    assert "DATABASE_URL" in content, "env.validation must validate DATABASE_URL"
+    """The base env module must declare DATABASE_URL as required so a missing value is caught
+    at application startup.
+
+    Validates project_initializer/templates-api-nestjs/api/src/config/env.base.ts.
+    """
+    content = _read(NESTJS_BASE, _BASE_ENV)
+    assert "DATABASE_URL" in content, "env.base.ts must validate DATABASE_URL"
 
 
 def test_when_supabase_overlay_env_validation_is_read_then_supabase_url_is_a_required_field():
@@ -100,7 +113,10 @@ def test_when_response_dtos_are_scanned_then_no_password_field_is_exposed():
     """All response DTO/schema files in the base NestJS template must not expose a
     'password' field — Prisma rows must never leak secret columns through the serialiser.
     Scans all *.dto.ts files under templates-api-nestjs/api/src/ and fails if any
-    response-facing schema declares a 'password' property."""
+    response-facing schema declares a 'password' property.
+
+    Validates project_initializer/templates-api-nestjs/api/src/**/*.dto.ts.
+    """
     src_dir = NESTJS_BASE / "api" / "src"
     assert src_dir.exists(), f"Expected NestJS src directory not found: {src_dir}"
     dto_files = list(src_dir.rglob("*.dto.ts"))
@@ -135,20 +151,18 @@ def test_when_base_app_module_is_read_then_bull_module_is_registered_with_redis_
         (NESTJS_SUPABASE, "supabase"),
     ],
 )
-def test_when_auth_overlay_app_module_is_read_then_bull_module_uses_redis_env_vars(
+def test_when_auth_overlay_is_listed_then_bull_module_comes_from_the_shared_app_module(
     overlay_dir: Path, label: str
 ) -> None:
-    """Auth overlay app.module.ts must configure BullModule with REDIS_HOST / REDIS_PORT
-    so the queue connection is environment-driven in all three NestJS variants."""
-    content = _read(overlay_dir, _APP_MODULE)
-    assert "BullModule" in content, (
-        f"{label} overlay app.module.ts must import BullModule"
-    )
-    assert "REDIS_HOST" in content, (
-        f"{label} overlay app.module.ts must reference REDIS_HOST"
-    )
-    assert "REDIS_PORT" in content, (
-        f"{label} overlay app.module.ts must reference REDIS_PORT"
+    """The queue connection is environment-driven in all three NestJS variants because they
+    share the one base app.module.ts (asserted above). An overlay that shipped its own copy
+    could drop or hard-code the Redis wiring, so it must not.
+
+    Validates project_initializer/templates-{token,supabase}-nestjs/api/src/app.module.ts absence.
+    """
+    assert not (overlay_dir / _APP_MODULE).exists(), (
+        f"{label} overlay ships its own app.module.ts; it would have to configure "
+        "BullModule with REDIS_HOST / REDIS_PORT itself. Use src/app.auth.ts instead."
     )
 
 
@@ -157,21 +171,27 @@ def test_when_auth_overlay_app_module_is_read_then_bull_module_uses_redis_env_va
 
 def test_when_env_validation_is_evaluated_then_redis_host_defaults_to_localhost():
     """env.validation must declare REDIS_HOST with a default of 'localhost' so the app
-    starts without explicit Redis config in local development."""
-    content = _read(NESTJS_BASE, _ENV_VALIDATION)
-    assert "REDIS_HOST" in content, "env.validation must declare REDIS_HOST"
+    starts without explicit Redis config in local development.
+
+    Validates project_initializer/templates-api-nestjs/api/src/config/env.base.ts.
+    """
+    content = _read(NESTJS_BASE, _BASE_ENV)
+    assert "REDIS_HOST" in content, "env.base.ts must declare REDIS_HOST"
     assert "localhost" in content, (
-        "env.validation must provide 'localhost' as the default for REDIS_HOST"
+        "env.base.ts must provide 'localhost' as the default for REDIS_HOST"
     )
 
 
 def test_when_env_validation_is_evaluated_then_redis_port_defaults_to_6379():
     """env.validation must declare REDIS_PORT with a default of 6379 so the app starts
-    without explicit Redis config in local development."""
-    content = _read(NESTJS_BASE, _ENV_VALIDATION)
-    assert "REDIS_PORT" in content, "env.validation must declare REDIS_PORT"
+    without explicit Redis config in local development.
+
+    Validates project_initializer/templates-api-nestjs/api/src/config/env.base.ts.
+    """
+    content = _read(NESTJS_BASE, _BASE_ENV)
+    assert "REDIS_PORT" in content, "env.base.ts must declare REDIS_PORT"
     assert "6379" in content, (
-        "env.validation must provide 6379 as the default for REDIS_PORT"
+        "env.base.ts must provide 6379 as the default for REDIS_PORT"
     )
 
 
@@ -231,14 +251,18 @@ def test_when_docker_compose_is_read_then_api_service_depends_on_redis_being_hea
 
 def test_when_base_app_module_is_read_then_queue_monitor_module_is_registered():
     """Base app.module.ts must import and register a queue-monitor module.
-    Assumption: the module follows the conventional naming QueueMonitorModule or
-    uses @bull-board/nestjs (BullBoardModule); either satisfies the criterion."""
+    Assumption: the module follows the conventional naming QueueMonitorModule, wraps
+    @bull-board/nestjs (BullBoardModule) or is the MonitoringModule that hosts the
+    dashboard behind its fail-closed gate; any of them satisfies the criterion.
+
+    Validates project_initializer/templates-api-nestjs/api/src/app.module.ts.
+    """
     content = _read(NESTJS_BASE, _APP_MODULE)
     assert re.search(
-        r"QueueMonitor\w*Module|BullBoard\w*Module|queue[-_]monitor",
+        r"QueueMonitor\w*Module|BullBoard\w*Module|Monitoring\w*Module|queue[-_]monitor",
         content,
         re.IGNORECASE,
     ), (
         "app.module.ts must register a queue-monitor module "
-        "(e.g. QueueMonitorModule or BullBoardModule from @bull-board/nestjs)"
+        "(e.g. MonitoringModule, QueueMonitorModule or BullBoardModule from @bull-board/nestjs)"
     )
