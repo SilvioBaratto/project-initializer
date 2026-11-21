@@ -2,10 +2,10 @@
 
 The database URL comes from the application settings (``DIRECT_DATABASE_URL``,
 falling back to ``DATABASE_URL``), so migrations and the application read the
-same configuration and the connection arguments, TLS mode included, stay in one
-place. Logging goes through the application's structured logger rather than
-Alembic's ``fileConfig``, so migration output carries the same timestamps and
-format as the rest of the service.
+same configuration, and the driver choice and the connection arguments, TLS mode
+included, stay in one place. Logging goes through the application's structured
+logger rather than Alembic's ``fileConfig``, so migration output carries the
+same timestamps and format as the rest of the service.
 
 A caller that embeds the migrations, such as the test suite, sets
 ``config.attributes["embedded"]``: the environment and logging are then left as
@@ -31,7 +31,10 @@ embedded = config.attributes.get(EMBEDDED_ATTRIBUTE, False)
 if not embedded:
     load_configuration()
 
-from app.infrastructure.database import build_connect_args  # noqa: E402
+from app.infrastructure.database import (  # noqa: E402
+    build_connect_args,
+    with_psycopg2_driver,
+)
 from app.infrastructure.migration_safety import (  # noqa: E402
     include_object,
     preserve_dropped_tables,
@@ -59,8 +62,10 @@ def _configure(**options: Any) -> None:
 
 def run_migrations_offline() -> None:
     """Emit the migration SQL without connecting to a database."""
+    # The same driver as the online path, so the script is rendered by the
+    # dialect the application really runs on.
     _configure(
-        url=settings.migration_database_url,
+        url=with_psycopg2_driver(settings.migration_database_url),
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
@@ -80,7 +85,7 @@ def run_migrations_online() -> None:
     if injected is not None:
         _run_migrations(injected)
         return
-    url = settings.migration_database_url
+    url = with_psycopg2_driver(settings.migration_database_url)
     # Bound parameters stay out of error messages: a failed statement could
     # otherwise write row values into the migration log.
     engine = create_engine(

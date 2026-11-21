@@ -12,7 +12,7 @@ import logging
 from unittest import mock
 
 import pytest
-from sqlalchemy import Engine, create_engine, event, select, text
+from sqlalchemy import Engine, create_engine, event, make_url, select, text
 from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
@@ -36,6 +36,7 @@ from app.infrastructure.database import (
     register_shutdown_hook,
     registered_readiness_probes,
     run_shutdown_hooks,
+    with_psycopg2_driver,
 )
 from app.infrastructure.errors import (
     CONNECTIVITY_ERRORS,
@@ -50,6 +51,16 @@ from tests.fakes import FakeClock
 
 SQLITE_URL = "sqlite://"
 POSTGRES_URL = "postgresql://localhost:5433/app_db"
+DATABASE_PASSWORD = "not-a-real-password"
+# A bare ``postgresql://`` URL is what the settings default, the compose file,
+# the generated .env and the Supabase dashboard all hand out.
+DRIVERLESS_POSTGRES_URL = f"postgresql://app:{DATABASE_PASSWORD}@db:5432/app_db"
+PSYCOPG2_POSTGRES_URL = f"postgresql+psycopg2://app:{DATABASE_PASSWORD}@db:5432/app_db"
+TLS_POSTGRES_URL = (
+    f"postgresql://app:{DATABASE_PASSWORD}@db.example.com:6543/postgres?sslmode=require"
+)
+PSYCOPG2_DRIVERNAME = "postgresql+psycopg2"
+PSYCOPG2_DRIVER = "psycopg2"
 UNREACHABLE_SQLITE_URL = "sqlite:////nonexistent-directory/app.db"
 FAILURE_THRESHOLD = 3
 RESET_TIMEOUT_SECONDS = 30.0
@@ -217,6 +228,51 @@ def test_when_engine_is_built_then_pool_follows_settings_and_parameters_are_hidd
     assert engine.pool.timeout() == CUSTOM_POOL_TIMEOUT
     assert engine.hide_parameters is True
     engine.dispose()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "url",
+    [DRIVERLESS_POSTGRES_URL, PSYCOPG2_POSTGRES_URL, TLS_POSTGRES_URL],
+    ids=["driverless", "psycopg2", "sslmode-require"],
+)
+def test_when_engine_is_built_from_a_postgres_url_then_it_runs_on_psycopg2_with_the_password_intact(
+    url,
+):
+    """Validates app.infrastructure.database.build_engine()."""
+    engine = build_engine(make_settings(database_url=url))
+
+    assert engine.dialect.driver == PSYCOPG2_DRIVER
+    assert engine.url.password == DATABASE_PASSWORD
+    assert engine.url.query == make_url(url).query
+    engine.dispose()
+
+
+@pytest.mark.unit
+def test_when_a_postgres_url_names_no_driver_then_psycopg2_is_pinned_and_the_rest_is_kept():
+    """Validates app.infrastructure.database.with_psycopg2_driver()."""
+    url = with_psycopg2_driver(TLS_POSTGRES_URL)
+
+    assert url == make_url(TLS_POSTGRES_URL).set(drivername=PSYCOPG2_DRIVERNAME)
+    assert url.password == DATABASE_PASSWORD
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "url",
+    [
+        PSYCOPG2_POSTGRES_URL,
+        f"postgresql+psycopg://app:{DATABASE_PASSWORD}@db:5432/app_db",
+        SQLITE_URL,
+        UNREACHABLE_SQLITE_URL,
+    ],
+    ids=["psycopg2", "psycopg", "sqlite-memory", "sqlite-file"],
+)
+def test_when_a_url_names_its_driver_or_another_backend_then_it_is_left_unchanged(
+    url,
+):
+    """Validates app.infrastructure.database.with_psycopg2_driver()."""
+    assert with_psycopg2_driver(url) == make_url(url)
 
 
 @pytest.mark.unit

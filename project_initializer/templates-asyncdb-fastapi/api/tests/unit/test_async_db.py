@@ -3,19 +3,24 @@
 They need no PostgreSQL server: URL translation is pure, the engine is built
 without connecting, and the session scope, breaker and probe run on in-memory
 ``aiosqlite``, which the unit level allows because no external service is
-involved. Repositories and real connection failures are in
+involved. A server that rejects the login is played by a stand-in for
+``asyncpg.connect``, so the real SQLAlchemy asyncpg dialect translates its error.
+Repositories and real connection failures are in
 ``tests/integration/test_async_database.py``. ``asyncio_mode = auto``
 (pytest.ini) collects the ``async def`` tests.
 """
 
 import ssl
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import NoReturn
 from unittest import mock
 from urllib.parse import urlencode
 
+import asyncpg
 import pytest
+from asyncpg.exceptions import CannotConnectNowError, TooManyConnectionsError
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -24,6 +29,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
@@ -51,6 +57,7 @@ from app.infrastructure.errors import (
     DatabaseOperationError,
     DatabaseUnavailableError,
     is_connectivity_failure,
+    sqlstate_of,
 )
 from app.infrastructure.health import DatabaseStatus
 from app.infrastructure.orm.base import Base
@@ -174,6 +181,38 @@ async def query_then_throw(error: BaseException) -> None:
     session = await anext(dependency)
     await session.execute(select(1))
     await dependency.athrow(error)
+
+
+def refuse_logins_with(
+    rejection: type[asyncpg.PostgresError],
+) -> Callable[..., Awaitable[NoReturn]]:
+    """Build an ``asyncpg.connect`` stand-in for a server that rejects every login.
+
+    Args:
+        rejection: The asyncpg error class the server's startup answer maps to.
+
+    Returns:
+        A coroutine function that raises a fresh ``rejection`` on each call.
+    """
+
+    async def refuse(*_args: object, **_kwargs: object) -> NoReturn:
+        """Fail the way ``asyncpg.connect`` does when the server answers with an error."""
+        raise rejection("rejected during connection startup")
+
+    return refuse
+
+
+@pytest.fixture
+async def asyncpg_engine(monkeypatch) -> AsyncIterator[AsyncEngine]:
+    """An engine from ``build_async_engine``, with its connect hook, behind the session scope."""
+    engine = build_async_engine(Settings(database_url=POSTGRES_URL))
+    monkeypatch.setattr(
+        database_async,
+        "async_session_factory",
+        async_sessionmaker(bind=engine, autoflush=False),
+    )
+    yield engine
+    await engine.dispose()
 
 
 async def trip_circuit(breaker: CircuitBreaker) -> None:
@@ -554,6 +593,28 @@ async def test_when_outages_reach_the_threshold_then_the_next_request_is_refused
 
     with pytest.raises(CircuitOpenError):
         await anext(get_async_db())
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "rejection",
+    [TooManyConnectionsError, CannotConnectNowError],
+    ids=["53300-too-many-connections", "57P03-starting-up"],
+)
+async def test_when_the_server_rejects_the_login_then_unavailable_is_raised_and_the_circuit_opens(
+    monkeypatch, asyncpg_engine, breaker, rejection
+):
+    """Validates app.infrastructure.database_async.build_async_engine()."""
+    monkeypatch.setattr(asyncpg, "connect", refuse_logins_with(rejection))
+
+    for _ in range(FAILURE_THRESHOLD):
+        with pytest.raises(DatabaseUnavailableError) as raised:
+            async with async_session_scope() as session:
+                await session.execute(select(1))
+        assert isinstance(raised.value.__cause__, OperationalError)
+        assert sqlstate_of(raised.value.__cause__) == rejection.sqlstate
+
+    assert breaker.state is CircuitState.OPEN
 
 
 @pytest.mark.unit

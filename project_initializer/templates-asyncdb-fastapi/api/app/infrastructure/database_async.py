@@ -10,9 +10,13 @@ disposed by a shutdown hook and its health is reported by a readiness probe (see
 the hook registry in ``app.infrastructure.database``).
 
 asyncpg does not take libpq's query parameters, so ``to_asyncpg_url`` translates
-the ones it knows and refuses the rest at startup. asyncpg also lets socket
-errors escape unwrapped; ``_open_connection`` wraps them where the connection is
-made, so a timeout from unrelated code in a request can never open the breaker.
+the ones it knows and refuses the rest at startup. A failed connect surfaces
+either as a socket error, which SQLAlchemy lets escape unwrapped, or as a server
+rejection, which SQLAlchemy has already translated into its emulated DBAPI error
+and would report as a generic ``DBAPIError``. ``_open_connection`` turns both
+into ``OperationalError`` where the connection is made, so an unreachable, full
+or starting server trips the breaker, while a timeout from unrelated code in a
+request never can.
 
 Required packages (added by the flag): ``asyncpg`` and ``sqlalchemy[asyncio]``.
 """
@@ -24,7 +28,6 @@ from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 from urllib.parse import ParseResult, parse_qsl, urlencode, urlparse, urlunparse
 
-import asyncpg
 from sqlalchemy import event, select
 from sqlalchemy.engine import Dialect
 from sqlalchemy.engine.interfaces import DBAPIConnection
@@ -291,13 +294,16 @@ def _open_connection(
     connect_args: tuple[object, ...],
     connect_kwargs: dict[str, object],
 ) -> DBAPIConnection:
-    # asyncpg raises socket and server errors from ``connect`` unwrapped, so the
-    # breaker could not tell them from an unrelated OSError raised elsewhere in
-    # a request. Wrapping them here, where the connection is made, is what lets
-    # the breaker ignore every other OSError.
+    # A socket error escapes ``connect`` unwrapped, so the breaker could not tell
+    # it from an unrelated OSError raised elsewhere in a request; wrapping it
+    # here, where the connection is made, is what lets the breaker ignore every
+    # other OSError. A server rejection such as 53300 (too many connections) or
+    # 57P03 (starting up) arrives as the dialect's emulated DBAPI error, which
+    # SQLAlchemy would otherwise wrap as a plain DBAPIError that the breaker does
+    # not count. The SQLSTATE stays on the wrapped error.
     try:
         return dialect.connect(*connect_args, **connect_kwargs)
-    except (OSError, asyncpg.PostgresError) as error:
+    except (OSError, dialect.loaded_dbapi.Error) as error:
         raise OperationalError(None, None, error) from error
 
 

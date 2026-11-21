@@ -22,7 +22,7 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, NamedTuple
 
 from sqlalchemy import Engine, create_engine, event
-from sqlalchemy.engine import make_url
+from sqlalchemy.engine import URL, make_url
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -46,6 +46,9 @@ logger = logging.getLogger(__name__)
 BREAKER_NAME = "database"
 APPLICATION_NAME_PREFIX = "app-api"
 POSTGRES_BACKEND = "postgresql"
+# SQLAlchemy 2.1 runs a driverless ``postgresql://`` URL on psycopg 3, which the
+# project does not install; psycopg2 is the driver it ships.
+PSYCOPG2_DRIVERNAME = "postgresql+psycopg2"
 
 # Without TCP keepalives a firewall or NAT can drop an idle pooled connection
 # silently, and the next request then hangs until the OS gives up.
@@ -76,8 +79,29 @@ def application_name(app_settings: Settings) -> str:
     return f"{APPLICATION_NAME_PREFIX}-{app_settings.environment}"
 
 
-def build_connect_args(url: str, app_settings: Settings) -> dict[str, object]:
-    """Build the driver connection arguments for a psycopg2 URL.
+def with_psycopg2_driver(url: str | URL) -> URL:
+    """Parse a database URL and name the psycopg2 driver when it names none.
+
+    The settings default, the compose file, the generated ``.env`` and the URLs
+    the Supabase dashboard hands out are all driverless ``postgresql://`` URLs.
+
+    Args:
+        url: Database URL from the settings.
+
+    Returns:
+        The parsed URL; a driverless PostgreSQL one with ``postgresql+psycopg2``
+        as its driver name. Every other part, the password included, is kept, so
+        pass the returned object on rather than its string form, which masks the
+        password. A URL that names its driver, or another backend, is unchanged.
+    """
+    parsed = make_url(url)
+    if parsed.drivername != POSTGRES_BACKEND:
+        return parsed
+    return parsed.set(drivername=PSYCOPG2_DRIVERNAME)
+
+
+def build_connect_args(url: str | URL, app_settings: Settings) -> dict[str, object]:
+    """Build the libpq connection arguments for a PostgreSQL URL.
 
     Args:
         url: Database URL the engine will connect to.
@@ -112,9 +136,10 @@ def build_engine(app_settings: Settings) -> Engine:
 
     Returns:
         An engine that hides bound parameters from error messages and from the
-        SQL echo, so values such as emails stay out of logs.
+        SQL echo, so values such as emails stay out of logs. A driverless
+        PostgreSQL URL runs on psycopg2 (see ``with_psycopg2_driver``).
     """
-    url = app_settings.database_url
+    url = with_psycopg2_driver(app_settings.database_url)
     return create_engine(
         url,
         connect_args=build_connect_args(url, app_settings),
