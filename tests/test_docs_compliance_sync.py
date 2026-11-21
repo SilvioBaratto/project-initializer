@@ -713,12 +713,12 @@ def test_when_the_repo_docs_are_read_then_stale_statements_are_gone(name):
 
 
 def test_when_the_changelog_is_read_then_the_breaking_changes_are_listed():
-    """[Unreleased] lists every change a client or an operator must act on.
+    """[0.5.0] lists every change a client or an operator must act on.
 
-    Validates CHANGELOG.md [Unreleased].
+    Validates CHANGELOG.md [0.5.0].
     """
     changelog = (_REPO / "CHANGELOG.md").read_text(encoding="utf-8")
-    unreleased = changelog.split("## [0.4.1]")[0]
+    release = changelog.split("## [0.4.1]")[0]
 
     for keyword in (
         "audit log line changed",
@@ -733,17 +733,18 @@ def test_when_the_changelog_is_read_then_the_breaking_changes_are_listed():
         "`DB_WAIT_TIMEOUT_SECONDS`",
         "`migration_backup`",
     ):
-        assert keyword in unreleased, f"CHANGELOG [Unreleased] lacks {keyword!r}"
+        assert keyword in release, f"CHANGELOG [0.5.0] lacks {keyword!r}"
+    assert "## [0.5.0] - 2026-11-21" in changelog
     assert "## [0.4.1] - 2026-09-14" in changelog
 
 
-def _unreleased_section(heading: str) -> str:
-    """Return the text of one ``### <heading>`` block of the [Unreleased] changelog."""
+def _release_section(heading: str) -> str:
+    """Return the text of one ``### <heading>`` block of the [0.5.0] changelog."""
     changelog = (_REPO / "CHANGELOG.md").read_text(encoding="utf-8")
-    unreleased = changelog.split("## [Unreleased]", 1)[1].split("## [0.4.1]", 1)[0]
+    release = changelog.split("## [0.5.0]", 1)[1].split("## [0.4.1]", 1)[0]
     (block,) = [
         block
-        for block in re.split(r"^### ", unreleased, flags=re.M)
+        for block in re.split(r"^### ", release, flags=re.M)
         if block.startswith(heading)
     ]
     return block
@@ -808,9 +809,9 @@ def test_when_the_changelog_is_read_then_each_entry_sits_under_its_heading(
 ):
     """Operators find the TLS refusal, the opt-outs, the signature change and the new features.
 
-    Validates CHANGELOG.md [Unreleased] headings.
+    Validates CHANGELOG.md [0.5.0] headings.
     """
-    section = _unreleased_section(heading)
+    section = _release_section(heading)
     missing = [statement for statement in statements if statement not in section]
 
     assert missing == []
