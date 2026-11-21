@@ -8,7 +8,10 @@ Tests authored directly from acceptance criteria only; no implementation source 
 from pathlib import Path
 
 import pytest
-from hypothesis import given, strategies as st
+from hypothesis import given
+from hypothesis import strategies as st
+
+from tests.toml_support import tomllib
 
 _ROOT = Path(__file__).parent.parent
 _PKG = _ROOT / "project_initializer"
@@ -171,16 +174,21 @@ def test_when_entra_overlay_compared_to_supabase_then_top_level_subdirs_match(
 # ---------------------------------------------------------------------------
 
 
-def test_when_fastapi_requirements_txt_checked_then_pyjwt_crypto_is_declared() -> None:
+def test_when_fastapi_pyproject_checked_then_pyjwt_crypto_is_declared() -> None:
     """
-    FastAPI entra overlay requirements.txt must declare PyJWT (with [crypto]) so PyJWKClient
+    FastAPI entra overlay pyproject.toml must declare PyJWT (with [crypto]) so PyJWKClient
     can auto-refresh signing keys on rotation.
+
+    Validates project_initializer/templates-entra-fastapi/api/pyproject.toml.
     """
-    req = _PKG / "templates-entra-fastapi" / "api" / "requirements.txt"
-    assert req.exists(), "requirements.txt missing from templates-entra-fastapi/api/"
-    content = req.read_text(encoding="utf-8")
-    assert "PyJWT" in content, (
-        "requirements.txt must include PyJWT[crypto] for JWKS auto-refresh via PyJWKClient"
+    manifest_path = _PKG / "templates-entra-fastapi" / "api" / "pyproject.toml"
+    assert manifest_path.exists(), (
+        "pyproject.toml missing from templates-entra-fastapi/api/"
+    )
+    with manifest_path.open("rb") as handle:
+        dependencies = tomllib.load(handle)["project"]["dependencies"]
+    assert any(entry.lower().startswith("pyjwt[crypto]") for entry in dependencies), (
+        "pyproject.toml must include PyJWT[crypto] for JWKS auto-refresh via PyJWKClient"
     )
 
 

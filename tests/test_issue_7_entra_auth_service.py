@@ -24,13 +24,15 @@ import re
 from pathlib import Path
 
 import pytest
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from tests.fastapi_entra_sources import (
     ENTRA_VERIFIER_PATH,
     auth_failure_statuses_are_wired,
     generated_entra_env_example,
 )
+from tests.toml_support import tomllib
 
 # ── Path constants derived from CLAUDE.md project structure ──────────────────
 _PKG = Path("project_initializer")
@@ -44,7 +46,7 @@ FRONTEND_OVERLAY = _PKG / "templates-entra-frontend"
 
 # FastAPI overlay paths
 _FA_API = FASTAPI_OVERLAY / "api"
-FA_REQUIREMENTS = _FA_API / "requirements.txt"
+FA_PYPROJECT = _FA_API / "pyproject.toml"
 FA_DEPENDENCIES = ENTRA_VERIFIER_PATH
 
 # NestJS overlay paths
@@ -110,12 +112,15 @@ def test_when_existing_auth_modes_are_checked_then_none_are_removed_by_entra_add
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def test_when_fastapi_requirements_are_read_then_pyjwt_crypto_is_declared():
-    """In-process JWKS validation requires PyJWT[crypto]."""
-    content = _read(FA_REQUIREMENTS)
-    assert re.search(r"PyJWT\s*\[crypto\]", content, re.IGNORECASE), (
-        "PyJWT[crypto] must be declared in FastAPI overlay requirements.txt"
-    )
+def test_when_fastapi_pyproject_is_read_then_pyjwt_crypto_is_declared():
+    """In-process JWKS validation requires PyJWT[crypto].
+
+    Validates project_initializer/templates-entra-fastapi/api/pyproject.toml.
+    """
+    dependencies = tomllib.loads(_read(FA_PYPROJECT))["project"]["dependencies"]
+    assert any(
+        re.match(r"PyJWT\s*\[crypto\]", entry, re.IGNORECASE) for entry in dependencies
+    ), "PyJWT[crypto] must be declared in FastAPI overlay pyproject.toml"
 
 
 def test_when_fastapi_verifier_is_read_then_tid_pinning_is_enforced():

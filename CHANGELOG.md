@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Python projects now keep their dependencies and their version in `pyproject.toml` and nowhere else. The first three changes below alter what a **newly scaffolded** FastAPI project contains; a project scaffolded earlier is not touched.
+
+### Breaking changes for newly scaffolded projects
+
+- **FastAPI scaffolds no longer ship `api/requirements.txt`.** `api/pyproject.toml` declares the dependencies: the application's in `[project] dependencies`, the test tooling (`pytest`, `pytest-asyncio`, `pytest-cov`, and `httpx` in the no-auth and token variants; the supabase and entra variants keep `httpx` at runtime, as before) in the `dev` extra. Install with `pip install ".[dev]"` in `api/`, not `pip install -r requirements.txt`. With `--async-db`, `asyncpg` and `sqlalchemy[asyncio]` join the dependencies and `aiosqlite` joins `dev`.
+- **The application version comes from `[project] version` of `api/pyproject.toml`.** `Settings.version` is a read-only property over the installed project's metadata: the `version: str = "1.0.0"` field and the `VERSION` environment override are gone. After editing the number, run `pip install ".[dev]"` again; `tests/unit/test_version_source.py` fails when the installed metadata is stale.
+- **The API Docker image no longer carries the test tooling.** Its builder stage runs `pip install .`, which leaves out the `dev` extra.
+
+### Changed
+
+- `project-initializer --version` reads the installed package metadata directly. A source tree that was never installed reports that it has no version to show.
+
+### Removed
+
+- **`project_initializer.__version__`.** It breaks code that imports it; read `importlib.metadata.version("project-initializer")` instead, which is what `--version` does.
+- The `pyproject.toml` that every scaffold received at its root, NestJS and frontend-only ones included. It was a stale copy of this CLI's own metadata (name `project-initializer`, version 0.1.1).
+
+### Repo tests
+
+- `tests/test_python_metadata_single_source.py` fails on a `requirements*.txt` or a hardcoded version anywhere in the CLI package or the Python templates.
+- `tests/test_fastapi_requirements.py` is now `tests/test_fastapi_dependencies.py`: it parses the three `api/pyproject.toml` files and keeps the exact-pin, token-stack and audited-`PyJWT` guards.
+
 ## [0.5.0] - 2026-11-21
 
 The FastAPI and NestJS backend templates were reviewed against the code standard and reworked: secrets, error handling and logging, layering and ports, the database schema and its rollback, and the tests and tooling each scaffold ships. Everything below changes what a **newly scaffolded** project contains. A project scaffolded earlier is not touched.

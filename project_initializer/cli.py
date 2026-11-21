@@ -11,6 +11,7 @@ import shutil
 import sys
 from collections import Counter
 from collections.abc import Callable
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 import typer
@@ -18,7 +19,6 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.tree import Tree
 
-from . import __version__
 from .docs_generator import (
     generate_api_claude,
     generate_api_readme,
@@ -35,7 +35,7 @@ from .env_generator import (
     parse_env,
 )
 from .file_transforms import (
-    append_async_requirements,
+    append_async_dependencies,
     filter_compose,
     generate_frontend_compose,
     strip_nginx_proxy_block,
@@ -43,6 +43,10 @@ from .file_transforms import (
 from .wizard import WizardResult, run_wizard
 
 console = Console()
+
+# The ``[project] name`` of pyproject.toml: the key the installed metadata is
+# stored under, and the name the CLI shows for itself.
+DISTRIBUTION_NAME = "project-initializer"
 
 # Errors that mean "this terminal cannot host interactive prompts" — the only
 # case the wizard should fall back to non-interactive defaults for. questionary
@@ -109,12 +113,12 @@ def _nginx_handler() -> Callable:
     return handle
 
 
-def _requirements_handler() -> Callable:
-    """File handler that appends the async DB deps to api/requirements.txt."""
+def _dependencies_handler() -> Callable:
+    """File handler that adds the async DB deps to api/pyproject.toml."""
 
     def handle(path: Path) -> str | None:
-        if path.name == "requirements.txt":
-            return append_async_requirements(path.read_text(encoding="utf-8"))
+        if path.name == "pyproject.toml":
+            return append_async_dependencies(path.read_text(encoding="utf-8"))
         return None
 
     return handle
@@ -151,8 +155,8 @@ def select_layers(
 
     Each tuple is (src_dir, skip_subdirs, file_transform). The frontend branch
     MUST NOT consult ``framework`` — it is scope-only. When ``async_db`` is set
-    (FastAPI only), a requirements transform is composed onto the layers that
-    carry ``requirements.txt`` (the async overlay ships none), and the async
+    (FastAPI only), a dependencies transform is composed onto the layers that
+    carry ``pyproject.toml`` (the async overlay ships none), and the async
     overlay is appended last.
 
     Declarative data construction — exempt from the <10-line rule.
@@ -160,16 +164,20 @@ def select_layers(
     base = get_templates_dir()
     api = get_api_templates_dir(framework)
     want_async = async_db and framework == "fastapi"
-    reqs = _requirements_handler() if want_async else None
+    async_deps = _dependencies_handler() if want_async else None
 
     if scope == "fullstack":
         layers: list[tuple[Path, frozenset[str], Callable | None]] = [
             (base, frozenset(), None),
-            (api, frozenset(), _combine(reqs)),
+            (api, frozenset(), _combine(async_deps)),
         ]
         if auth:
             layers.append(
-                (get_auth_overlay_dir(auth, framework), frozenset(), _combine(reqs))
+                (
+                    get_auth_overlay_dir(auth, framework),
+                    frozenset(),
+                    _combine(async_deps),
+                )
             )
             layers.append((get_auth_frontend_overlay_dir(auth), frozenset(), None))
         if want_async:
@@ -180,14 +188,14 @@ def select_layers(
         compose = _compose_handler("api")
         layers = [
             (base, frozenset({"frontend"}), None),
-            (api, frozenset({"frontend"}), _combine(compose, reqs)),
+            (api, frozenset({"frontend"}), _combine(compose, async_deps)),
         ]
         if auth:
             layers.append(
                 (
                     get_auth_overlay_dir(auth, framework),
                     frozenset(),
-                    _combine(compose, reqs),
+                    _combine(compose, async_deps),
                 )
             )
         if want_async:
@@ -220,11 +228,11 @@ def _next_steps_lines(auth: str | None, framework: str) -> list[str]:
 
     Declarative data construction — exempt from the <10-line rule.
     """
-    lines = ["  # Edit .env with your real keys (generated secrets are already filled in)"]
+    lines = [
+        "  # Edit .env with your real keys (generated secrets are already filled in)"
+    ]
     if auth == "supabase":
-        lines.append(
-            "  # Configure SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in .env"
-        )
+        lines.append("  # Configure SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in .env")
     elif auth == "entra":
         lines.append(
             "  # Configure ENTRA_TENANT_ID, ENTRA_API_CLIENT_ID and ENTRA_SPA_CLIENT_ID in .env"
@@ -237,7 +245,7 @@ def _next_steps_lines(auth: str | None, framework: str) -> list[str]:
     else:
         lines.append("\n  # FastAPI development:")
         lines.append(
-            "  cd api && pip install -r requirements.txt && uvicorn app.main:app --reload"
+            '  cd api && pip install ".[dev]" && uvicorn app.main:app --reload'
         )
     return lines
 
@@ -256,7 +264,7 @@ def _config_panel(
     )
     if scope != "frontend" and framework == "fastapi":
         body += f"\n[bold]Database[/bold]   {db_label}"
-    return Panel(body, title="project-initializer", expand=False, border_style="cyan")
+    return Panel(body, title=DISTRIBUTION_NAME, expand=False, border_style="cyan")
 
 
 def _summary_tree(dest_dir: Path, created: dict[str, bool]) -> Tree:
@@ -438,14 +446,24 @@ def copy_template(
     include_frontend = scope in ("fullstack", "frontend")
     docs: dict[str, str] = {
         "README.md": generate_root_readme(
-            framework, auth, api=include_api, frontend=include_frontend, async_db=async_db
+            framework,
+            auth,
+            api=include_api,
+            frontend=include_frontend,
+            async_db=async_db,
         ),
         "CLAUDE.md": generate_root_claude(
-            framework, auth, api=include_api, frontend=include_frontend, async_db=async_db
+            framework,
+            auth,
+            api=include_api,
+            frontend=include_frontend,
+            async_db=async_db,
         ),
     }
     if include_api:
-        docs["api/README.md"] = generate_api_readme(framework, async_db=async_db, auth=auth)
+        docs["api/README.md"] = generate_api_readme(
+            framework, async_db=async_db, auth=auth
+        )
         docs["api/.claude/CLAUDE.md"] = generate_api_claude(
             framework, auth, async_db=async_db
         )
@@ -499,10 +517,23 @@ def validate_scope(
     return []
 
 
+def _installed_version() -> str:
+    """Return the version declared in ``pyproject.toml``, read from package metadata.
+
+    Setuptools writes the metadata from ``[project] version`` at install time, so
+    no module repeats the number. A source tree that was never installed has no
+    metadata to read.
+    """
+    try:
+        return version(DISTRIBUTION_NAME)
+    except PackageNotFoundError:
+        return "(not installed, so no version to report)"
+
+
 def _version_callback(value: bool) -> None:
     """Print the version and exit (for the top-level --version option)."""
     if value:
-        typer.echo(f"project-initializer {__version__}")
+        typer.echo(f"{DISTRIBUTION_NAME} {_installed_version()}")
         raise typer.Exit()
 
 
@@ -634,20 +665,26 @@ def _scaffold(  # noqa: PLR0913 — flat flag surface mirrors the scaffold optio
     if fastapi and nestjs:
         raise typer.BadParameter("--fastapi and --nestjs are mutually exclusive.")
     if (fastapi or nestjs) and framework is not None:
-        raise typer.BadParameter("--framework cannot be combined with --fastapi/--nestjs.")
+        raise typer.BadParameter(
+            "--framework cannot be combined with --fastapi/--nestjs."
+        )
     if fastapi:
         framework = "fastapi"
     elif nestjs:
         framework = "nestjs"
 
     if scope is not None and scope not in SCOPES:
-        raise typer.BadParameter(f"'{scope}' is not one of {SCOPES}.", param_hint="--scope")
+        raise typer.BadParameter(
+            f"'{scope}' is not one of {SCOPES}.", param_hint="--scope"
+        )
     if framework is not None and framework not in FRAMEWORKS:
         raise typer.BadParameter(
             f"'{framework}' is not one of {FRAMEWORKS}.", param_hint="--framework"
         )
     if auth is not None and auth not in AUTH_MODES:
-        raise typer.BadParameter(f"'{auth}' is not one of {AUTH_MODES}.", param_hint="--auth")
+        raise typer.BadParameter(
+            f"'{auth}' is not one of {AUTH_MODES}.", param_hint="--auth"
+        )
 
     # Validate the explicitly-supplied flags BEFORE any prompt so an illegal
     # combination fails fast with the exit-code-2 usage error (BadParameter),

@@ -32,11 +32,12 @@ NEW_MODULES = (
     "test_entra_fastapi_overlay.py",
     "test_env_generator_runtime_defaults.py",
     "test_env_generator_secrets.py",
+    "test_fastapi_dependencies.py",
     "test_fastapi_migrations.py",
-    "test_fastapi_requirements.py",
     "test_nestjs_auth_seam.py",
     "test_nestjs_migrations.py",
     "test_no_ai_framework_in_templates.py",
+    "test_python_metadata_single_source.py",
     "test_template_packaging_complete.py",
     "test_repo_test_traceability.py",
 )
@@ -44,6 +45,15 @@ NEW_MODULES = (
 TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
     "test_async_db_flag.py": frozenset(
         {
+            "test_when_pyproject_transformed_then_async_runtime_deps_join_dependencies",
+            "test_when_pyproject_transformed_then_aiosqlite_joins_dev_extra",
+            "test_when_pyproject_transformed_then_existing_dependencies_survive",
+            "test_when_pyproject_transformed_twice_then_second_pass_changes_nothing",
+            "test_when_pyproject_already_has_asyncpg_then_transform_returns_it_unchanged",
+            "test_when_pyproject_lacks_an_array_then_transform_raises_value_error",
+            "test_when_scaffolded_with_async_db_then_pyproject_declares_async_deps",
+            "test_when_scaffolded_with_async_db_then_no_requirements_txt_exists",
+            "test_when_supabase_scaffolded_with_async_db_then_pyproject_gains_async_deps",
             "test_when_scaffolded_with_async_db_async_files_exist",
             "test_when_async_db_false_scaffold_is_byte_identical_to_default",
         }
@@ -117,12 +127,14 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
     ),
     "test_issue_11_packaging.py": frozenset(
         {
+            "test_when_fastapi_pyproject_checked_then_pyjwt_crypto_is_declared",
             "test_when_fastapi_entra_overlay_checked_then_auth_seam_and_verifier_exist",
             "test_when_entra_env_example_generated_then_no_client_secret_is_present",
         }
     ),
     "test_issue_12_global_criteria.py": frozenset(
         {
+            "test_when_fastapi_overlay_present_then_pyjwt_crypto_in_pyproject",
             "test_when_fastapi_env_example_present_then_no_client_secret_key",
             "test_when_fastapi_overlay_present_then_pyjwks_client_used",
             "test_when_fastapi_verifier_present_then_rs256_algorithm_is_enforced",
@@ -145,6 +157,7 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
     ),
     "test_issue_13_jwt_validation.py": frozenset(
         {
+            "test_when_fastapi_overlay_dependencies_are_read_then_pyjwt_crypto_is_declared",
             "test_when_fastapi_verifier_is_read_then_jwks_client_is_used",
             "test_when_fastapi_verifier_is_read_then_tid_pinning_is_present",
             "test_when_fastapi_verifier_is_read_then_scp_scope_is_enforced",
@@ -193,11 +206,12 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
     ),
     "test_issue_15_ci_matrix_entra.py": frozenset(
         {
-            "test_when_fastapi_entra_row_install_cmd_is_pip_install_requirements",
+            "test_when_fastapi_entra_row_install_cmd_is_pip_install_of_the_api_extras",
         }
     ),
     "test_issue_15_entra_global_criteria.py": frozenset(
         {
+            "test_when_fastapi_overlay_read_pyjwt_crypto_is_declared_as_dependency",
             "test_when_fastapi_verifier_read_rs256_algorithm_is_referenced",
             "test_when_fastapi_verifier_read_aud_claim_is_validated",
             "test_when_fastapi_verifier_read_iss_claim_is_validated",
@@ -243,6 +257,7 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
     ),
     "test_issue_7_entra_auth_service.py": frozenset(
         {
+            "test_when_fastapi_pyproject_is_read_then_pyjwt_crypto_is_declared",
             "test_when_fastapi_verifier_is_read_then_tid_pinning_is_enforced",
             "test_when_fastapi_verifier_is_read_then_scp_scope_is_checked",
             "test_when_fastapi_verifier_and_handlers_are_read_then_401_is_returned_on_auth_failure",

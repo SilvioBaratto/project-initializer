@@ -1,27 +1,29 @@
 """Tests for the --async-db generator flag gating the FastAPI async path (#21).
 
 Covers: flag parsing, validation rejection (nestjs / frontend), layer routing
-(overlay appended only for fastapi + api/fullstack), the pure requirements
-transform, and scaffold behaviour (flag-on includes async files + appended
-deps; flag-off byte-identical to today).
+(overlay appended only for fastapi + api/fullstack), the pure pyproject
+dependency transform, and scaffold behaviour (flag-on includes async files +
+appended deps; flag-off byte-identical to today).
 """
 
 import hashlib
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
 import project_initializer.cli as cli
-from project_initializer.env_generator import GENERATED_SECRET_KEYS
 from project_initializer.cli import (
     app,
     copy_template,
+    get_api_templates_dir,
     get_asyncdb_overlay_dir,
     select_layers,
     validate_scope,
 )
-from project_initializer.file_transforms import append_async_requirements
-from typer.testing import CliRunner
+from project_initializer.env_generator import GENERATED_SECRET_KEYS
+from project_initializer.file_transforms import append_async_dependencies
+from tests.toml_support import tomllib
 
 runner = CliRunner()
 
@@ -50,6 +52,20 @@ def _masked_env_bytes(env_path):
         key, _, _ = line.partition("=")
         lines.append(f"{key}=" if key in GENERATED_SECRET_KEYS else line)
     return "\n".join(lines).encode("utf-8")
+
+
+def _base_pyproject_text():
+    path = get_api_templates_dir("fastapi") / "api" / "pyproject.toml"
+    return path.read_text(encoding="utf-8")
+
+
+def _declared_names(requirements):
+    """Requirement names without their pins, so a version bump never breaks a test."""
+    return {requirement.split("==")[0] for requirement in requirements}
+
+
+def _scaffolded_pyproject(api_dir):
+    return tomllib.loads((api_dir / "pyproject.toml").read_text(encoding="utf-8"))
 
 
 def _tree_hashes(root):
@@ -119,20 +135,80 @@ def test_when_async_db_set_for_nestjs_no_overlay_layer():
     assert get_asyncdb_overlay_dir() not in _srcs(layers)
 
 
-# --- pure requirements transform --------------------------------------------
+# --- pure pyproject dependency transform -------------------------------------
 
 
-def test_when_requirements_transformed_async_deps_are_appended():
-    """when requirements text is transformed, asyncpg and sqlalchemy[asyncio] appear."""
-    out = append_async_requirements("fastapi==0.136.3\n")
-    assert "asyncpg" in out
-    assert "sqlalchemy[asyncio]" in out
+def test_when_pyproject_transformed_then_async_runtime_deps_join_dependencies():
+    """when pyproject text is transformed, asyncpg and sqlalchemy[asyncio] join [project] dependencies.
+
+    Validates project_initializer/file_transforms.py append_async_dependencies().
+    """
+    parsed = tomllib.loads(append_async_dependencies(_base_pyproject_text()))
+    assert {"asyncpg", "sqlalchemy[asyncio]"} <= _declared_names(
+        parsed["project"]["dependencies"]
+    )
 
 
-def test_when_requirements_already_has_asyncpg_transform_is_idempotent():
-    """when requirements already lists asyncpg, the transform leaves it unchanged."""
-    already = "fastapi==0.136.3\nasyncpg==0.31.0\n"
-    assert append_async_requirements(already) == already
+def test_when_pyproject_transformed_then_aiosqlite_joins_dev_extra():
+    """when pyproject text is transformed, aiosqlite joins the dev extra and not the runtime set.
+
+    Validates project_initializer/file_transforms.py append_async_dependencies().
+    """
+    parsed = tomllib.loads(append_async_dependencies(_base_pyproject_text()))
+    assert "aiosqlite" in _declared_names(
+        parsed["project"]["optional-dependencies"]["dev"]
+    )
+    assert "aiosqlite" not in _declared_names(parsed["project"]["dependencies"])
+
+
+def test_when_pyproject_transformed_then_existing_dependencies_survive():
+    """when pyproject text is transformed, every pre-existing dependency is still declared.
+
+    Validates project_initializer/file_transforms.py append_async_dependencies().
+    """
+    original = tomllib.loads(_base_pyproject_text())["project"]
+    parsed = tomllib.loads(append_async_dependencies(_base_pyproject_text()))["project"]
+    assert set(original["dependencies"]) <= set(parsed["dependencies"])
+    assert set(original["optional-dependencies"]["dev"]) <= set(
+        parsed["optional-dependencies"]["dev"]
+    )
+
+
+def test_when_pyproject_transformed_twice_then_second_pass_changes_nothing():
+    """when the transform runs on its own output, the text is unchanged.
+
+    Validates project_initializer/file_transforms.py append_async_dependencies().
+    """
+    once = append_async_dependencies(_base_pyproject_text())
+    assert append_async_dependencies(once) == once
+
+
+def test_when_pyproject_already_has_asyncpg_then_transform_returns_it_unchanged():
+    """when pyproject text already lists asyncpg, the transform leaves it unchanged.
+
+    Validates project_initializer/file_transforms.py append_async_dependencies().
+    """
+    already = '[project]\ndependencies = [\n    "asyncpg==0.31.0",\n]\n'
+    assert append_async_dependencies(already) == already
+
+
+@pytest.mark.parametrize(
+    ("body", "missing_array"),
+    [
+        ('[project]\nname = "api"\n', "dependencies"),
+        ('[project]\ndependencies = [\n    "fastapi==1.0.0",\n]\n', "dev"),
+    ],
+    ids=["no-dependencies-array", "no-dev-array"],
+)
+def test_when_pyproject_lacks_an_array_then_transform_raises_value_error(
+    body, missing_array
+):
+    """when the dependencies or dev array is missing, the transform raises instead of dropping the deps.
+
+    Validates project_initializer/file_transforms.py append_async_dependencies().
+    """
+    with pytest.raises(ValueError, match=missing_array):
+        append_async_dependencies(body)
 
 
 # --- scaffold: flag-on includes async files + deps --------------------------
@@ -151,16 +227,35 @@ def test_when_scaffolded_with_async_db_async_files_exist(tmp_path, scope):
     ).exists()
 
 
-def test_when_scaffolded_with_async_db_requirements_has_async_deps(tmp_path):
-    """when scaffolded with --async-db, requirements.txt lists the async deps."""
+def test_when_scaffolded_with_async_db_then_pyproject_declares_async_deps(tmp_path):
+    """when scaffolded with --async-db, api/pyproject.toml declares the async deps.
+
+    Validates project_initializer/cli.py _dependencies_handler() and project_initializer/file_transforms.py append_async_dependencies().
+    """
     copy_template(tmp_path, "app", framework="fastapi", scope="api", async_db=True)
-    reqs = (tmp_path / "api" / "requirements.txt").read_text(encoding="utf-8")
-    assert "asyncpg" in reqs
-    assert "sqlalchemy[asyncio]" in reqs
+    project = _scaffolded_pyproject(tmp_path / "api")["project"]
+    assert {"asyncpg", "sqlalchemy[asyncio]"} <= _declared_names(
+        project["dependencies"]
+    )
+    assert "aiosqlite" in _declared_names(project["optional-dependencies"]["dev"])
 
 
-def test_when_supabase_scaffolded_with_async_db_requirements_has_async_deps(tmp_path):
-    """when supabase is scaffolded with --async-db, its requirements gain async deps."""
+def test_when_scaffolded_with_async_db_then_no_requirements_txt_exists(tmp_path):
+    """when scaffolded with --async-db, the dependencies live in pyproject.toml only.
+
+    Validates project_initializer/cli.py copy_template().
+    """
+    copy_template(tmp_path, "app", framework="fastapi", scope="api", async_db=True)
+    assert not (tmp_path / "api" / "requirements.txt").exists()
+
+
+def test_when_supabase_scaffolded_with_async_db_then_pyproject_gains_async_deps(
+    tmp_path,
+):
+    """when supabase is scaffolded with --async-db, its pyproject gains the async deps.
+
+    Validates project_initializer/cli.py _dependencies_handler() and project_initializer/templates-supabase-fastapi/api/pyproject.toml.
+    """
     copy_template(
         tmp_path,
         "app",
@@ -169,9 +264,12 @@ def test_when_supabase_scaffolded_with_async_db_requirements_has_async_deps(tmp_
         scope="api",
         async_db=True,
     )
-    reqs = (tmp_path / "api" / "requirements.txt").read_text(encoding="utf-8")
-    assert "asyncpg" in reqs
-    assert "supabase" in reqs  # the supabase overlay's own deps survive
+    project = _scaffolded_pyproject(tmp_path / "api")["project"]
+    declared = _declared_names(project["dependencies"])
+    assert {"asyncpg", "sqlalchemy[asyncio]"} <= declared
+    assert "supabase" in declared  # the supabase overlay's own deps survive
+    assert "aiosqlite" in _declared_names(project["optional-dependencies"]["dev"])
+    assert not (tmp_path / "api" / "requirements.txt").exists()
 
 
 # --- scaffold: flag-off is byte-identical to today --------------------------

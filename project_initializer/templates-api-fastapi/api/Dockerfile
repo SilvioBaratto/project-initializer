@@ -2,10 +2,11 @@ FROM python:3.12-slim AS builder
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY pyproject.toml .
 # One --prefix directory lets the runtime stage take the packages as a whole
-# without the pip cache or any build tooling.
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+# without the pip cache or any build tooling. It also carries the project's
+# metadata, which is where the application reads its version.
+RUN pip install --no-cache-dir --prefix=/install .
 
 
 FROM python:3.12-slim

@@ -189,7 +189,7 @@ Level Security. The NestJS migrations enable RLS on every table.
 
 ```bash
 cd api
-pip install -r requirements.txt
+pip install ".[dev]"
 uvicorn app.main:app --reload          # API on :8000
 alembic upgrade head                   # Run migrations
 alembic downgrade -1                   # Roll the newest migration back (rows are kept in a backup table)
