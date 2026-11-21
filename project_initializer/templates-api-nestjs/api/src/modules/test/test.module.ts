@@ -1,9 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TestController } from './test.controller';
-import { TestService } from './test.service';
 
-@Module({
-  controllers: [TestController],
-  providers: [TestService],
-})
+/** Hosts the smoke-test routes; it has no providers because it reads no state. */
+@Module({ controllers: [TestController] })
 export class TestModule {}

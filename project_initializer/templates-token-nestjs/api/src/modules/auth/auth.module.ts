@@ -1,13 +1,13 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ACCESS_TOKEN_VERIFIER } from '../../common/auth/access-token-verifier';
+import { CurrentUserController } from '../../common/auth/current-user.controller';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { AuthGuard } from './auth.guard';
 
+/** Wires the shared-secret verifier behind `ACCESS_TOKEN_VERIFIER` for the global guard. */
 @Module({
-  imports: [ConfigModule],
-  controllers: [AuthController],
-  providers: [AuthService, AuthGuard],
-  exports: [AuthService, AuthGuard],
+  controllers: [AuthController, CurrentUserController],
+  providers: [AuthService, { provide: ACCESS_TOKEN_VERIFIER, useExisting: AuthService }],
+  exports: [ACCESS_TOKEN_VERIFIER],
 })
 export class AuthModule {}

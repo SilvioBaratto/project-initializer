@@ -1,72 +1,72 @@
-import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
-import { BullBoardModule } from '@bull-board/nestjs';
-import { ExpressAdapter } from '@bull-board/express';
-import { ConfigModule } from '@nestjs/config';
-import { validate } from './config/env.validation';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { APP_GUARD, APP_PIPE, APP_INTERCEPTOR } from '@nestjs/core';
-import { ZodValidationPipe, ZodSerializerInterceptor } from 'nestjs-zod';
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
-import { PrismaModule } from './prisma/prisma.module';
-import { HealthModule } from './modules/health/health.module';
-import { TestModule } from './modules/test/test.module';
+import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
+import { AUTH_GUARDS, AUTH_MODULES } from './app.auth';
+import { RolesGuard } from './common/auth/roles.guard';
+import type { BaseEnv } from './config/env.base';
+import { validate as validateEnv } from './config/env.validation';
+import { ENV_FILE_PATHS } from './config/env-files';
+import { buildLoggerParams } from './config/logger.config';
+import { THROTTLER_MODULE_OPTIONS } from './config/rate-limit';
 import { ChatbotModule } from './modules/chatbot/chatbot.module';
-import { AuthModule } from './modules/auth/auth.module';
+import { HealthModule } from './modules/health/health.module';
+import { ItemsModule } from './modules/items/items.module';
 import { MonitoringModule } from './modules/monitoring/monitoring.module';
-import { loggerConfig } from './config/logger.config';
+import { TestModule } from './modules/test/test.module';
 
-// Base template (no auth): dashboard is open to local operators.
-// Protect with a reverse-proxy allowlist in production.
-// Dashboard path: /api/v1/admin/queues (global prefix prepended by BullBoardModule).
+/**
+ * Root module, identical in every variant. What differs between variants is the authentication
+ * wiring, which comes in through `AUTH_MODULES` and `AUTH_GUARDS` from `app.auth.ts`.
+ *
+ * The rate limiter is the first global guard, ahead of the authentication guards, so that
+ * requests with bad credentials are counted and a caller cannot guess tokens at full speed.
+ * `RolesGuard` is the last one, so it checks `@Roles(...)` against an identity that is already
+ * verified.
+ */
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      // The project .env lives at the repo root (one level above api/). Check it
-      // first, then a local api/.env fallback. In Docker no file is read — compose
-      // env_file injects the vars as real environment variables (validate() reads
-      // process.env either way).
-      envFilePath: ['../.env', '.env'],
-      validate: validate,
+      // The project .env sits at the repository root, one level above api/; a local api/.env is
+      // the fallback. In Docker no file is read: compose passes the variables as real ones.
+      envFilePath: [...ENV_FILE_PATHS],
+      validate: validateEnv,
     }),
-    BullModule.forRoot({
-      connection: {
-        host: process.env.REDIS_HOST ?? 'localhost',
-        port: Number(process.env.REDIS_PORT ?? 6379),
-      },
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<BaseEnv, true>) => ({
+        connection: {
+          host: config.get('REDIS_HOST', { infer: true }),
+          port: config.get('REDIS_PORT', { infer: true }),
+        },
+      }),
     }),
-    BullBoardModule.forRoot({
-      route: '/admin/queues',
-      adapter: ExpressAdapter,
+    LoggerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<BaseEnv, true>) =>
+        buildLoggerParams({
+          level: config.get('LOG_LEVEL', { infer: true }),
+          pretty: config.get('NODE_ENV', { infer: true }) === 'development',
+        }),
     }),
-    LoggerModule.forRoot(loggerConfig),
-    PrismaModule,
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60000,
-        limit: 100,
-      },
-    ]),
+    ThrottlerModule.forRoot(THROTTLER_MODULE_OPTIONS),
     HealthModule,
     TestModule,
+    ItemsModule,
     ChatbotModule,
-    AuthModule,
     MonitoringModule,
+    ...AUTH_MODULES,
   ],
   providers: [
-    {
-      provide: APP_GUARD,
-      useClass: ThrottlerGuard,
-    },
-    {
-      provide: APP_PIPE,
-      useClass: ZodValidationPipe,
-    },
-    {
-      provide: APP_INTERCEPTOR,
-      useClass: ZodSerializerInterceptor,
-    },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    ...AUTH_GUARDS,
+    { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_PIPE, useClass: ZodValidationPipe },
+    { provide: APP_INTERCEPTOR, useClass: ZodSerializerInterceptor },
   ],
 })
 export class AppModule {}

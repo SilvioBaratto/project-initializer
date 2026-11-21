@@ -1,25 +1,16 @@
-import { z } from 'zod';
+import type { z } from 'zod';
+import { baseEnvSchema, createEnvValidator } from './env.base';
 
-export const envSchema = z
-  .object({
-    DATABASE_URL: z.string().min(1),
-    DIRECT_URL: z.string().min(1),
-    PORT: z.coerce.number().default(3000),
-    NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-    REDIS_HOST: z.string().default('localhost'),
-    REDIS_PORT: z.coerce.number().default(6379),
-    CORS_ORIGINS: z.string().optional(),
-    LOG_LEVEL: z.string().optional(),
-  })
-  .passthrough();
+/**
+ * Schema of every environment key this variant reads.
+ *
+ * The base variant needs only the shared keys. An auth overlay replaces this file with
+ * `baseEnvSchema.extend({ ... })` for its own keys; nothing else in the template changes.
+ */
+export const envSchema = baseEnvSchema;
 
-export function validate(config: Record<string, unknown>): Record<string, unknown> {
-  const parsed = envSchema.safeParse(config);
-  if (!parsed.success) {
-    const failures = parsed.error.issues
-      .map((i) => `${i.path.join('.')}: ${i.message}`)
-      .join('; ');
-    throw new Error(`Invalid environment variables: ${failures}`);
-  }
-  return parsed.data as Record<string, unknown>;
-}
+/** Validated configuration of this variant. Shared code types its config as `BaseEnv` instead. */
+export type Env = z.output<typeof envSchema>;
+
+/** Passed to `ConfigModule.forRoot` so a bad or missing key stops the process at start-up. */
+export const validate = createEnvValidator(envSchema);

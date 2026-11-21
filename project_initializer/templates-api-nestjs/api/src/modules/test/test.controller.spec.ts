@@ -1,84 +1,110 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import type { Server } from 'node:http';
+import { INestApplication } from '@nestjs/common';
+import { APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
+import { Test } from '@nestjs/testing';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { cleanupOpenApiDoc, ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
+import request from 'supertest';
+import { MAX_ECHO_MESSAGE_LENGTH } from './dto/echo.dto';
 import { TestController } from './test.controller';
-import { TestService } from './test.service';
 
-const mockTestService = {
-  findAll: jest.fn(),
-  findOne: jest.fn(),
-  create: jest.fn(),
-  update: jest.fn(),
-  remove: jest.fn(),
-};
-
+/** Validates src/modules/test/test.controller.ts through real routing, validation and serialization. */
 describe('TestController', () => {
-  let controller: TestController;
+  let app: INestApplication;
+  // Nest types the server as `any`; one cast here keeps every supertest call typed.
+  const httpServer = (): Server => app.getHttpServer() as Server;
 
-  beforeEach(async () => {
-    jest.clearAllMocks();
-
-    const module: TestingModule = await Test.createTestingModule({
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
       controllers: [TestController],
-      providers: [{ provide: TestService, useValue: mockTestService }],
+      providers: [
+        { provide: APP_PIPE, useClass: ZodValidationPipe },
+        { provide: APP_INTERCEPTOR, useClass: ZodSerializerInterceptor },
+      ],
     }).compile();
-
-    controller = module.get<TestController>(TestController);
+    app = moduleRef.createNestApplication();
+    await app.init();
   });
 
-  describe('ping()', () => {
-    it('when ping is called, returns { message: "pong" }', () => {
-      expect(controller.ping()).toEqual({ message: 'pong' });
+  afterAll(async () => {
+    await app.close();
+  });
+
+  describe('GET /test/ping', () => {
+    it('when called, then it answers pong', async () => {
+      const response = await request(httpServer()).get('/test/ping').expect(200);
+
+      expect(response.body).toEqual({ message: 'pong' });
     });
   });
 
-  describe('findAll()', () => {
-    it('when findAll is called, delegates to TestService.findAll and returns its result', () => {
-      const items = [{ id: '1', name: 'a', created_at: '', updated_at: '' }];
-      mockTestService.findAll.mockReturnValue(items);
+  describe('GET /test/echo/:message', () => {
+    it('when a message is given, then it is echoed back', async () => {
+      const response = await request(httpServer()).get('/test/echo/hello').expect(200);
 
-      expect(controller.findAll()).toBe(items);
-      expect(mockTestService.findAll).toHaveBeenCalledTimes(1);
+      expect(response.body).toEqual({ message: 'hello' });
+    });
+
+    it('when the message is over the maximum length, then it answers 400', async () => {
+      const message = 'm'.repeat(MAX_ECHO_MESSAGE_LENGTH + 1);
+
+      await request(httpServer()).get(`/test/echo/${message}`).expect(400);
     });
   });
 
-  describe('findOne()', () => {
-    it('when findOne is called with an id, delegates to TestService.findOne with that id', () => {
-      const item = { id: 'abc', name: 'x', created_at: '', updated_at: '' };
-      mockTestService.findOne.mockReturnValue(item);
+  describe('POST /test/echo', () => {
+    it('when a message is posted, then it is echoed back with 200 because nothing is created', async () => {
+      const response = await request(httpServer())
+        .post('/test/echo')
+        .send({ message: 'hello' })
+        .expect(200);
 
-      expect(controller.findOne('abc')).toBe(item);
-      expect(mockTestService.findOne).toHaveBeenCalledWith('abc');
+      expect(response.body).toEqual({ message: 'hello' });
+    });
+
+    it('when the message is missing, then it answers 400', async () => {
+      await request(httpServer()).post('/test/echo').send({}).expect(400);
+    });
+
+    it('when the message is over the maximum length, then it answers 400', async () => {
+      await request(httpServer())
+        .post('/test/echo')
+        .send({ message: 'm'.repeat(MAX_ECHO_MESSAGE_LENGTH + 1) })
+        .expect(400);
     });
   });
 
-  describe('create()', () => {
-    it('when create is called with a DTO, delegates to TestService.create with that DTO', () => {
-      const dto = { name: 'widget' };
-      const created = { id: '1', name: 'widget', created_at: '', updated_at: '' };
-      mockTestService.create.mockReturnValue(created);
+  describe('OpenAPI document', () => {
+    function responseCodesOf(path: string, method: 'get' | 'post'): string[] {
+      const document = cleanupOpenApiDoc(
+        SwaggerModule.createDocument(app, new DocumentBuilder().build()),
+      );
+      return Object.keys(document.paths[path]?.[method]?.responses ?? {});
+    }
 
-      expect(controller.create(dto as any)).toBe(created);
-      expect(mockTestService.create).toHaveBeenCalledWith(dto);
+    it.each([
+      ['/test/ping', 'get'],
+      ['/test/echo/{message}', 'get'],
+      ['/test/echo', 'post'],
+    ] as const)(
+      'when %s %s is documented, then it declares its 200 success response',
+      (path, method) => {
+        expect(responseCodesOf(path, method)).toContain('200');
+      },
+    );
+
+    it('when the POST echo route is documented, then it does not claim a 201 because nothing is created', () => {
+      expect(responseCodesOf('/test/echo', 'post')).not.toContain('201');
     });
-  });
 
-  describe('update()', () => {
-    it('when update is called with an id and DTO, delegates to TestService.update with those args', () => {
-      const dto = { name: 'updated' };
-      const updated = { id: 'abc', name: 'updated', created_at: '', updated_at: '' };
-      mockTestService.update.mockReturnValue(updated);
-
-      expect(controller.update('abc', dto as any)).toBe(updated);
-      expect(mockTestService.update).toHaveBeenCalledWith('abc', dto);
-    });
-  });
-
-  describe('remove()', () => {
-    it('when remove is called with an id, delegates to TestService.remove with that id', () => {
-      mockTestService.remove.mockReturnValue(undefined);
-
-      controller.remove('abc');
-
-      expect(mockTestService.remove).toHaveBeenCalledWith('abc');
-    });
+    it.each([
+      ['/test/echo/{message}', 'get'],
+      ['/test/echo', 'post'],
+    ] as const)(
+      'when %s %s is documented, then it declares its 400 validation failure',
+      (path, method) => {
+        expect(responseCodesOf(path, method)).toContain('400');
+      },
+    );
   });
 });
