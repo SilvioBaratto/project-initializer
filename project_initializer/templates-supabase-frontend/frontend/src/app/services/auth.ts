@@ -199,9 +199,21 @@ export class AuthService {
     return true;
   }
 
+  /**
+   * Signs the user out and clears the signed-in state.
+   *
+   * The sign-out covers every device when the server confirms it and this device only when it
+   * cannot. A rejection from supabase-js still surfaces, after the state is cleared.
+   */
   async logout(): Promise<void> {
     try {
-      await this.supabase.auth.signOut();
+      const { error } = await this.supabase.auth.signOut();
+      if (error) {
+        // supabase-js 2.119 keeps the stored session when the server fails a global sign-out, and
+        // its auto-refresh would sign the user back in after a reload. The local scope removes the
+        // session before it contacts the server, so its own result needs no check.
+        await this.supabase.auth.signOut({ scope: 'local' });
+      }
     } finally {
       this.isAuthenticated.set(false);
       this.currentUser.set(null);
