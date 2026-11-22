@@ -23,6 +23,12 @@ from __future__ import annotations
 
 _LICENSE = "MIT"
 
+# The PostgreSQL major each framework's compose `db` image runs. The two stacks
+# upgrade independently, so one number would document a version a scaffold does
+# not run; tests/test_docs_generator_selfcheck.py derives the expected major from
+# each compose file and fails when this table drifts from it.
+_COMPOSE_POSTGRES_MAJOR = {"fastapi": 19, "nestjs": 16}
+
 # The NestJS production-readiness checklist is static, framework-fixed reference
 # content (9 concern sections + legend + global-criteria table + filter-DI note),
 # appended verbatim to the generated api/.claude/CLAUDE.md so the depth the
@@ -197,7 +203,7 @@ def _docker_services_table(framework: str, auth: str | None, *, frontend: bool) 
     """Compose services table — omits db/adminer for supabase."""
     rows = ["| Service | Port | Description |", "|---------|------|-------------|"]
     if auth != "supabase":
-        rows.append("| `db` | 5433:5432 | PostgreSQL 19 |")
+        rows.append(f"| `db` | 5433:5432 | PostgreSQL {_COMPOSE_POSTGRES_MAJOR[framework]} |")
     rows.append(
         f"| `api` | 8000:8000 | {_framework_label(framework)} with hot reload |"
     )
