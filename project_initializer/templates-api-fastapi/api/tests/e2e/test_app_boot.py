@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 import uvicorn
 from fastapi import FastAPI
+from fastapi.routing import iter_route_contexts
 from fastapi.testclient import TestClient
 
 from app import main as main_module
@@ -56,11 +57,16 @@ DOCS_POLICY = [
 
 
 def served_routes(application: FastAPI) -> set[tuple[str, str]]:
-    """The (method, path) pairs of every route the application registers."""
+    """The (method, path) pairs of every route the application registers.
+
+    ``application.routes`` holds an included router as one node with no path, so
+    the pairs come from ``iter_route_contexts``, which flattens the nodes and
+    joins the ``include_router`` prefix to each path.
+    """
     return {
-        (method, route.path)
-        for route in application.routes
-        for method in getattr(route, "methods", ())
+        (method, context.path)
+        for context in iter_route_contexts(application.routes)
+        for method in context.methods or ()
     }
 
 

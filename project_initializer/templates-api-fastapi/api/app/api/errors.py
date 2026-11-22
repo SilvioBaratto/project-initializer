@@ -5,14 +5,27 @@ from datetime import UTC, datetime
 from http import HTTPStatus
 from types import MappingProxyType
 from typing import Any
+from weakref import WeakKeyDictionary
 
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute, iter_route_contexts
+from starlette.applications import Starlette
+from starlette.routing import BaseRoute, Mount
 from starlette.types import Scope
 
 from app.api.schemas.errors import ErrorBody, ErrorEnvelope, FieldError
 
 UNMATCHED_ROUTE = "unmatched"
+
+# FastAPI puts a route declared on the application or a router in ``scope["route"]``,
+# and that object has lost the prefix given to ``include_router``. For a plain
+# Starlette route or a mount it sets no route at all and leaves only the handler in
+# ``scope["endpoint"]``. Only ``iter_route_contexts`` exposes the whole template,
+# and it walks every router on each call, so each application keeps a lookup from
+# the identity of what the scope holds to the template. Routes may be added after
+# the first request, so an identity missing from the lookup rebuilds it.
+_TEMPLATES_BY_APP: WeakKeyDictionary[Starlette, dict[int, str]] = WeakKeyDictionary()
 
 DEFAULT_ERROR_DESCRIPTIONS: Mapping[int, str] = MappingProxyType(
     {
@@ -106,21 +119,61 @@ Merge it with the route's own statuses, for example
 """
 
 
+def _left_in_scope(route: BaseRoute) -> object | None:
+    """The object routing leaves in the scope when ``route`` serves a request."""
+    if isinstance(route, APIRoute):
+        return route
+    if isinstance(route, Mount):
+        return route.app
+    return getattr(route, "endpoint", None)
+
+
+def _templates_of(app: Starlette) -> dict[int, str]:
+    templates: dict[int, str] = {}
+    for context in iter_route_contexts(app.routes):
+        in_scope = _left_in_scope(context.original_route)
+        if in_scope is not None and context.path is not None:
+            templates[id(in_scope)] = context.path
+    return templates
+
+
 def route_template(scope: Scope) -> str:
     """Name the route that served a request, for logs.
 
     A path parameter can hold user text and an unmatched path is chosen by the
     caller, so neither is safe to log raw. The route template, such as
-    ``/items/{item_id}``, has a bounded set of values and no personal data.
+    ``/api/v1/items/{item_id}``, has a bounded set of values and no personal data.
+
+    The template includes the prefix given to ``include_router``. A plain Starlette
+    route, such as ``/openapi.json``, is named by its path and a mounted application
+    by its mount path. A mounted FastAPI or Starlette application routes on its
+    own: the routes it serves are named by their path inside it, and a 404 of its
+    own is logged as ``UNMATCHED_ROUTE``. A router, route or endpoint registered
+    at several paths is one object, so the registrations cannot be told apart and
+    the template of the later one is logged for all of them.
 
     Args:
         scope: ASGI scope of the request, as seen after routing.
 
     Returns:
-        The matched route's path template, or ``UNMATCHED_ROUTE`` when no route
-        matched (or routing has not happened yet).
+        The path template of the route, plain route or mount that served the
+        request, or ``UNMATCHED_ROUTE`` when none did (or routing has not happened
+        yet) or when the application does not list the plain route or mount. Without
+        an application in the scope, or for a declared route it does not list, the
+        route's own unprefixed path.
     """
-    return getattr(scope.get("route"), "path", UNMATCHED_ROUTE)
+    route = scope.get("route")
+    in_scope = route if route is not None else scope.get("endpoint")
+    if in_scope is None:
+        return UNMATCHED_ROUTE
+    declared_path = getattr(route, "path", UNMATCHED_ROUTE)
+    app = scope.get("app")
+    if app is None:
+        return declared_path
+    templates = _TEMPLATES_BY_APP.get(app)
+    if templates is None or id(in_scope) not in templates:
+        templates = _TEMPLATES_BY_APP[app] = _templates_of(app)
+    return templates.get(id(in_scope), declared_path)
 
 
 def request_id_of(request: Request) -> str | None:

@@ -21,6 +21,7 @@ Criteria mapped below — NOT VERIFIABLE criteria are omitted:
 
 import json
 import re
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -32,7 +33,6 @@ from tests.fastapi_entra_sources import (
     auth_failure_statuses_are_wired,
     generated_entra_env_example,
 )
-from tests.toml_support import tomllib
 
 # ── Path constants derived from CLAUDE.md project structure ──────────────────
 _PKG = Path("project_initializer")

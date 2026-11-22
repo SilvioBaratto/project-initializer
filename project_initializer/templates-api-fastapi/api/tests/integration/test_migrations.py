@@ -5,6 +5,8 @@ compare the result with the ORM metadata, so a model change without a matching
 migration fails here. The migrations use only portable DDL, so SQLite exercises
 the same operations PostgreSQL runs; what only PostgreSQL does (the backup
 schema, row level security) is asserted on the SQL that an offline run renders.
+The driver ``env.py`` connects with is checked by pointing psycopg2 at a closed
+local port, which needs no server.
 """
 
 import io
@@ -20,6 +22,7 @@ import sqlalchemy as sa
 from alembic.config import Config
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
+from alembic.runtime.environment import EnvironmentContext
 from alembic.script import ScriptDirectory
 from sqlalchemy import (
     Column,
@@ -30,8 +33,10 @@ from sqlalchemy import (
     Table,
     create_engine,
     inspect,
+    make_url,
     text,
 )
+from sqlalchemy.exc import OperationalError
 
 from alembic import command
 from app.infrastructure.migration_safety import (
@@ -53,6 +58,7 @@ from tests.migration_support import (
     backup_tables,
     destructive_calls_in_downgrade,
     migrate,
+    migrations_reading,
     offline_script,
     schema_diff,
     schema_tables,
@@ -64,6 +70,12 @@ pytestmark = pytest.mark.integration
 # a plain import would turn every test parameter into a redefined unused import.
 migration_engine = migration_support.migration_engine
 
+MIGRATION_PASSWORD = "not-a-real-password"
+DRIVERLESS_POSTGRES_URL = f"postgresql://app:{MIGRATION_PASSWORD}@db:5432/app_db"
+# Nothing listens on port 1, so the connection is refused at once.
+CLOSED_PORT_POSTGRES_URL = f"postgresql://app:{MIGRATION_PASSWORD}@127.0.0.1:1/app_db"
+PSYCOPG2_DRIVERNAME = "postgresql+psycopg2"
+PSYCOPG2_MODULE = "psycopg2"
 MOMENT = datetime(2026, 1, 2, 3, 4, 5, 678901, tzinfo=UTC)
 REVISION_FILE_PATTERN = re.compile(r"^\d{4}_[a-z0-9_]+\.py$")
 # alembic_version.version_num is VARCHAR(32).
@@ -229,6 +241,36 @@ def test_when_offline_then_the_downgrade_logs_the_backup_as_planned(caplog):
 
     assert "migration.preserve_planned table=items" in caplog.text
     assert "migration.preserved " not in caplog.text
+
+
+def test_when_offline_with_a_driverless_url_then_the_sql_is_rendered_for_psycopg2_with_the_password_intact():
+    """Validates alembic.env.run_migrations_offline()."""
+    with patch.object(
+        EnvironmentContext,
+        "configure",
+        autospec=True,
+        side_effect=EnvironmentContext.configure,
+    ) as configure:
+        offline_script(HEAD, database_url=DRIVERLESS_POSTGRES_URL)
+
+    url = make_url(configure.call_args.kwargs["url"])
+    assert url.drivername == PSYCOPG2_DRIVERNAME
+    assert url.password == MIGRATION_PASSWORD
+
+
+def test_when_online_with_a_driverless_url_then_env_connects_through_psycopg2_with_the_password_intact():
+    """Validates alembic.env.run_migrations_online()."""
+    with (
+        migrations_reading(CLOSED_PORT_POSTGRES_URL),
+        patch("sqlalchemy.create_engine", wraps=create_engine) as engine_factory,
+        pytest.raises(OperationalError) as refused,
+    ):
+        command.upgrade(alembic_config(), HEAD)
+
+    url = make_url(engine_factory.call_args.args[0])
+    assert url.drivername == PSYCOPG2_DRIVERNAME
+    assert url.password == MIGRATION_PASSWORD
+    assert type(refused.value.orig).__module__.startswith(PSYCOPG2_MODULE)
 
 
 def test_when_a_backup_name_is_built_then_it_carries_the_table_and_a_timestamp():

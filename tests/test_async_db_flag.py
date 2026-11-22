@@ -7,6 +7,7 @@ appended deps; flag-off byte-identical to today).
 """
 
 import hashlib
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -23,7 +24,6 @@ from project_initializer.cli import (
 )
 from project_initializer.env_generator import GENERATED_SECRET_KEYS
 from project_initializer.file_transforms import append_async_dependencies
-from tests.toml_support import tomllib
 
 runner = CliRunner()
 
@@ -188,7 +188,7 @@ def test_when_pyproject_already_has_asyncpg_then_transform_returns_it_unchanged(
 
     Validates project_initializer/file_transforms.py append_async_dependencies().
     """
-    already = '[project]\ndependencies = [\n    "asyncpg==0.31.0",\n]\n'
+    already = '[project]\ndependencies = [\n    "asyncpg==0.32.0",\n]\n'
     assert append_async_dependencies(already) == already
 
 
@@ -238,6 +238,31 @@ def test_when_scaffolded_with_async_db_then_pyproject_declares_async_deps(tmp_pa
         project["dependencies"]
     )
     assert "aiosqlite" in _declared_names(project["optional-dependencies"]["dev"])
+
+
+@pytest.mark.parametrize("auth", [None, "supabase", "entra"])
+def test_when_async_dependencies_are_appended_then_the_sqlalchemy_extra_matches_the_base_pin(
+    tmp_path, auth
+):
+    """when the async dependencies are appended, sqlalchemy[asyncio] pins the manifest's SQLAlchemy version.
+
+    The transform carries its own copy of the pin, so a SQLAlchemy bump in a
+    manifest that forgets it would leave two pins of one package that disagree
+    and a scaffold pip cannot resolve.
+
+    Validates project_initializer/file_transforms.py append_async_dependencies().
+    """
+    copy_template(
+        tmp_path, "app", auth=auth, framework="fastapi", scope="api", async_db=True
+    )
+    dependencies = _scaffolded_pyproject(tmp_path / "api")["project"]["dependencies"]
+    pins = {
+        requirement.partition("==")[0].lower(): requirement.partition("==")[2]
+        for requirement in dependencies
+        if "==" in requirement
+    }
+
+    assert pins["sqlalchemy[asyncio]"] == pins["sqlalchemy"]
 
 
 def test_when_scaffolded_with_async_db_then_no_requirements_txt_exists(tmp_path):

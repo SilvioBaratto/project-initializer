@@ -7,12 +7,12 @@ dependencies, so a dependency that no code imports is attack surface every scaff
 carries.
 """
 
+import ast
 import re
+import tomllib
 from pathlib import Path
 
 import pytest
-
-from tests.toml_support import tomllib
 
 _PACKAGE = Path(__file__).resolve().parent.parent / "project_initializer"
 _PYPROJECT_FILES = {
@@ -47,13 +47,28 @@ def _declared_dependencies(variant: str) -> list[str]:
     return _runtime_dependencies(variant) + _dev_dependencies(variant)
 
 
-def _dependency_names(variant: str) -> set[str]:
+def _names_of(variant: str, entries: list[str]) -> set[str]:
     names: set[str] = set()
-    for entry in _declared_dependencies(variant):
+    for entry in entries:
         match = _REQUIREMENT.match(entry)
         assert match is not None, f"{variant}: unparsable dependency {entry!r}"
         names.add(match.group("name").lower())
     return names
+
+
+def _dependency_names(variant: str) -> set[str]:
+    return _names_of(variant, _declared_dependencies(variant))
+
+
+def _imported_top_level_modules(source_root: Path) -> set[str]:
+    modules: set[str] = set()
+    for path in source_root.rglob("*.py"):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Import):
+                modules.update(alias.name.split(".")[0] for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
+                modules.add(node.module.split(".")[0])
+    return modules
 
 
 @pytest.mark.parametrize("variant", sorted(_PYPROJECT_FILES))
@@ -169,3 +184,46 @@ def test_when_pyproject_is_parsed_then_no_python_package_is_listed(variant: str)
     Validates project_initializer/templates-{api,supabase,entra}-fastapi/api/pyproject.toml [tool.setuptools].packages.
     """
     assert _manifest(variant)["tool"]["setuptools"]["packages"] == []
+
+
+@pytest.mark.parametrize("variant", sorted(_PYPROJECT_FILES))
+def test_when_dev_dependencies_are_read_then_httpx2_carries_the_test_client(
+    variant: str,
+):
+    """Starlette's TestClient warns when only httpx is installed, so every dev extra declares httpx2.
+
+    Validates project_initializer/templates-{api,supabase,entra}-fastapi/api/pyproject.toml.
+    """
+    assert "httpx2" in _names_of(variant, _dev_dependencies(variant))
+
+
+def test_when_the_base_dependencies_are_read_then_httpx_is_not_declared():
+    """The base layer and the token overlay that inherits its manifest install httpx2 alone.
+
+    Validates project_initializer/templates-api-fastapi/api/pyproject.toml.
+    """
+    assert "httpx" not in _dependency_names("base")
+
+
+def test_when_the_httpx_less_layers_are_scanned_then_no_module_imports_httpx():
+    """No layer that lands on the no-auth or token manifest installs httpx, so an import of it would fail the scaffold's own tests.
+
+    Validates project_initializer/templates-{api,token,asyncdb}-fastapi/api (imports).
+    """
+    imported: set[str] = set()
+    for layer in ("templates-api-fastapi", "templates-token-fastapi", "templates-asyncdb-fastapi"):
+        imported |= _imported_top_level_modules(_PACKAGE / layer / "api")
+
+    assert "httpx" not in imported
+
+
+def test_when_the_supabase_dependencies_are_read_then_httpx_stays_a_runtime_dependency():
+    """The Supabase client and the variant's own code need httpx beside the httpx2 test transport.
+
+    Validates project_initializer/templates-supabase-fastapi/api/pyproject.toml.
+    """
+    assert "httpx" in _names_of("supabase", _runtime_dependencies("supabase"))
+    imported = _imported_top_level_modules(
+        _PACKAGE / "templates-supabase-fastapi" / "api" / "app"
+    )
+    assert "httpx" in imported

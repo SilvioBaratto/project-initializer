@@ -3,19 +3,30 @@
 They need no PostgreSQL server: URL translation is pure, the engine is built
 without connecting, and the session scope, breaker and probe run on in-memory
 ``aiosqlite``, which the unit level allows because no external service is
-involved. Repositories and real connection failures are in
+involved. A server that rejects a new connection is played by a stand-in for
+``asyncpg.connect``, so the real SQLAlchemy asyncpg dialect translates its error.
+Repositories and real connection failures are in
 ``tests/integration/test_async_database.py``. ``asyncio_mode = auto``
 (pytest.ini) collects the ``async def`` tests.
 """
 
+import asyncio
 import ssl
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import NoReturn
 from unittest import mock
 from urllib.parse import urlencode
 
+import aiosqlite
+import asyncpg
 import pytest
+from asyncpg.exceptions import (
+    CannotConnectNowError,
+    InvalidPasswordError,
+    TooManyConnectionsError,
+)
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -24,6 +35,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
@@ -51,6 +63,7 @@ from app.infrastructure.errors import (
     DatabaseOperationError,
     DatabaseUnavailableError,
     is_connectivity_failure,
+    sqlstate_of,
 )
 from app.infrastructure.health import DatabaseStatus
 from app.infrastructure.orm.base import Base
@@ -68,6 +81,7 @@ CUSTOM_CONNECT_TIMEOUT = 9
 SECRET_VALUE = "hunter2"
 DEADLOCK_SQLSTATE = "40P01"
 UNREACHABLE_SQLITE_URL = "sqlite+aiosqlite:////nonexistent-directory/app.db"
+WORKER_STOP_TIMEOUT_SECONDS = 5
 CERTIFICATE_VALIDITY = timedelta(days=1)
 
 
@@ -174,6 +188,67 @@ async def query_then_throw(error: BaseException) -> None:
     session = await anext(dependency)
     await session.execute(select(1))
     await dependency.athrow(error)
+
+
+def refuse_connections_with(
+    rejection: type[asyncpg.PostgresError],
+) -> Callable[..., Awaitable[NoReturn]]:
+    """Build an ``asyncpg.connect`` stand-in for a server that rejects every connection.
+
+    Args:
+        rejection: The asyncpg error class the server's startup answer maps to.
+
+    Returns:
+        A coroutine function that raises a fresh ``rejection`` on each call.
+    """
+
+    async def refuse(*_args: object, **_kwargs: object) -> NoReturn:
+        """Fail the way ``asyncpg.connect`` does when the server answers with an error."""
+        raise rejection("rejected during connection startup")
+
+    return refuse
+
+
+@pytest.fixture
+async def asyncpg_engine(monkeypatch) -> AsyncIterator[AsyncEngine]:
+    """An engine from ``build_async_engine``, with its connect hook, behind the session scope."""
+    engine = build_async_engine(Settings(database_url=POSTGRES_URL))
+    monkeypatch.setattr(
+        database_async,
+        "async_session_factory",
+        async_sessionmaker(bind=engine, autoflush=False),
+    )
+    yield engine
+    await engine.dispose()
+
+
+@pytest.fixture
+async def settled_aiosqlite_stops(monkeypatch) -> AsyncIterator[None]:
+    """Let aiosqlite finish stopping its worker threads before the event loop closes.
+
+    After a failed connect aiosqlite stops the worker thread without awaiting
+    the answer, which the thread delivers later through ``call_soon_threadsafe``.
+    When the test's loop is already closed by then, the thread dies with
+    ``RuntimeError: Event loop is closed`` and pytest reports it as an unhandled
+    thread exception in whichever later test is running.
+
+    Raises:
+        TimeoutError: A worker did not answer its stop within the timeout.
+    """
+    stops: list[asyncio.Future] = []
+    stop = aiosqlite.Connection.stop
+
+    def recording_stop(connection: aiosqlite.Connection) -> asyncio.Future | None:
+        """Call the real ``stop`` and keep the future it returns."""
+        future = stop(connection)
+        if future is not None:
+            stops.append(future)
+        return future
+
+    monkeypatch.setattr(aiosqlite.Connection, "stop", recording_stop)
+    yield
+    async with asyncio.timeout(WORKER_STOP_TIMEOUT_SECONDS):
+        await asyncio.gather(*stops)
 
 
 async def trip_circuit(breaker: CircuitBreaker) -> None:
@@ -558,6 +633,49 @@ async def test_when_outages_reach_the_threshold_then_the_next_request_is_refused
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
+    "rejection",
+    [TooManyConnectionsError, CannotConnectNowError],
+    ids=["53300-too-many-connections", "57P03-starting-up"],
+)
+async def test_when_the_server_rejects_the_connection_then_unavailable_is_raised_and_the_circuit_opens(
+    monkeypatch, asyncpg_engine, breaker, rejection
+):
+    """Validates app.infrastructure.database_async.build_async_engine()."""
+    monkeypatch.setattr(asyncpg, "connect", refuse_connections_with(rejection))
+
+    for _ in range(FAILURE_THRESHOLD):
+        with pytest.raises(DatabaseUnavailableError) as raised:
+            async with async_session_scope() as session:
+                await session.execute(select(1))
+        assert isinstance(raised.value.__cause__, OperationalError)
+        assert sqlstate_of(raised.value.__cause__) == rejection.sqlstate
+
+    assert breaker.state is CircuitState.OPEN
+
+
+@pytest.mark.unit
+async def test_when_the_server_rejects_the_password_then_an_operation_error_is_raised_and_the_circuit_stays_closed(
+    monkeypatch, asyncpg_engine, breaker
+):
+    """Validates app.infrastructure.database_async.build_async_engine()."""
+    monkeypatch.setattr(
+        asyncpg, "connect", refuse_connections_with(InvalidPasswordError)
+    )
+
+    for _ in range(FAILURE_THRESHOLD + 1):
+        with pytest.raises(DatabaseOperationError) as raised:
+            async with async_session_scope() as session:
+                await session.execute(select(1))
+
+    assert raised.value.log_context == {
+        "error_type": "OperationalError",
+        "sqlstate": InvalidPasswordError.sqlstate,
+    }
+    assert breaker.state is CircuitState.CLOSED
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
     "unrelated_failure",
     [ConnectionRefusedError("refused"), TimeoutError(), OSError("disk")],
 )
@@ -681,7 +799,7 @@ async def test_when_the_database_answers_then_the_async_probe_reports_up(
 
 @pytest.mark.unit
 async def test_when_the_database_cannot_be_opened_then_the_async_probe_reports_down(
-    monkeypatch, breaker, caplog
+    monkeypatch, breaker, caplog, settled_aiosqlite_stops
 ):
     """Validates app.infrastructure.database_async.probe_async_database()."""
     engine = create_async_engine(UNREACHABLE_SQLITE_URL)

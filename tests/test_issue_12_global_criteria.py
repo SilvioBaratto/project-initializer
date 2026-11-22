@@ -14,6 +14,7 @@ Criteria covered:
 """
 
 import re
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -25,7 +26,6 @@ from tests.fastapi_entra_sources import (
     entra_verifier_text,
     generated_entra_env_example,
 )
-from tests.toml_support import tomllib
 
 # ---------------------------------------------------------------------------
 # Helpers

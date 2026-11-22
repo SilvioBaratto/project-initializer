@@ -16,6 +16,7 @@ import fnmatch
 import glob
 import shutil
 import subprocess
+import tomllib
 from pathlib import Path, PurePosixPath
 
 import pytest
@@ -48,7 +49,6 @@ def _template_files() -> list[str]:
 
 
 def _pyproject() -> dict:
-    tomllib = pytest.importorskip("tomllib")
     return tomllib.loads((_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
 
