@@ -146,9 +146,11 @@ def route_template(scope: Scope) -> str:
 
     The template includes the prefix given to ``include_router``. A plain Starlette
     route, such as ``/openapi.json``, is named by its path and a mounted application
-    by its mount path. A router, route or endpoint registered at several paths is
-    one object, so the registrations cannot be told apart and the template of the
-    later one is logged for all of them.
+    by its mount path. A mounted FastAPI or Starlette application routes on its
+    own: the routes it serves are named by their path inside it, and a 404 of its
+    own is logged as ``UNMATCHED_ROUTE``. A router, route or endpoint registered
+    at several paths is one object, so the registrations cannot be told apart and
+    the template of the later one is logged for all of them.
 
     Args:
         scope: ASGI scope of the request, as seen after routing.

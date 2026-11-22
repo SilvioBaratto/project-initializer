@@ -1,9 +1,9 @@
 """Adapters of the credential ports: bcrypt password hashing and JWT access tokens.
 
-``bcrypt`` is called directly, without a wrapper library. Since 5.0 it raises
-``ValueError`` for a password over 72 bytes (4.x ignored everything past the
-72nd byte) and for a malformed hash. The hasher checks both before calling it, so
-``verify`` never raises and never truncates, and ``hash`` refuses a password
+``bcrypt`` is called directly, without a wrapper library. It raises
+``ValueError`` for a malformed hash and, since 5.0, for a password over 72 bytes
+(4.x ignored everything past the 72nd byte). The hasher checks both before calling
+it, so ``verify`` never raises and never truncates, and ``hash`` refuses a password
 that bcrypt could not hash in full.
 """
 
