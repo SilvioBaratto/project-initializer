@@ -6,7 +6,7 @@ Tailwind in favour of Angular Material 3 (Angular Material + CDK 21.2, now 22.3)
 so the file keeps its name for the issue history and now pins the dependency truth:
   - package.json (the base template, and the supabase / entra overlays that ship
     their own) declares no tailwindcss / @tailwindcss/postcss and depends on
-    @angular/material and @angular/cdk pinned to the same exact 22.3.x release
+    @angular/material and @angular/cdk ^22.3, both on the same range
   - package-lock.json resolves @angular/material to 22.3.x, resolves
     @angular/cdk to the exact release Material peers on, and contains no Tailwind
     package
@@ -40,7 +40,7 @@ PACKAGE_JSONS = {
 
 TAILWIND_PACKAGES = ("tailwindcss", "@tailwindcss/postcss")
 MATERIAL_PACKAGES = ("@angular/material", "@angular/cdk")
-_MATERIAL_PIN = re.compile(r"^22\.3\.\d+$")
+_MATERIAL_RANGE = re.compile(r"^\^22\.3\.\d+$")
 
 _DEPENDENCY_SECTIONS = (
     "dependencies",
@@ -82,7 +82,7 @@ def _resolved_version(lock: dict, package_name: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# package.json: no Tailwind, Angular Material + CDK 22.3
+# package.json: no Tailwind, Angular Material + CDK ^22.3
 # ---------------------------------------------------------------------------
 
 
@@ -99,7 +99,7 @@ def test_when_package_json_read_then_no_tailwind_dependency_is_declared(variant)
 def test_when_package_json_read_then_material_package_is_a_22_3_runtime_dependency(
     variant, package_name
 ):
-    """@angular/material and @angular/cdk are runtime dependencies pinned to an exact 22.3.x release.
+    """@angular/material and @angular/cdk are runtime dependencies on a ^22.3.x range.
 
     Validates project_initializer/templates/frontend/package.json, project_initializer/templates-supabase-frontend/frontend/package.json and project_initializer/templates-entra-frontend/frontend/package.json.
     """
@@ -107,8 +107,8 @@ def test_when_package_json_read_then_material_package_is_a_22_3_runtime_dependen
     assert package_name in dependencies, (
         f"[{variant}] {package_name} must be listed under dependencies"
     )
-    assert _MATERIAL_PIN.match(dependencies[package_name]), (
-        f"[{variant}] expected {package_name} pinned to 22.3.x, "
+    assert _MATERIAL_RANGE.match(dependencies[package_name]), (
+        f"[{variant}] expected {package_name} on ^22.3.x, "
         f"got {dependencies[package_name]!r}"
     )
 

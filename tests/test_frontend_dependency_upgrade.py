@@ -54,7 +54,9 @@ _REPO_CLAUDE = _REPO / "CLAUDE.md"
 _FROM_LINE = re.compile(r"^FROM\s+(?P<image>\S+)", re.M)
 _PINNED_NGINX = re.compile(r"nginx:\d+\.\d+(\.\d+)?-alpine")
 _ACTION_USE = re.compile(r"uses:\s*(?P<action>actions/[\w-]+)@(?P<ref>\S+)")
-_EXACT_VERSION = re.compile(r"\d+\.\d+\.\d+")
+# The frontend manifests declare npm ranges, a caret for most packages and a tilde
+# where only patch releases may follow (TypeScript, rxjs); the base lock holds the release.
+_RANGE_SPECIFIER = re.compile(r"(?P<operator>[\^~])(?P<version>\d+\.\d+\.\d+)")
 _OLD_ICON_IMPORT = re.compile(r"""from\s+['"]lucide-angular['"]""")
 # A quoted value is consumed whole, so a ">" inside a binding ("n() > 0", "=>") does not
 # end the start tag before the attributes that follow it.
@@ -93,9 +95,18 @@ _ANGULAR_PACKAGES = tuple(
 # 22.3.0 is the first Material release whose checkbox and radio DOM agrees with
 # its own test harness selectors.
 _ANGULAR_FLOOR = (22, 3, 0)
-_ANGULAR_MAJOR = 22
-_TYPESCRIPT_PIN = re.compile(r"6\.0\.\d+")
-_EXACT_PINNED = (*_ANGULAR_PACKAGES, "typescript", "tslib", "rxjs")
+_ANGULAR_CEILING = (23, 0, 0)
+# 1.77.0 is the release whose class names icons.ts imports.
+_LUCIDE_FLOOR = (1, 77, 0)
+_LUCIDE_CEILING = (2, 0, 0)
+_TYPESCRIPT_RANGE = re.compile(r"~6\.0\.\d+")
+_SHARED_SPECIFIERS = (
+    *_ANGULAR_PACKAGES,
+    "@lucide/angular",
+    "typescript",
+    "tslib",
+    "rxjs",
+)
 _PEER_COMPARATOR = re.compile(r"(?P<operator>>=|<)(?P<version>\d+(?:\.\d+)*)")
 _WITH_FETCH = re.compile(r"\bwithFetch\b")
 # Default is the deprecated alias of Eager; both opt a component out of OnPush.
@@ -176,19 +187,19 @@ def test_when_a_workflow_is_read_then_every_use_of_checkout_and_setup_node_is_v7
 
 @pytest.mark.unit
 def test_when_the_frontend_manifests_are_read_then_the_deprecated_lucide_package_is_gone():
-    """No frontend manifest lists ``lucide-angular``; each pins the same ``@lucide/angular``.
+    """No frontend manifest lists ``lucide-angular``; each declares the same ``@lucide/angular`` caret range.
 
-    The pin is exact and shared by the three manifests because the package
-    renames icons in minor releases: a range, or two layers on different
-    releases, could resolve names that ``icons.ts`` no longer matches. The base
-    lock, the only one in the repo, must resolve that same release.
+    The range starts at 1.77.0, the release whose class names ``icons.ts``
+    imports, and is the same in the three manifests, so every auth mode installs
+    from one release line. The base lock, the only one in the repo, must resolve
+    a release inside it.
 
     Validates project_initializer/templates/frontend/package.json, project_initializer/templates-supabase-frontend/frontend/package.json, project_initializer/templates-entra-frontend/frontend/package.json and project_initializer/templates/frontend/package-lock.json.
     """
     assert len(_FRONTEND_MANIFESTS) == 3, [
         _repo_relative(m) for m in _FRONTEND_MANIFESTS
     ]
-    pins = {}
+    specifiers = {}
     for manifest in _FRONTEND_MANIFESTS:
         package = json.loads(manifest.read_text(encoding="utf-8"))
         declared = {
@@ -198,17 +209,23 @@ def test_when_the_frontend_manifests_are_read_then_the_deprecated_lucide_package
         assert "lucide-angular" not in declared, (
             f"{_repo_relative(manifest)} still lists lucide-angular"
         )
-        pins[_repo_relative(manifest)] = package.get("dependencies", {}).get(
+        specifiers[_repo_relative(manifest)] = package.get("dependencies", {}).get(
             "@lucide/angular"
         )
 
-    assert all(pin and _EXACT_VERSION.fullmatch(pin) for pin in pins.values()), pins
-    assert len(set(pins.values())) == 1, f"the manifests pin different releases: {pins}"
+    assert all(
+        _is_caret_range_within(specifier, _LUCIDE_FLOOR, _LUCIDE_CEILING)
+        for specifier in specifiers.values()
+    ), specifiers
+    assert len(set(specifiers.values())) == 1, (
+        f"the manifests declare different ranges: {specifiers}"
+    )
 
     packages = json.loads(_FRONTEND_LOCK.read_text(encoding="utf-8"))["packages"]
     assert "node_modules/lucide-angular" not in packages
-    assert packages["node_modules/@lucide/angular"]["version"] == next(
-        iter(pins.values())
+    assert _in_npm_range(
+        packages["node_modules/@lucide/angular"]["version"],
+        next(iter(specifiers.values())),
     )
 
 
@@ -371,13 +388,44 @@ def _satisfies(version: str, peer_range: str) -> bool:
     )
 
 
+def _in_npm_range(version: str, specifier: str) -> bool:
+    """Tell whether ``version`` falls inside a ``^x.y.z`` or ``~x.y.z`` npm range.
+
+    Raises:
+        ValueError: when ``specifier`` is any other form, an exact version included,
+            so a manifest that leaves the range style fails instead of being half read.
+    """
+    match = _RANGE_SPECIFIER.fullmatch(specifier)
+    if not match:
+        raise ValueError(f"not a caret or tilde range: {specifier!r}")
+    floor = _version_tuple(match["version"])
+    candidate = _version_tuple(version)
+    if match["operator"] == "~":
+        return candidate >= floor and candidate[:2] == floor[:2]
+    # Below 1.0.0 a caret holds the minor; from 1.0.0 on it holds the major.
+    held = 2 if floor[0] == 0 else 1
+    return candidate >= floor and candidate[:held] == floor[:held]
+
+
+def _is_caret_range_within(
+    specifier: str | None, floor: tuple[int, ...], ceiling: tuple[int, ...]
+) -> bool:
+    """Tell whether ``specifier`` is a caret range whose lower bound is in ``[floor, ceiling)``."""
+    match = _RANGE_SPECIFIER.fullmatch(specifier or "")
+    return bool(
+        match
+        and match["operator"] == "^"
+        and floor <= _version_tuple(match["version"]) < ceiling
+    )
+
+
 @pytest.mark.unit
-def test_when_the_frontend_manifests_are_read_then_every_angular_package_is_an_exact_22_pin():
-    """Every ``@angular/*`` package of each manifest is pinned to an Angular 22 release, 22.3.0 or later.
+def test_when_the_frontend_manifests_are_read_then_every_angular_package_is_on_a_22_caret_range():
+    """Every ``@angular/*`` package of each manifest declares a caret range on Angular 22, from 22.3.0 or later.
 
     A range left on 21 would let npm put an Angular 21 package next to Angular 22
-    ones, and a range of any kind lets the layers drift from the release the
-    templates were verified with.
+    ones, and a floor below 22.3.0 would admit Material releases whose checkbox and
+    radio DOM disagrees with their own harnesses.
 
     Validates project_initializer/templates/frontend/package.json, project_initializer/templates-supabase-frontend/frontend/package.json and project_initializer/templates-entra-frontend/frontend/package.json.
     """
@@ -389,24 +437,22 @@ def test_when_the_frontend_manifests_are_read_then_every_angular_package_is_an_e
         declared = _manifest_dependencies(manifest)
         missing = [name for name in _ANGULAR_PACKAGES if name not in declared]
         assert missing == [], f"{_repo_relative(manifest)} lacks {missing}"
-        for name, pin in declared.items():
-            if not name.startswith("@angular/"):
-                continue
-            # A range is not a version, so it is rejected before it is compared.
-            if not _EXACT_VERSION.fullmatch(pin) or not (
-                _ANGULAR_FLOOR <= _version_tuple(pin) < (_ANGULAR_MAJOR + 1, 0, 0)
-            ):
-                offenders.append(f"{_repo_relative(manifest)}: {name}@{pin}")
+        offenders += [
+            f"{_repo_relative(manifest)}: {name}@{specifier}"
+            for name, specifier in declared.items()
+            if name.startswith("@angular/")
+            and not _is_caret_range_within(specifier, _ANGULAR_FLOOR, _ANGULAR_CEILING)
+        ]
     assert offenders == []
 
 
 @pytest.mark.unit
 def test_when_the_frontend_manifests_are_read_then_a_package_they_share_has_the_same_pin_in_each():
-    """A dependency that more than one frontend manifest declares carries the same pin in all of them.
+    """A dependency that more than one frontend manifest declares carries the same specifier in all of them.
 
-    The supabase and entra overlays replace the base manifest whole, so a version
-    bumped in one copy only would scaffold a different Angular, Material, CDK or
-    TypeScript for one auth mode.
+    The supabase and entra overlays replace the base manifest whole, so a range
+    bumped in one copy only would scaffold a different Angular, Material, CDK,
+    icon library or TypeScript for one auth mode.
 
     Validates project_initializer/templates/frontend/package.json, project_initializer/templates-supabase-frontend/frontend/package.json and project_initializer/templates-entra-frontend/frontend/package.json.
     """
@@ -416,7 +462,7 @@ def test_when_the_frontend_manifests_are_read_then_a_package_they_share_has_the_
             pins.setdefault(name, {})[_repo_relative(manifest)] = pin
     shared = {name: found for name, found in pins.items() if len(found) > 1}
 
-    assert sorted(set(_EXACT_PINNED) - set(shared)) == []
+    assert sorted(set(_SHARED_SPECIFIERS) - set(shared)) == []
     diverging = {
         name: found for name, found in shared.items() if len(set(found.values())) > 1
     }
@@ -428,11 +474,11 @@ def test_when_the_frontend_manifests_are_read_then_a_package_they_share_has_the_
 def test_when_a_frontend_manifest_is_read_then_each_angular_release_group_shares_one_version(
     group: str,
 ):
-    """The packages Angular publishes together carry one version in each manifest.
+    """The packages Angular publishes together declare one range in each manifest.
 
     ``@angular/compiler-cli`` peers on ``@angular/compiler`` and ``@angular/material``
-    on ``@angular/cdk`` at exactly their own release, so a split group breaks the
-    install or the build.
+    on ``@angular/cdk`` at exactly their own release, so a group split across two
+    ranges can resolve to releases that break the install or the build.
 
     Validates project_initializer/templates/frontend/package.json, project_initializer/templates-supabase-frontend/frontend/package.json and project_initializer/templates-entra-frontend/frontend/package.json.
     """
@@ -445,22 +491,27 @@ def test_when_a_frontend_manifest_is_read_then_each_angular_release_group_shares
 
 
 @pytest.mark.unit
-def test_when_typescript_is_read_then_it_is_an_exact_6_0_pin_inside_the_angular_compiler_peer_range():
-    """Each manifest pins TypeScript 6.0.x, and the lock resolves it inside the Angular compiler's and builder's peer range.
+def test_when_typescript_is_read_then_it_is_a_6_0_tilde_range_inside_the_angular_compiler_peer_range():
+    """Each manifest declares TypeScript ``~6.0.x``, and the lock resolves it inside the Angular compiler's and builder's peer range.
 
     The Angular 22 compiler and builder peer on ``typescript >=6.0 <6.1``:
-    TypeScript 7 is the registry's latest release, but the compiler rejects it.
+    TypeScript 7 is the registry's latest release, but the compiler rejects it,
+    so the range may follow patch releases only.
 
     Validates project_initializer/templates/frontend/package.json, project_initializer/templates-supabase-frontend/frontend/package.json, project_initializer/templates-entra-frontend/frontend/package.json and project_initializer/templates/frontend/package-lock.json.
     """
-    pins = {
+    specifiers = {
         _repo_relative(m): _manifest_dependencies(m).get("typescript")
         for m in _FRONTEND_MANIFESTS
     }
-    assert all(pin and _TYPESCRIPT_PIN.fullmatch(pin) for pin in pins.values()), pins
+    assert all(
+        specifier and _TYPESCRIPT_RANGE.fullmatch(specifier)
+        for specifier in specifiers.values()
+    ), specifiers
 
     packages = _lock_packages()
     resolved = packages["node_modules/typescript"]["version"]
+    assert _in_npm_range(resolved, specifiers[_repo_relative(_BASE_MANIFEST)])
     for dependent in ("@angular/compiler-cli", "@angular/build"):
         peer_range = packages[f"node_modules/{dependent}"]["peerDependencies"][
             "typescript"
@@ -471,11 +522,12 @@ def test_when_typescript_is_read_then_it_is_an_exact_6_0_pin_inside_the_angular_
 
 
 @pytest.mark.unit
-def test_when_the_base_lock_is_read_then_it_resolves_every_exact_pin_of_the_base_manifest():
-    """The base lock declares and resolves Angular, TypeScript, tslib and rxjs at the base manifest's exact pins.
+def test_when_the_base_lock_is_read_then_it_declares_the_manifest_ranges_and_resolves_inside_them():
+    """The base lock declares Angular, the icon library, TypeScript, tslib and rxjs with the base manifest's ranges and resolves a release inside each.
 
-    ``npm ci`` in the image build refuses a lock that disagrees with the manifest,
-    and only an exact pin makes the lock's release the declared one.
+    ``npm ci`` in the image build refuses a lock whose root entry disagrees with
+    the manifest, and a resolved release outside its range means the lock was
+    not regenerated after a manifest change.
 
     Validates project_initializer/templates/frontend/package.json and project_initializer/templates/frontend/package-lock.json.
     """
@@ -486,14 +538,12 @@ def test_when_the_base_lock_is_read_then_it_resolves_every_exact_pin_of_the_base
         **packages[""].get("devDependencies", {}),
     }
     mismatches = []
-    for name in _EXACT_PINNED:
-        pin = declared[name]
-        resolved = packages.get(f"node_modules/{name}", {}).get("version")
-        if not _EXACT_VERSION.fullmatch(pin):
-            mismatches.append(f"{name}: {pin!r} is not an exact version")
-        elif root.get(name) != pin or resolved != pin:
+    for name in _SHARED_SPECIFIERS:
+        specifier = declared[name]
+        resolved = packages.get(f"node_modules/{name}", {}).get("version", "0.0.0")
+        if root.get(name) != specifier or not _in_npm_range(resolved, specifier):
             mismatches.append(
-                f"{name}: manifest {pin}, lock root {root.get(name)}, resolved {resolved}"
+                f"{name}: manifest {specifier}, lock root {root.get(name)}, resolved {resolved}"
             )
     assert mismatches == []
 
@@ -581,14 +631,17 @@ def test_when_a_root_service_is_read_then_it_uses_the_service_decorator_and_noth
 
 
 @pytest.mark.unit
-def test_when_the_docs_name_the_angular_release_then_it_is_the_one_the_manifests_pin():
-    """The generated root and frontend CLAUDE.md and the repo CLAUDE.md name the pinned Angular major and Material + CDK minor.
+def test_when_the_docs_name_the_angular_release_then_it_is_the_one_the_manifests_declare():
+    """The generated root and frontend CLAUDE.md and the repo CLAUDE.md name the Angular major and Material + CDK minor the base manifest declares.
 
     Validates project_initializer/docs_generator.py generate_root_claude(), project_initializer/docs_generator.py generate_frontend_claude() and CLAUDE.md.
     """
     declared = _manifest_dependencies(_BASE_MANIFEST)
-    angular_major = declared["@angular/core"].split(".")[0]
-    material_minor = ".".join(declared["@angular/material"].split(".")[:2])
+    angular_floor = _RANGE_SPECIFIER.fullmatch(declared["@angular/core"])
+    material_floor = _RANGE_SPECIFIER.fullmatch(declared["@angular/material"])
+    assert angular_floor and material_floor, declared
+    angular_major = angular_floor["version"].split(".")[0]
+    material_minor = ".".join(material_floor["version"].split(".")[:2])
 
     root_docs = {
         "fullstack": generate_root_claude("fastapi", None),
