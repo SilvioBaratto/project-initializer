@@ -1,5 +1,5 @@
 # Stage 1: Build Angular application
-FROM node:22-alpine AS builder
+FROM node:26-alpine AS builder
 
 WORKDIR /app
 
@@ -16,9 +16,11 @@ COPY . .
 RUN npm run build -- --configuration=production
 
 # Stage 2: Serve with nginx
-# The stable branch, not the moving `alpine` tag: that one follows mainline, so a
-# rebuild could change nginx branch. Stable keeps a plain random draw behind
-# $request_id, which nginx.conf uses as the CSP nonce.
+# The stable branch (an even minor), not the moving `alpine` tag: that one follows
+# mainline, so a rebuild could change nginx branch. nginx.conf uses $request_id as
+# the CSP nonce, which must be unguessable: stable draws it from random bytes on
+# every request, while mainline (1.31.2 on) derives it with SipHash, so changing
+# branch means re-checking how the nonce is produced.
 FROM nginx:1.30-alpine
 
 # Remove default nginx config

@@ -1,8 +1,11 @@
-"""Pins what the frontend dependency upgrade moved: the runtime image, the CI actions, the icon library and Angular.
+"""Pins what the frontend dependency upgrade moved: the images, the CI, the icon library and Angular.
 
 A moving nginx tag would let the runtime stage change nginx branch between two
 builds, and an action left on an old major keeps a job on a runtime that GitHub
-has retired. ``lucide-angular`` is deprecated and caps its Angular peers at 21,
+has retired. Angular 22 needs Node 22.22.3 or later, so the builder image and
+both CI workflows run Node 26, which Vitest 5 and jsdom 31 also support
+(Vitest 4 left Node's Web Storage ``localStorage`` global over jsdom's).
+``lucide-angular`` is deprecated and caps its Angular peers at 21,
 so the frontends render their icons through ``@lucide/angular`` instead.
 Angular, Angular Material and the CDK are on 22 and TypeScript on 6.0, the only
 minor the Angular 22 compiler accepts; the APIs Angular 22 deprecates, and the
@@ -52,8 +55,14 @@ _BASE_INDEX_HTML = _TEMPLATES / "templates" / "frontend" / "src" / "index.html"
 _REPO_CLAUDE = _REPO / "CLAUDE.md"
 
 _FROM_LINE = re.compile(r"^FROM\s+(?P<image>\S+)", re.M)
-_PINNED_NGINX = re.compile(r"nginx:\d+\.\d+(\.\d+)?-alpine")
-_ACTION_USE = re.compile(r"uses:\s*(?P<action>actions/[\w-]+)@(?P<ref>\S+)")
+_PINNED_NGINX = re.compile(r"nginx:\d+\.(?P<minor>\d+)(\.\d+)?-alpine")
+# YAML lets a value be quoted, and a "#" that opens a line or follows whitespace starts a comment.
+_ACTION_USE = re.compile(
+    r"""uses:\s*["']?(?P<action>actions/[\w-]+)@(?P<ref>[^\s"']+)"""
+)
+_SETUP_NODE_USE = re.compile(r"""uses:\s*["']?actions/setup-node@""")
+_NODE_VERSION = re.compile(r"""node-version:\s*["']?(?P<version>[^\s"']+)""")
+_YAML_COMMENT = re.compile(r"(?:^|[ \t])#.*$", re.M)
 # The frontend manifests declare npm ranges, a caret for most packages and a tilde
 # where only patch releases may follow (TypeScript, rxjs); the base lock holds the release.
 _RANGE_SPECIFIER = re.compile(r"(?P<operator>[\^~])(?P<version>\d+\.\d+\.\d+)")
@@ -141,18 +150,42 @@ def _frontend_sources(*suffixes: str) -> Iterator[Path]:
                 yield path
 
 
+def _without_yaml_comments(text: str) -> str:
+    """Return ``text`` with every YAML comment removed, so a commented-out step is not read as live."""
+    return _YAML_COMMENT.sub("", text)
+
+
 def _action_refs(text: str, action: str) -> list[str]:
-    """Return the ref of every ``uses:`` line of ``action``, in file order."""
-    return [m["ref"] for m in _ACTION_USE.finditer(text) if m["action"] == action]
+    """Return the ref of every live ``uses:`` line of ``action``, in file order."""
+    return [
+        m["ref"]
+        for m in _ACTION_USE.finditer(_without_yaml_comments(text))
+        if m["action"] == action
+    ]
+
+
+def _node_version_before(text: str, step: str) -> str | None:
+    """Return the ``node-version`` of the last live setup-node step in front of ``step``.
+
+    Returns ``None`` when no setup-node step precedes ``step`` or the step names no version.
+    """
+    live = _without_yaml_comments(text)
+    step_start = live.index(f"name: {step}")
+    setups = [m for m in _SETUP_NODE_USE.finditer(live) if m.start() < step_start]
+    if not setups:
+        return None
+    version = _NODE_VERSION.search(live, setups[-1].end())
+    return version["version"] if version else None
 
 
 @pytest.mark.unit
-def test_when_the_frontend_dockerfile_is_read_then_the_runtime_stage_pins_an_nginx_branch():
-    """The runtime stage names a stable nginx branch, never the moving tag.
+def test_when_the_frontend_dockerfile_is_read_then_the_builder_is_node_26_and_nginx_is_pinned():
+    """The builder stage is node:26-alpine and the runtime stage pins a stable nginx branch.
 
-    The tag must carry a version (``nginx:1.30-alpine``), not ``nginx:alpine`` or
-    ``latest``: an unpinned tag follows the mainline branch and changes security
-    level between two builds of the same template.
+    Angular 22 needs Node 22.22.3 or later, and the toolchain is verified on 26.
+    The runtime tag must carry a version (``nginx:1.30-alpine``), not
+    ``nginx:alpine`` or ``latest``: an unpinned tag follows the mainline branch and
+    changes security level between two builds of the same template.
 
     Validates project_initializer/templates/frontend/Dockerfile.
     """
@@ -162,11 +195,17 @@ def test_when_the_frontend_dockerfile_is_read_then_the_runtime_stage_pins_an_ngi
     ]
     assert len(images) == 2, f"expected a builder and a runtime stage, got {images}"
 
-    runtime_image = images[-1]
-    assert _PINNED_NGINX.fullmatch(runtime_image), (
-        f"runtime stage must pin an nginx branch, got {runtime_image}"
+    builder_image, runtime_image = images
+    assert builder_image == "node:26-alpine"
+
+    pinned = _PINNED_NGINX.fullmatch(runtime_image)
+    assert pinned, f"runtime stage must pin an nginx branch, got {runtime_image}"
+    # nginx numbers its stable branches with an even minor (1.28, 1.30) and mainline with an
+    # odd one. The CSP nonce is $request_id, which stable draws from random bytes on every
+    # request and mainline derives with SipHash, so an odd minor needs that re-checked first.
+    assert int(pinned["minor"]) % 2 == 0, (
+        f"{runtime_image} is a mainline branch; pin a stable one (even minor)"
     )
-    assert runtime_image not in {"nginx:alpine", "nginx:latest"}
 
 
 @pytest.mark.unit
@@ -185,6 +224,90 @@ def test_when_a_workflow_is_read_then_every_use_of_checkout_and_setup_node_is_v7
     refs = _action_refs(workflow.read_text(encoding="utf-8"), action)
     assert refs, f"{_repo_relative(workflow)} no longer uses {action}"
     assert set(refs) == {"v7"}, f"{_repo_relative(workflow)} uses {action}@{refs}"
+
+
+@pytest.mark.unit
+def test_when_a_workflow_has_commented_out_or_quoted_uses_lines_then_only_the_live_refs_are_read():
+    """A commented-out ``uses:`` line is ignored and a quoted one is still read.
+
+    The v7 guard reads refs through this scan; a stale ``# uses: ...@v4`` comment
+    must not fail it, and a quoted ``uses: "actions/...@v6"`` must not slip past it.
+
+    Validates tests/test_frontend_dependency_upgrade.py _action_refs().
+    """
+    workflow = (
+        "steps:\n"
+        "  # - uses: actions/checkout@v4\n"
+        "  - uses: actions/checkout@v7\n"
+        '  - uses: "actions/checkout@v6"\n'
+        "  - uses: 'actions/setup-node@v7' # pinned\n"
+        "  - uses: actions/setup-python@v5\n"
+    )
+
+    assert _action_refs(workflow, "actions/checkout") == ["v7", "v6"]
+    assert _action_refs(workflow, "actions/setup-node") == ["v7"]
+
+
+@pytest.mark.unit
+def test_when_a_workflow_has_a_commented_out_setup_node_then_the_node_version_comes_from_the_live_step():
+    """The Node version is read from the live setup-node step in front of the named step.
+
+    A commented-out earlier setup-node, an unquoted version and a later job that
+    sets another Node up must not change the answer.
+
+    Validates tests/test_frontend_dependency_upgrade.py _node_version_before().
+    """
+    workflow = (
+        "  # - uses: actions/setup-node@v4\n"
+        "  #   with:\n"
+        '  #     node-version: "18"\n'
+        "  - uses: actions/setup-node@v7\n"
+        "    with:\n"
+        "      node-version: 26 # the Angular build\n"
+        "  - name: Build Angular frontend\n"
+        "  - uses: actions/setup-node@v7\n"
+        '    with:\n      node-version: "22"\n'
+    )
+
+    assert _node_version_before(workflow, "Build Angular frontend") == "26"
+    assert _node_version_before("  - name: Build\n", "Build") is None
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("workflow", _WORKFLOWS, ids=_repo_relative)
+def test_when_a_workflow_builds_the_frontend_then_the_node_it_sets_up_is_26(
+    workflow: Path,
+):
+    """The setup-node step in front of the Angular build installs Node 26.
+
+    The Angular 22 CLI refuses Node 20 and needs 22.22.3 or later; 26 is the line
+    the unit-test toolchain is verified on. The NestJS suites job later in the repo
+    workflow sets Node up for the API and is not this step.
+
+    Validates .github/workflows/test-package.yml and project_initializer/templates/.github/workflows/test-package.yml.
+    """
+    version = _node_version_before(
+        workflow.read_text(encoding="utf-8"), "Build Angular frontend"
+    )
+
+    assert version == "26", (
+        f"{_repo_relative(workflow)} builds the frontend on Node {version}"
+    )
+
+
+@pytest.mark.unit
+def test_when_contributing_is_read_then_it_asks_for_node_26_and_not_node_20():
+    """The prerequisites name Node.js 26, a release the Angular 22 CLI accepts.
+
+    A contributor scaffolds the frontend on the host, and the Angular 22 CLI
+    refuses Node 20.
+
+    Validates CONTRIBUTING.md.
+    """
+    contributing = (_REPO / "CONTRIBUTING.md").read_text(encoding="utf-8")
+
+    assert "- Node.js 26\n" in contributing
+    assert "Node.js 20" not in contributing
 
 
 @pytest.mark.unit
