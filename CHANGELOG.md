@@ -46,7 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **The NestJS lock files no longer pin the vulnerable releases of 0.6.0.** `npm audit` reports 37 advisories against the three locks of 0.6.0, two of them critical (`proxy-addr` 2.0.7, IP spoofing through an IPv4-mapped IPv6 trust subnet, in a runtime dependency of Express; `handlebars`, a development dependency) and high ones in `multer` 2.1.1 (two denial-of-service advisories, fixed from 2.2.0; the locks now hold 2.5.0), `body-parser` 2.3.0 (fixed in 2.4.0) and `zod` 4.4.3 (memory exhaustion, fixed in 4.6.6). The locks now report 23, none critical (see the lock entry under Changed for what remains).
+- **The NestJS lock files no longer pin the vulnerable releases of 0.6.0.** `npm audit` reports 37 advisories against the three locks of 0.6.0, two of them critical (`proxy-addr` 2.0.7, IP spoofing through an IPv4-mapped IPv6 trust subnet, in a runtime dependency of Express; `handlebars`, a development dependency) and high ones in `multer` 2.1.1 (denial-of-service advisories, fixed between 2.2.0 and 2.5.0; the locks now hold 2.5.0), `body-parser` 2.3.0 (fixed in 2.4.0) and `zod` 4.4.3 (memory exhaustion, fixed in 4.6.6). The locks now report 23, none critical (see the lock entry under Changed for what remains).
 
 ### Repo tests
 
