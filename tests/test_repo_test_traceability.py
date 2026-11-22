@@ -330,6 +330,11 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_nestjs_layer_owns_a_lock_exactly_when_it_ships_a_package_json",
         }
     ),
+    "test_package_data.py": frozenset(
+        {
+            "test_when_pyproject_package_data_is_read_then_runtime_data_file_is_listed",
+        }
+    ),
     "test_scope_scaffold.py": frozenset(
         {
             "test_when_fullstack_scaffolded_twice_trees_are_identical",

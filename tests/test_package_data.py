@@ -47,6 +47,10 @@ def test_when_package_root_is_listed_then_every_tracked_data_file_is_declared() 
 
 @pytest.mark.parametrize("name", _RUNTIME_DATA_FILES)
 def test_when_pyproject_package_data_is_read_then_runtime_data_file_is_listed(name: str) -> None:
+    """A runtime data file missing from package-data stays out of the wheel.
+
+    Validates pyproject.toml [tool.setuptools.package-data].
+    """
     config = tomllib.loads((_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     patterns = config["tool"]["setuptools"]["package-data"]["project_initializer"]
     assert name in patterns, f"pyproject.toml package-data must list {name!r}, or the wheel leaves it out"

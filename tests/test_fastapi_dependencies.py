@@ -205,14 +205,14 @@ def test_when_the_base_dependencies_are_read_then_httpx_is_not_declared():
     assert "httpx" not in _dependency_names("base")
 
 
-def test_when_the_base_and_token_layers_are_scanned_then_no_module_imports_httpx():
-    """Neither layer installs httpx, so an import of it would fail the scaffold's own tests.
+def test_when_the_httpx_less_layers_are_scanned_then_no_module_imports_httpx():
+    """No layer that lands on the no-auth or token manifest installs httpx, so an import of it would fail the scaffold's own tests.
 
-    Validates project_initializer/templates-api-fastapi/api and templates-token-fastapi/api (imports).
+    Validates project_initializer/templates-{api,token,asyncdb}-fastapi/api (imports).
     """
-    imported = _imported_top_level_modules(
-        _PACKAGE / "templates-api-fastapi" / "api"
-    ) | _imported_top_level_modules(_PACKAGE / "templates-token-fastapi" / "api")
+    imported: set[str] = set()
+    for layer in ("templates-api-fastapi", "templates-token-fastapi", "templates-asyncdb-fastapi"):
+        imported |= _imported_top_level_modules(_PACKAGE / layer / "api")
 
     assert "httpx" not in imported
 
