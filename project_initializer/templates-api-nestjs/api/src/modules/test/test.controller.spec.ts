@@ -1,9 +1,5 @@
 import type { Server } from 'node:http';
-import {
-  INestApplication,
-  StandardSchemaSerializerInterceptor,
-  StandardSchemaValidationPipe,
-} from '@nestjs/common';
+import { INestApplication, StandardSchemaSerializerInterceptor } from '@nestjs/common';
 import { APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -13,6 +9,7 @@ import {
   requestBodySchemaOf,
   responseSchemaOf,
 } from '../../../test/support/openapi-document';
+import { createSchemaValidationPipe } from '../../common/filters/schema-validation.exception';
 import { MAX_ECHO_MESSAGE_LENGTH, PING_MESSAGE } from './dto/echo.dto';
 import { TestController } from './test.controller';
 
@@ -34,7 +31,7 @@ describe('TestController', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [TestController],
       providers: [
-        { provide: APP_PIPE, useClass: StandardSchemaValidationPipe },
+        { provide: APP_PIPE, useFactory: createSchemaValidationPipe },
         { provide: APP_INTERCEPTOR, useClass: StandardSchemaSerializerInterceptor },
       ],
     }).compile();

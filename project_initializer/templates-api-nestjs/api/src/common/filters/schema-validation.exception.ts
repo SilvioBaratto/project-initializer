@@ -1,4 +1,8 @@
-import { BadRequestException, type StandardSchemaValidationPipeOptions } from '@nestjs/common';
+import {
+  BadRequestException,
+  StandardSchemaValidationPipe,
+  type StandardSchemaValidationPipeOptions,
+} from '@nestjs/common';
 
 /** Message of every request-validation failure; the failing fields are listed separately. */
 export const VALIDATION_FAILED_MESSAGE = 'Validation failed';
@@ -25,4 +29,17 @@ export class SchemaValidationException extends BadRequestException {
   constructor(readonly issues: SchemaIssues) {
     super(VALIDATION_FAILED_MESSAGE);
   }
+}
+
+/**
+ * Builds the validation pipe the application registers as `APP_PIPE`: Nest's
+ * `StandardSchemaValidationPipe`, throwing {@link SchemaValidationException} so a failure keeps its
+ * field detail. Specs that wire a pipe of their own use this too, so they test the production one.
+ *
+ * @returns A new pipe; it validates only parameters that pass `{ schema }`.
+ */
+export function createSchemaValidationPipe(): StandardSchemaValidationPipe {
+  return new StandardSchemaValidationPipe({
+    exceptionFactory: (issues) => new SchemaValidationException(issues),
+  });
 }

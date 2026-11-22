@@ -10,6 +10,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { describeError } from '../describe-error';
+import { requestPathOf } from '../filters/error-body';
 import { ACCESS_TOKEN_VERIFIER, AccessTokenVerifier } from './access-token-verifier';
 import { AUTHENTICATION_REQUIRED_MESSAGE, INVALID_CREDENTIALS_MESSAGE } from './auth-messages';
 import { AuthenticatedRequest, AuthenticatedUser } from './authenticated-user';
@@ -90,7 +91,7 @@ export class AccessTokenGuard implements CanActivate {
       msg: 'Request rejected by access token guard',
       status: exception.getStatus(),
       method: request.method,
-      path: request.path,
+      path: requestPathOf(request),
       requestId: requestIdOf(request),
     });
     return exception;

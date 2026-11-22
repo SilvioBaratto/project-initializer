@@ -2,7 +2,7 @@ import type { Server } from 'node:http';
 import { INestApplication, Type } from '@nestjs/common';
 import { Test, TestingModuleBuilder } from '@nestjs/testing';
 import { AppModule } from '../../src/app.module';
-import { configureApp } from '../../src/app.setup';
+import { answerUnmatchedRequests, configureApp } from '../../src/app.setup';
 import {
   ACCESS_TOKEN_VERIFIER,
   AccessTokenVerifier,
@@ -49,8 +49,9 @@ const prismaServiceStub = {
 /**
  * Boots the whole `AppModule` over in-memory doubles, so e2e runs need no Postgres.
  *
- * The app is configured through the same `configureApp` as `main.ts`, so prefix, filters and CORS
- * match production.
+ * The app is configured through the same `configureApp`, and finished with the same
+ * `answerUnmatchedRequests`, as `main.ts`, so prefix, filters, CORS and the answer to unmatched
+ * paths match production.
  *
  * @param options - See {@link E2eAppOptions}.
  * @returns The initialised application; the caller closes it in `afterAll`.
@@ -77,6 +78,7 @@ export async function createE2eApp(options: E2eAppOptions = {}): Promise<E2eApp>
   const app = moduleRef.createNestApplication();
   configureApp(app);
   await app.init();
+  answerUnmatchedRequests(app);
   return { app, ...doubles };
 }
 

@@ -15,18 +15,48 @@ import { z } from 'zod';
 import { ResponseSchema } from './response-schema.decorator';
 
 const WidgetSchema = z.object({ name: z.string() });
+type Widget = z.infer<typeof WidgetSchema>;
 const LIST_DESCRIPTION = 'Every widget';
+const GEAR: Widget = { name: 'gear' };
 
 class WidgetController {
   @ResponseSchema(HttpStatus.OK, WidgetSchema)
-  findOne(): void {}
+  findOne(): Widget {
+    return GEAR;
+  }
 
   @ResponseSchema(HttpStatus.OK, WidgetSchema, { many: true, description: LIST_DESCRIPTION })
-  findAll(): void {}
+  findAll(): Promise<Widget[]> {
+    return Promise.resolve([GEAR]);
+  }
 
   @HttpCode(HttpStatus.CREATED)
   @ResponseSchema(HttpStatus.CREATED, WidgetSchema)
-  create(): void {}
+  create(): Promise<Widget> {
+    return Promise.resolve(GEAR);
+  }
+}
+
+// Compiled with the specs, so a decorator that stopped checking return types fails the run: each
+// directive below must meet the error it announces.
+class MismatchedController {
+  // @ts-expect-error a handler that returns a number cannot declare the widget schema
+  @ResponseSchema(HttpStatus.OK, WidgetSchema)
+  count(): number {
+    return 1;
+  }
+
+  // @ts-expect-error a list declared with many must be returned as an array
+  @ResponseSchema(HttpStatus.OK, WidgetSchema, { many: true })
+  first(): Widget {
+    return GEAR;
+  }
+
+  // @ts-expect-error a single-object schema rejects a handler that returns an array
+  @ResponseSchema(HttpStatus.OK, WidgetSchema)
+  all(): Widget[] {
+    return [GEAR];
+  }
 }
 
 type WidgetHandler = keyof WidgetController;
@@ -80,6 +110,14 @@ describe('ResponseSchema', () => {
 
   it('when the handler returns data that violates the schema, then serialization fails', async () => {
     await expect(serialize('findOne', { name: 42 })).rejects.toThrow(Error);
+  });
+
+  it('when a handler returns another type than its schema, then only the compiler objects', () => {
+    // The @ts-expect-error directives on MismatchedController are the assertion; at run time the
+    // decorator is applied as usual.
+    expect(
+      Reflect.getMetadata(DECORATORS.API_RESPONSE, MismatchedController.prototype.count),
+    ).toBeDefined();
   });
 
   it('when it decorates a handler, then it leaves the HTTP status to the handler', () => {

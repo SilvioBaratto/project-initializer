@@ -31,11 +31,12 @@ const REQUEST_SUMMARY = `POST ${REQUEST_PATH} (requestId: ${REQUEST_ID})`;
 
 function fakeRequest(id: unknown = REQUEST_ID): {
   method: string;
+  baseUrl: string;
   path: string;
   originalUrl: string;
   id: unknown;
 } {
-  return { method: 'POST', path: REQUEST_PATH, originalUrl: REQUEST_PATH, id };
+  return { method: 'POST', baseUrl: '', path: REQUEST_PATH, originalUrl: REQUEST_PATH, id };
 }
 
 async function schemaIssues(): Promise<SchemaIssues> {
@@ -322,7 +323,7 @@ describe('HttpExceptionFilter', () => {
 
   describe('when the request has no usable id', () => {
     it('then a request without an id property is answered without one', () => {
-      const request = { method: 'GET', path: REQUEST_PATH, originalUrl: REQUEST_PATH };
+      const request = { method: 'GET', baseUrl: '', path: REQUEST_PATH, originalUrl: REQUEST_PATH };
 
       expect(sentErrorBody(handle(new Error('boom'), request))).not.toHaveProperty('requestId');
     });

@@ -5,7 +5,7 @@ import { createE2eApp, E2eApp, httpServerOf } from '../test/support/create-e2e-a
 import { TEST_BEARER_TOKEN } from '../test/support/test-doubles';
 import { INTERNAL_ERROR_MESSAGE } from './common/filters/error-body';
 import { ResponseSchema } from './common/serialization/response-schema.decorator';
-import { ItemResponseSchema } from './modules/items/dto/item.dto';
+import { ItemResponseSchema, type ItemResponseDto } from './modules/items/dto/item.dto';
 
 /**
  * Validates the response whitelist of src/modules/items/dto/item.dto.ts and the serializer that
@@ -24,10 +24,12 @@ const LEAKED_SECRET = 'leaked-password';
 
 @Controller('serialization-probe')
 class SerializationProbeController {
+  // The types allow any string as id, so only the serializer at run time can catch this one.
   @Get('violating')
   @ResponseSchema(HttpStatus.OK, ItemResponseSchema)
-  violating(): unknown {
-    return { ...validItem, id: MALFORMED_ID, password: LEAKED_SECRET };
+  violating(): ItemResponseDto {
+    const withSecret = { ...validItem, id: MALFORMED_ID, password: LEAKED_SECRET };
+    return withSecret;
   }
 }
 

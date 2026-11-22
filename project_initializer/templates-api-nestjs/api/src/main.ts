@@ -5,7 +5,13 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { PinoLogger } from 'nestjs-pino';
 import { AUTH_GUARDS } from './app.auth';
 import { AppModule } from './app.module';
-import { configureApp, isOpenApiEnabled, readPackageVersion, setupOpenApi } from './app.setup';
+import {
+  answerUnmatchedRequests,
+  configureApp,
+  isOpenApiEnabled,
+  readPackageVersion,
+  setupOpenApi,
+} from './app.setup';
 import type { BaseEnv } from './config/env.base';
 import { ENV_FILE_PATHS } from './config/env-files';
 import { createLogLevelSink, installLogLevelReload } from './config/log-level-reload';
@@ -45,6 +51,9 @@ async function startApplication(app: NestExpressApplication): Promise<void> {
       bearerAuthRequired: AUTH_GUARDS.length > 0,
     });
   }
+  // init() registers the routes, so the unmatched-request handler can go in after all of them.
+  await app.init();
+  answerUnmatchedRequests(app);
   await app.listen(config.get('PORT', { infer: true }));
   enableLogLevelReload(app);
 }

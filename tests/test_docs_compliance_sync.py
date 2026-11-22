@@ -20,6 +20,7 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
+from project_initializer.cli import copy_template
 from project_initializer.docs_generator import (
     generate_api_claude,
     generate_api_readme,
@@ -165,6 +166,11 @@ _NESTJS_ALL = [
     "`SchemaValidationException`",
     "`@Body({ schema })`",
     "a forgotten `schema` switches validation off",
+    "`createSchemaValidationPipe()`",
+    "`src/common/validation-coverage.spec.ts` finds every controller under `src/`",
+    "a compile error (TS1241)",
+    "answers 404 `Route not found` with the same body, under `/api/v1` and outside it",
+    "`answerUnmatchedRequests(app)`",
     "keeps its own `@HttpCode(HttpStatus.OK)`",
     "a 415 for an unsupported charset",
     "recognises it by its `cause`",
@@ -234,6 +240,8 @@ _STALE_NESTJS = [
     "@ZodResponse",
     "createZodDto",
     "cleanupOpenApiDoc",
+    "Express's own 404 page",
+    "a repo test fails on it",
 ]
 
 _NESTJS_BY_AUTH = {
@@ -500,6 +508,23 @@ def test_when_the_nestjs_api_claude_is_generated_then_the_guard_order_matches_th
     assert doc.index("6. `StandardSchemaValidationPipe`") < doc.index(
         "7. `StandardSchemaSerializerInterceptor`"
     )
+
+
+@pytest.mark.parametrize("auth", AUTHS)
+def test_when_a_nestjs_project_is_scaffolded_then_the_validation_coverage_spec_the_docs_name_ships(
+    tmp_path, auth
+):
+    """The generated api CLAUDE.md points at a spec that guards against forgotten schemas; the
+    scaffold of every auth variant must contain that spec, or the docs promise a guard the
+    project does not have.
+
+    Validates project_initializer/cli.py copy_template() and project_initializer/docs_generator.py generate_api_claude().
+    """
+    spec = "src/common/validation-coverage.spec.ts"
+    copy_template(tmp_path, auth=auth, framework="nestjs", scope="api")
+
+    assert f"`{spec}`" in generate_api_claude("nestjs", auth)
+    assert (tmp_path / "api" / spec).is_file()
 
 
 @pytest.mark.parametrize("auth", AUTHS)

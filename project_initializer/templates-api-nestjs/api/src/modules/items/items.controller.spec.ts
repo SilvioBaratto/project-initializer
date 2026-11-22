@@ -8,7 +8,6 @@ import {
   INestApplication,
   NotFoundException,
   StandardSchemaSerializerInterceptor,
-  StandardSchemaValidationPipe,
 } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
@@ -21,6 +20,7 @@ import {
 } from '../../../test/support/openapi-document';
 import { ANONYMOUS_ACTOR_ID } from '../../common/audit/audit-logger';
 import type { AuthenticatedRequest } from '../../common/auth/authenticated-user';
+import { createSchemaValidationPipe } from '../../common/filters/schema-validation.exception';
 import type { Item } from './item.entity';
 import {
   ITEM_NOT_FOUND_MESSAGE,
@@ -81,7 +81,7 @@ describe('ItemsController', () => {
       providers: [
         { provide: ItemsService, useValue: service },
         { provide: APP_GUARD, useValue: identityStub },
-        { provide: APP_PIPE, useClass: StandardSchemaValidationPipe },
+        { provide: APP_PIPE, useFactory: createSchemaValidationPipe },
         { provide: APP_INTERCEPTOR, useClass: StandardSchemaSerializerInterceptor },
       ],
     }).compile();

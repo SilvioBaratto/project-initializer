@@ -14,7 +14,6 @@ export const ROUTE_NOT_FOUND_MESSAGE = 'Route not found';
 export const SERVICE_UNAVAILABLE_MESSAGE = 'Service temporarily unavailable';
 
 const UNKNOWN_STATUS_LABEL = 'Error';
-const QUERY_OR_FRAGMENT = /[?#]/;
 
 /** One rejected field of a request, as reported to the client. */
 export interface FieldError {
@@ -51,16 +50,17 @@ export function requestIdOf(request: Request): string | undefined {
 /**
  * Reads the full path of a request, without the query string, which may carry credentials.
  *
- * It is taken from the original URL rather than `request.path`: Nest answers an unknown path under
- * the global prefix from a router mounted at that prefix, and there Express reports `request.path`
- * relative to the mount, without the prefix.
+ * `request.path` alone is not enough: Nest answers an unknown path under the global prefix from a
+ * router mounted at that prefix, and there Express reports the path relative to the mount, so the
+ * mount point (`baseUrl`) is put back in front. Both come from Express's parse of the request
+ * target, never from the raw target, which in absolute form (`GET http://user:pass@host/...`)
+ * carries a scheme, a host and possibly credentials.
  *
  * @param request - The request being answered.
- * @returns The path as the client sent it, e.g. `/api/v1/items/42`.
+ * @returns The path, e.g. `/api/v1/items/42`.
  */
-function requestPathOf(request: Request): string {
-  const [path = ''] = request.originalUrl.split(QUERY_OR_FRAGMENT);
-  return path;
+export function requestPathOf(request: Request): string {
+  return `${request.baseUrl}${request.path}`;
 }
 
 /**

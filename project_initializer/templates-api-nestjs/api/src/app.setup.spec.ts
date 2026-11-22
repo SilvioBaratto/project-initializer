@@ -3,15 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import type { Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import {
-  Body,
-  Controller,
-  Get,
-  INestApplication,
-  Post,
-  Req,
-  StandardSchemaValidationPipe,
-} from '@nestjs/common';
+import { Body, Controller, Get, INestApplication, Post, Req } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD, APP_PIPE } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
@@ -27,6 +19,7 @@ import {
   CORS_EXPOSED_HEADERS,
   CORS_MAX_AGE_SECONDS,
   CORS_METHODS,
+  answerUnmatchedRequests,
   configureApp,
   isOpenApiEnabled,
   readPackageVersion,
@@ -34,7 +27,7 @@ import {
 } from './app.setup';
 import { INTERNAL_ERROR_MESSAGE, ROUTE_NOT_FOUND_MESSAGE } from './common/filters/error-body';
 import { MALFORMED_JSON_MESSAGE } from './common/filters/malformed-json.middleware';
-import { SchemaValidationException } from './common/filters/schema-validation.exception';
+import { createSchemaValidationPipe } from './common/filters/schema-validation.exception';
 import { validate } from './config/env.validation';
 import { MAX_REQUEST_BODY_BYTES } from './config/http-limits';
 import { buildLoggerParams } from './config/logger.config';
@@ -107,13 +100,7 @@ async function createProbeApp(options: ProbeAppOptions = {}): Promise<INestAppli
     ],
     controllers: [ProbeController],
     providers: [
-      {
-        provide: APP_PIPE,
-        useFactory: () =>
-          new StandardSchemaValidationPipe({
-            exceptionFactory: (issues) => new SchemaValidationException(issues),
-          }),
-      },
+      { provide: APP_PIPE, useFactory: createSchemaValidationPipe },
       ...(options.rateLimited ? [{ provide: APP_GUARD, useClass: ThrottlerGuard }] : []),
     ],
   }).compile();
@@ -454,6 +441,23 @@ describe('setupOpenApi', () => {
     const document = await documentFor(false);
 
     expect(document).not.toHaveProperty('security');
+  });
+
+  it('when the docs are published, then the UI still answers next to the JSON 404 for unknown root paths', async () => {
+    const app = await createProbeApp();
+    configureApp(app);
+    setupOpenApi(app, { version: '9.8.7', bearerAuthRequired: false });
+    await app.init();
+    answerUnmatchedRequests(app);
+
+    const ui = await request(httpServerOf(app)).get('/docs');
+    const unknown = await request(httpServerOf(app)).get('/docs-missing');
+    await app.close();
+
+    expect(ui.status).toBe(200);
+    expect(ui.headers['content-type']).toMatch(/^text\/html/);
+    expect(unknown.status).toBe(404);
+    expect(unknown.body).toMatchObject({ message: ROUTE_NOT_FOUND_MESSAGE, path: '/docs-missing' });
   });
 });
 

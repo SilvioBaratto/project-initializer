@@ -22,6 +22,10 @@ TPL = REPO_ROOT / "project_initializer"
 
 # One root module serves every variant; an overlay registers its guard through `app.auth.ts`.
 BASE_APP_MODULE = TPL / "templates-api-nestjs/api/src/app.module.ts"
+# `createSchemaValidationPipe` builds the global pipe there and in every spec that wires one.
+BASE_VALIDATION_PIPE_FACTORY = (
+    TPL / "templates-api-nestjs/api/src/common/filters/schema-validation.exception.ts"
+)
 TOKEN_APP_MODULE = TPL / "templates-token-nestjs/api/src/app.auth.ts"
 SUPABASE_APP_MODULE = TPL / "templates-supabase-nestjs/api/src/app.auth.ts"
 OVERLAY_ROOT_MODULES = [
@@ -63,14 +67,18 @@ def _dto_files_under(root: Path) -> list[Path]:
     return list(root.rglob("*.dto.ts")) if root.exists() else []
 
 
-def _controller_files_under(root: Path) -> list[Path]:
+def _every_controller_file_under(root: Path) -> list[Path]:
     if not root.exists():
         return []
+    return [p for p in root.rglob("*.controller.ts") if ".spec." not in p.name]
+
+
+def _controller_files_under(root: Path) -> list[Path]:
     # health.controller.ts returns Terminus health-check results, not ORM entity data.
     return [
         p
-        for p in root.rglob("*.controller.ts")
-        if ".spec." not in p.name and p.name != "health.controller.ts"
+        for p in _every_controller_file_under(root)
+        if p.name != "health.controller.ts"
     ]
 
 
@@ -83,16 +91,19 @@ def _has_app_guard(text: str) -> bool:
     return "APP_GUARD" in text
 
 
-def _has_app_pipe_standard_schema(text: str) -> bool:
+def _has_app_pipe_standard_schema(module_text: str, factory_text: str) -> bool:
     """Criterion C: Nest's StandardSchemaValidationPipe wired as APP_PIPE.
 
-    The pipe must throw SchemaValidationException, the exception the error filter reads the
-    failing fields from; with the pipe's default factory the client would lose them.
+    The root module registers `createSchemaValidationPipe` as the APP_PIPE factory, and that
+    factory builds the native pipe with an exceptionFactory that throws
+    SchemaValidationException, the exception the error filter reads the failing fields from;
+    with the pipe's default factory the client would lose them.
     """
     return (
-        "APP_PIPE" in text
-        and "StandardSchemaValidationPipe" in text
-        and "SchemaValidationException" in text
+        "APP_PIPE" in module_text
+        and "createSchemaValidationPipe" in module_text
+        and "new StandardSchemaValidationPipe(" in factory_text
+        and "new SchemaValidationException(" in factory_text
     )
 
 
@@ -263,15 +274,19 @@ def test_when_app_module_is_read_then_standard_schema_validation_pipe_is_registe
 ) -> None:
     """
     The shared app.module.ts must provide Nest's StandardSchemaValidationPipe as APP_PIPE,
-    throwing SchemaValidationException, so every request parameter that declares a schema is
-    validated, unknown properties are stripped, and the error body lists the failing fields.
+    built by createSchemaValidationPipe so it throws SchemaValidationException: every request
+    parameter that declares a schema is validated, unknown properties are stripped, and the
+    error body lists the failing fields.
 
-    Validates project_initializer/templates-api-nestjs/api/src/app.module.ts.
+    Validates project_initializer/templates-api-nestjs/api/src/app.module.ts and src/common/filters/schema-validation.exception.ts.
     """
     assert module_path.exists(), f"[{label}] app.module.ts not found: {module_path}"
-    assert _has_app_pipe_standard_schema(_read(module_path)), (
-        f"[{label}] app.module.ts must provide StandardSchemaValidationPipe as APP_PIPE with "
-        "an exceptionFactory that throws SchemaValidationException. Without it, request schemas "
+    assert _has_app_pipe_standard_schema(
+        _read(module_path), _read(BASE_VALIDATION_PIPE_FACTORY)
+    ), (
+        f"[{label}] app.module.ts must register createSchemaValidationPipe as the APP_PIPE "
+        "factory, and that factory must build StandardSchemaValidationPipe with an "
+        "exceptionFactory that throws SchemaValidationException. Without it, request schemas "
         "are not enforced globally or the 400 body loses its field errors."
     )
 
@@ -424,15 +439,25 @@ def test_when_all_controller_files_are_read_then_every_body_param_and_query_pass
     None
 ):
     """
-    Every `@Body(`, `@Param(` and `@Query(` in a controller must pass `{ schema }`. Nest's
-    StandardSchemaValidationPipe returns a parameter unchanged when it carries no schema, so a
-    forgotten schema would let unvalidated input reach the handler instead of failing.
+    Every `@Body(`, `@Param(` and `@Query(` in a controller, the health controller included,
+    must pass `{ schema }`. Nest's StandardSchemaValidationPipe returns a parameter unchanged
+    when it carries no schema, so a forgotten schema would let unvalidated input reach the
+    handler instead of failing. The scaffolds carry the same rule as a Jest spec,
+    `src/common/validation-coverage.spec.ts`.
 
     Validates the *.controller.ts files under project_initializer/templates-{api,token,supabase,entra}-nestjs/api/src.
     """
+    controllers = [
+        path
+        for root in _ALL_TEMPLATE_ROOTS
+        for path in _every_controller_file_under(root)
+    ]
+    assert any(path.name == "health.controller.ts" for path in controllers), (
+        "The controller scan found no health.controller.ts; it must cover every controller."
+    )
     unvalidated = {
         str(path): found
-        for path in _all_controller_files()
+        for path in controllers
         if (found := _parameters_without_schema(_read(path)))
     }
     assert not unvalidated, (
