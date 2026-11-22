@@ -1,4 +1,4 @@
-import { Injectable, OnDestroy, inject, signal } from '@angular/core';
+import { Service, OnDestroy, inject, signal } from '@angular/core';
 import { MatSnackBar, MatSnackBarRef } from '@angular/material/snack-bar';
 
 import { ToastComponent } from './toast';
@@ -38,7 +38,7 @@ const PANEL_CLASS = 'app-toast';
  *   size at open time, because MatSnackBar applies panelClass only once and pages routed
  *   outside the shell (login) have no bar.
  */
-@Injectable({ providedIn: 'root' })
+@Service()
 export class ToastService implements OnDestroy {
   private readonly snackBar = inject(MatSnackBar);
   private readonly _toasts = signal<Toast[]>([]);

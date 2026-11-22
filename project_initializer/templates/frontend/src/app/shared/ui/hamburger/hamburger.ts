@@ -6,7 +6,7 @@ import {
   output,
 } from '@angular/core';
 import { MatIconButton } from '@angular/material/button';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideDynamicIcon } from '@lucide/angular';
 
 import type { IconName } from '../../../icons';
 
@@ -25,7 +25,7 @@ export type HamburgerVariant = 'modal' | 'rail';
 @Component({
   selector: 'app-hamburger',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatIconButton, LucideAngularModule],
+  imports: [MatIconButton, LucideDynamicIcon],
   templateUrl: './hamburger.html',
   styleUrl: './hamburger.css',
 })

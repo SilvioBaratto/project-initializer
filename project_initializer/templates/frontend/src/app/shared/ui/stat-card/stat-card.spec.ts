@@ -43,11 +43,40 @@ function readText(el: Element | null): string {
 }
 
 /**
- * The color declaration stat-card.css applies to the element. jsdom matches the component's scoped rules but
- * does not resolve `var()`, so this is the token reference itself, e.g. `var(--app-success)`.
+ * The value that the top-level style rules matching `el` declare for `property`, as authored (for
+ * example "var(--app-success)"). Declarations are read in document order and the last non-empty one
+ * wins: specificity, `!important` and inheritance are ignored, and grouping rules (@media, @supports,
+ * @layer, @container) are skipped. CSSOM rule declarations keep var() references in jsdom and in real
+ * browsers alike, whereas getComputedStyle substitutes them.
+ */
+function declaredValue(el: Element, property: string): string {
+  let value = '';
+  for (const sheet of Array.from(document.styleSheets)) {
+    let rules: CSSRule[];
+    try {
+      rules = Array.from(sheet.cssRules);
+    } catch {
+      continue; // cross-origin sheet
+    }
+    for (const rule of rules) {
+      if (!(rule instanceof CSSStyleRule)) continue;
+      try {
+        if (!el.matches(rule.selectorText)) continue;
+      } catch {
+        continue; // selector this engine cannot evaluate
+      }
+      value = rule.style.getPropertyValue(property).trim() || value;
+    }
+  }
+  return value;
+}
+
+/**
+ * The color role stat-card.css gives the element: the token reference itself, e.g. `var(--app-success)`.
+ * No theme defines the tokens in a spec, so the computed color would be the inherited fallback.
  */
 function colorRole(el: Element): string {
-  return getComputedStyle(el).color;
+  return declaredValue(el, 'color');
 }
 
 // ===========================================================================
@@ -113,7 +142,7 @@ describe('StatCardComponent — delta', () => {
   it('when delta is null, no delta element is rendered', async () => {
     const f = await setup({ metric: '10', label: 'Sales', delta: null });
     expect(deltaElement(f)).toBeNull();
-    expect(root(f).querySelector('lucide-icon')).toBeNull();
+    expect(root(f).querySelector('svg.lucide')).toBeNull();
   });
 
   it('when delta is an empty string, no delta element is rendered', async () => {
@@ -128,8 +157,8 @@ describe('StatCardComponent — delta', () => {
 
   // Object form with named placeholders, so the title can never drift from the row's field order.
   it.each<{ direction: DeltaDirection; delta: string; iconClass: string; word: string; role: string }>([
-    { direction: 'up', delta: '+5%', iconClass: 'lucide-ChevronUp', word: 'Up', role: 'var(--app-success)' },
-    { direction: 'down', delta: '-3%', iconClass: 'lucide-ChevronDown', word: 'Down', role: 'var(--mat-sys-error)' },
+    { direction: 'up', delta: '+5%', iconClass: 'lucide-chevron-up', word: 'Up', role: 'var(--app-success)' },
+    { direction: 'down', delta: '-3%', iconClass: 'lucide-chevron-down', word: 'Down', role: 'var(--mat-sys-error)' },
   ])(
     'when deltaDirection is $direction with delta $delta, the delta is colored $role and backed by the $iconClass icon and the hidden word $word',
     async ({ direction, delta, iconClass, word, role }) => {
@@ -140,7 +169,7 @@ describe('StatCardComponent — delta', () => {
       expect(el.getAttribute('data-direction')).toBe(direction);
       expect(colorRole(el)).toBe(role);
       // The icon shape and the hidden word back up the color.
-      expect(el.querySelector('.stat-card-delta-icon svg')?.classList).toContain(iconClass);
+      expect(el.querySelector('svg.stat-card-delta-icon')?.classList).toContain(iconClass);
       expect(readText(el.querySelector('.cdk-visually-hidden'))).toBe(word);
       expect(readText(el)).toBe(`${word} ${delta}`);
     },
@@ -152,7 +181,7 @@ describe('StatCardComponent — delta', () => {
 
     expect(el.getAttribute('data-direction')).toBe('neutral');
     expect(colorRole(el)).toBe('var(--mat-sys-on-surface-variant)');
-    expect(el.querySelector('lucide-icon')).toBeNull();
+    expect(el.querySelector('svg.lucide')).toBeNull();
     expect(el.querySelector('.cdk-visually-hidden')).toBeNull();
     expect(readText(el)).toBe('0%');
   });
@@ -173,12 +202,12 @@ describe('StatCardComponent — delta', () => {
     expect(f.componentInstance.resolvedDirection()).toBe('neutral');
     expect(deltaElement(f)!.getAttribute('data-direction')).toBe('neutral');
     expect(colorRole(deltaElement(f)!)).toBe('var(--mat-sys-on-surface-variant)');
-    expect(deltaElement(f)!.querySelector('lucide-icon')).toBeNull();
+    expect(deltaElement(f)!.querySelector('svg.lucide')).toBeNull();
   });
 
   it('when a direction icon renders, it is hidden from assistive technology', async () => {
     const f = await setup({ metric: '500', label: 'Revenue', delta: '+12%', deltaDirection: 'up' });
-    const icon = deltaElement(f)!.querySelector('lucide-icon')!;
+    const icon = deltaElement(f)!.querySelector('svg.stat-card-delta-icon')!;
     expect(icon.getAttribute('aria-hidden')).toBe('true');
   });
 
@@ -192,8 +221,8 @@ describe('StatCardComponent — delta', () => {
 
     expect(el.getAttribute('data-direction')).toBe('down');
     expect(colorRole(el)).toBe('var(--mat-sys-error)');
-    expect(el.querySelector('svg.lucide-ChevronUp')).toBeNull();
-    expect(el.querySelector('svg.lucide-ChevronDown')).not.toBeNull();
+    expect(el.querySelector('svg.lucide-chevron-up')).toBeNull();
+    expect(el.querySelector('svg.lucide-chevron-down')).not.toBeNull();
     expect(readText(el)).toBe('Down 2%');
   });
 

@@ -34,6 +34,7 @@ NEW_MODULES = (
     "test_env_generator_secrets.py",
     "test_fastapi_dependencies.py",
     "test_fastapi_migrations.py",
+    "test_frontend_dependency_upgrade.py",
     "test_nestjs_auth_seam.py",
     "test_nestjs_migrations.py",
     "test_no_ai_framework_in_templates.py",
@@ -90,10 +91,21 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_when_non_supabase_then_docker_table_has_local_db",
         }
     ),
+    "test_docs_frontend_material.py": frozenset(
+        {
+            "test_when_frontend_claude_generated_then_material_convention_is_documented_and_real",
+        }
+    ),
     "test_docs_sync_async.py": frozenset(
         {
             "test_when_api_claude_md_read_async_reserved_for_real_async_io_documented",
             "test_when_api_claude_md_read_canonical_sync_example_cited",
+        }
+    ),
+    "test_entra_frontend_overlay.py": frozenset(
+        {
+            "test_when_entra_frontend_package_json_is_read_then_msal_angular_v6_is_listed",
+            "test_when_entra_frontend_package_json_is_read_then_msal_browser_v5_is_listed",
         }
     ),
     "test_entra_nestjs_overlay.py": frozenset(
@@ -165,6 +177,11 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_when_any_entra_overlay_dir_checked_then_it_contains_at_least_one_file",
             "test_when_fastapi_overlay_present_then_no_hard_coded_refresh_schedule",
             "test_when_nestjs_overlay_present_then_no_hard_coded_refresh_schedule",
+        }
+    ),
+    "test_issue_12_toast.py": frozenset(
+        {
+            "test_when_toast_service_parsed_then_it_is_a_root_singleton",
         }
     ),
     "test_issue_13_jwks_auto_refresh.py": frozenset(
@@ -245,6 +262,22 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_when_nestjs_overlay_files_read_client_secret_is_absent",
         }
     ),
+    "test_issue_19_avatar_stat_card.py": frozenset(
+        {
+            "test_when_stat_card_read_then_delta_direction_is_not_signaled_by_color_alone",
+        }
+    ),
+    "test_issue_1_tailwind_bump.py": frozenset(
+        {
+            "test_when_package_json_read_then_material_package_is_a_22_3_runtime_dependency",
+            "test_when_package_lock_read_then_angular_material_resolves_to_22_3",
+        }
+    ),
+    "test_issue_20_pagination_accordion.py": frozenset(
+        {
+            "test_when_accordion_css_is_generated_then_expanded_headers_get_a_hover_state_layer",
+        }
+    ),
     "test_issue_2_nestjs_guard_wiring.py": frozenset(
         {
             "test_when_token_app_auth_is_read_then_AccessTokenGuard_is_registered_as_APP_GUARD",
@@ -283,6 +316,7 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_when_fastapi_verifier_and_handlers_are_read_then_403_is_returned_on_insufficient_scope",
             "test_when_fastapi_env_example_is_read_then_client_secret_key_is_absent",
             "test_when_fastapi_verifier_is_read_then_pyjwkclient_is_used_for_auto_refresh",
+            "test_when_auth_service_template_is_read_then_it_is_a_root_singleton",
         }
     ),
     "test_issue_9_backend_jwt_validation.py": frozenset(
@@ -299,6 +333,11 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_when_nestjs_overlay_present_then_jwks_rsa_cache_is_enabled",
             "test_when_nestjs_overlay_present_then_jwks_rsa_rate_limit_is_enabled",
             "test_when_nestjs_overlay_present_then_rs256_algorithm_is_declared",
+        }
+    ),
+    "test_issue_9_feedback_atoms.py": frozenset(
+        {
+            "test_when_alert_source_read_then_each_variant_has_a_leading_icon",
         }
     ),
     "test_issue_9_nestjs_acceptance.py": frozenset(

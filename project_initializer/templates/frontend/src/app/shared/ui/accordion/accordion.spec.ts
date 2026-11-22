@@ -132,7 +132,7 @@ describe('AccordionComponent — header semantics', () => {
     const { fixture, loader } = await setupHost();
     const panel = await loader.getHarness(MatExpansionPanelHarness);
     expect(await panel.hasToggleIndicator()).toBe(true);
-    expect((fixture.nativeElement as HTMLElement).querySelector('lucide-icon')).toBeNull();
+    expect((fixture.nativeElement as HTMLElement).querySelector('svg.lucide')).toBeNull();
   });
 });
 

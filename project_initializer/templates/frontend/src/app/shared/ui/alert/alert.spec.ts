@@ -105,10 +105,10 @@ describe('AlertComponent', () => {
   // --- Variant via tokens: host class selects the token set, icon + label back up color ---
 
   it.each<[AlertVariant, string, string]>([
-    ['info', 'lucide-Info', 'Information'],
-    ['success', 'lucide-CircleCheckBig', 'Success'],
-    ['warning', 'lucide-TriangleAlert', 'Warning'],
-    ['danger', 'lucide-CircleAlert', 'Error'],
+    ['info', 'lucide-info', 'Information'],
+    ['success', 'lucide-circle-check-big', 'Success'],
+    ['warning', 'lucide-triangle-exclamation-point', 'Warning'],
+    ['danger', 'lucide-circle-exclamation-point', 'Error'],
   ])('when variant is %s, the variant class, a distinct %s icon and the "%s" label are rendered', (variant, iconClass, label) => {
     setVariant(variant);
 
@@ -117,7 +117,7 @@ describe('AlertComponent', () => {
       expect(host.classList).not.toContain(`alert-${other}`);
     }
 
-    const icon = host.querySelector('.alert-icon svg');
+    const icon = host.querySelector('svg.alert-icon');
     expect(icon?.classList).toContain(iconClass);
 
     const hiddenLabel = host.querySelector('.alert-message .cdk-visually-hidden');
@@ -240,7 +240,7 @@ describe('AlertComponent with projected content', () => {
     expect(dismiss.tagName).toBe('BUTTON');
     expect(dismiss.type).toBe('button');
     expect(alertHost().querySelector('[role="alert"]')!.contains(dismiss)).toBe(false);
-    expect(dismiss.querySelector('svg')?.classList).toContain('lucide-X');
+    expect(dismiss.querySelector('svg')?.classList).toContain('lucide-x');
     expect(alertHost().classList).toContain('alert-dismissible');
 
     dismiss.focus();

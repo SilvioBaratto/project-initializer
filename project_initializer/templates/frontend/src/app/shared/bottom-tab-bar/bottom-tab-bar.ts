@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { MatRipple } from '@angular/material/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideDynamicIcon } from '@lucide/angular';
 
 import { NavItem, NAV_ITEMS } from '../nav-item';
 
@@ -32,7 +32,7 @@ export const NAV_BAR_BLOCK_SIZE_PROPERTY = '--app-nav-bar-block-size';
  */
 @Component({
   selector: 'app-bottom-tab-bar',
-  imports: [RouterLink, RouterLinkActive, MatRipple, LucideAngularModule],
+  imports: [RouterLink, RouterLinkActive, MatRipple, LucideDynamicIcon],
   templateUrl: './bottom-tab-bar.html',
   styleUrl: './bottom-tab-bar.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

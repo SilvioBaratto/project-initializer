@@ -84,9 +84,9 @@
   --mat-button-tonal-label-text-weight: var(--mat-sys-label-large-weight-prominent);
 }
 
-/* Lucide host: `display: flex` lets the transform apply and drops the svg baseline gap. */
+/* A block svg sits on no text baseline inside the icon button. */
 .icon {
-  display: flex;
+  display: block;
 }
 
 /* Directional chevrons point the other way in right-to-left layouts. */

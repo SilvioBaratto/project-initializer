@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideDynamicIcon } from '@lucide/angular';
 
 import type { IconName } from '../../../icons';
 import { CardComponent } from '../card/card';
@@ -39,7 +39,7 @@ function isDeltaDirection(value: string): value is DeltaDirection {
 @Component({
   selector: 'app-stat-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CardComponent, LucideAngularModule],
+  imports: [CardComponent, LucideDynamicIcon],
   templateUrl: './stat-card.html',
   styleUrl: './stat-card.css',
 })

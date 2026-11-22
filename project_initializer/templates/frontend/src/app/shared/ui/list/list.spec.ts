@@ -4,7 +4,7 @@ import { vi } from 'vitest';
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { MatListModule } from '@angular/material/list';
 import { MatListHarness } from '@angular/material/list/testing';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideDynamicIcon } from '@lucide/angular';
 
 import { ICON_PROVIDER } from '../../../icons';
 import { ListComponent, ListVariant } from './list';
@@ -29,11 +29,11 @@ class HostComponent {
 }
 
 @Component({
-  imports: [ListComponent, MatListModule, LucideAngularModule],
+  imports: [ListComponent, MatListModule, LucideDynamicIcon],
   template: `
     <ui-list>
       <mat-list-item>
-        <lucide-icon matListItemIcon name="Mail" />
+        <span matListItemIcon><svg lucideIcon="Mail" /></span>
         <span matListItemTitle>Inbox</span>
         <span matListItemLine>Two new messages</span>
       </mat-list-item>
@@ -253,11 +253,13 @@ describe('ListComponent — item slots', () => {
 
     expect(await item.hasIcon()).toBe(true);
     expect(listItems(f)[0].classList).toContain('mdc-list-item--with-leading-icon');
+    const icon = (f.nativeElement as HTMLElement).querySelector('svg.lucide-mail');
+    expect(icon?.closest('.mat-mdc-list-item-icon.mdc-list-item__start')).not.toBeNull();
   });
 
   it('when an item projects a decorative icon, the icon is hidden from assistive technology', async () => {
     const f = await render(SlotsHostComponent);
-    const icon = (f.nativeElement as HTMLElement).querySelector('lucide-icon')!;
+    const icon = (f.nativeElement as HTMLElement).querySelector('svg.lucide-mail')!;
     expect(icon.getAttribute('aria-hidden')).toBe('true');
   });
 });

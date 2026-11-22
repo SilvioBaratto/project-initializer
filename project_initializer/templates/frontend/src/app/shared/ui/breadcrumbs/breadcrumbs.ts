@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { MatRipple } from '@angular/material/core';
 import { RouterLink } from '@angular/router';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideDynamicIcon } from '@lucide/angular';
 
 export interface CrumbItem {
   label: string;
@@ -19,7 +19,7 @@ export interface CrumbItem {
 @Component({
   selector: 'ui-breadcrumbs',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, MatRipple, LucideAngularModule],
+  imports: [RouterLink, MatRipple, LucideDynamicIcon],
   templateUrl: './breadcrumbs.html',
   styleUrl: './breadcrumbs.css',
 })

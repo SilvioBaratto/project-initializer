@@ -2,7 +2,6 @@ import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, Routes, provideRouter } from '@angular/router';
 import { vi } from 'vitest';
-import { LucideIconConfig } from 'lucide-angular';
 
 import { ICON_PROVIDER } from '../../icons';
 import { NAV_ITEMS } from '../nav-item';
@@ -23,7 +22,7 @@ describe('BottomTabBarComponent', () => {
   async function setup(routes: Routes = [], url?: string): Promise<ComponentFixture<BottomTabBarComponent>> {
     await TestBed.configureTestingModule({
       imports: [BottomTabBarComponent],
-      providers: [provideRouter(routes), ICON_PROVIDER, LucideIconConfig],
+      providers: [provideRouter(routes), ICON_PROVIDER],
     }).compileComponents();
 
     if (url) {
@@ -77,13 +76,13 @@ describe('BottomTabBarComponent', () => {
     });
   });
 
-  it('when each tab renders, a decorative lucide-icon sits in the active indicator', async () => {
+  it('when each tab renders, its decorative icon sits in the active indicator', async () => {
     const tabs = tabsOf(await setup());
-    for (const tab of tabs) {
-      const icon = tab.querySelector('.nav-bar-indicator lucide-icon');
+    tabs.forEach((tab, index) => {
+      const icon = tab.querySelector(`.nav-bar-indicator svg.lucide-${NAV_ITEMS[index].icon}`);
       expect(icon).toBeTruthy();
       expect(icon?.getAttribute('aria-hidden')).toBe('true');
-    }
+    });
   });
 
   it('when the tabs render, the Home, Dashboard and Settings labels are shown', async () => {

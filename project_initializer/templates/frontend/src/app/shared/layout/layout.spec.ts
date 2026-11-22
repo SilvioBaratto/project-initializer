@@ -8,7 +8,6 @@ import { MatBottomSheetHarness } from '@angular/material/bottom-sheet/testing';
 import { MatButtonHarness } from '@angular/material/button/testing';
 import { MATERIAL_ANIMATIONS } from '@angular/material/core';
 import { Router, Routes, provideRouter } from '@angular/router';
-import { LucideIconConfig } from 'lucide-angular';
 
 import { ICON_PROVIDER } from '../../icons';
 import { WINDOW_SIZE_QUERIES, WindowSizeClass } from '../../services/window-size-class';
@@ -73,7 +72,6 @@ describe('LayoutComponent', () => {
         // SpyLocation: back() emits a popstate the router handles like the browser's.
         provideLocationMocks(),
         ICON_PROVIDER,
-        LucideIconConfig,
         { provide: MediaMatcher, useValue: mediaMatcherFor(size) },
         { provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } },
       ],
@@ -177,7 +175,7 @@ describe('LayoutComponent', () => {
     expect(button.getAttribute('aria-label')).toBe(RAIL_ACTIONS_SHEET.triggerLabel);
     expect(button.hasAttribute('aria-expanded')).toBe(false);
     expect(button.hasAttribute('aria-controls')).toBe(false);
-    expect(button.querySelector('lucide-icon')?.getAttribute('aria-hidden')).toBe('true');
+    expect(button.querySelector(`svg.lucide-${RAIL_ACTIONS_SHEET.triggerIcon}`)?.getAttribute('aria-hidden')).toBe('true');
   });
 
   it('when the actions button is clicked, a modal bottom sheet opens with app-sidebar in its modal form', async () => {

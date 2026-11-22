@@ -10,8 +10,8 @@
 }
 
 .hamburger-icon {
-  /* The 24px svg that matIconButton sizes becomes a grid item: no inline baseline gap below it. */
-  display: grid;
+  /* A block svg sits on no text baseline, so no gap opens below the 24px icon matIconButton sizes. */
+  display: block;
 }
 
 /* PanelLeftClose points at the rail's edge, so it mirrors with the layout in RTL. Menu and X are symmetric. */

@@ -623,15 +623,26 @@ def test_when_alert_source_read_then_live_region_role_is_alert_for_danger_and_st
 
 
 def test_when_alert_source_read_then_each_variant_has_a_leading_icon():
-    """Color is never the only signal: every variant maps to its own lucide icon."""
+    """Color is never the only signal: every variant maps to its own lucide icon.
+
+    The icon element is matched whatever the order of its attributes, since
+    ``lucideIcon`` and ``class`` may come in either order on the ``svg``.
+
+    Validates project_initializer/templates/frontend/src/app/shared/ui/alert/alert.ts and alert.html.
+    """
     ts = (ALERT_DIR / "alert.ts").read_text(encoding="utf-8")
     html = (ALERT_DIR / "alert.html").read_text(encoding="utf-8")
     icons = re.findall(r"icon:\s*'(\w+)'", ts)
     assert len(icons) == 4 and len(set(icons)) == 4, (
         f"Expected four distinct variant icons in alert.ts, found {icons}."
     )
-    assert re.search(r'<lucide-icon\s+class="alert-icon"', html), (
-        "Expected a leading <lucide-icon class=\"alert-icon\"> in alert.html."
+    icon_tags = [
+        tag
+        for tag in re.findall(r"<svg\b[^>]*>", html, re.S)
+        if "lucideIcon" in tag and 'class="alert-icon"' in tag
+    ]
+    assert icon_tags, (
+        'Expected a leading <svg lucideIcon class="alert-icon"> in alert.html.'
     )
 
 

@@ -129,7 +129,8 @@ describe('AuthService', () => {
     const redirectSpy = vi.fn<(req: unknown) => Promise<void>>().mockResolvedValue(undefined);
     setup({
       acquireTokenSilent: async () => {
-        throw new InteractionRequiredAuthError('interaction_required');
+        // msal-browser requires a correlation id on its auth error classes.
+        throw new InteractionRequiredAuthError('interaction_required', 'spec-correlation-id');
       },
       acquireTokenRedirect: redirectSpy,
     });

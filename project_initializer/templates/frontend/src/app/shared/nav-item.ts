@@ -50,7 +50,7 @@ export interface RailActionsSheet {
  * which is a developer reference rather than a primary view.
  */
 export const NAV_ITEMS: NavItem[] = [
-  { name: 'Home', route: '/home', icon: 'Home' },
+  { name: 'Home', route: '/home', icon: 'House' },
   { name: 'Dashboard', route: '/dashboard', icon: 'LayoutDashboard' },
   { name: 'Settings', route: '/settings', icon: 'Settings' },
 ];

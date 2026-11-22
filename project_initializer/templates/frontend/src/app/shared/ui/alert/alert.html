@@ -1,4 +1,4 @@
-<lucide-icon class="alert-icon" [name]="icon()" />
+<svg [lucideIcon]="icon()" class="alert-icon" />
 
 <div class="alert-message" [attr.role]="role()">
   <span class="cdk-visually-hidden">{{ statusLabel() }}:&ngsp;</span>
@@ -13,6 +13,6 @@
     [attr.aria-label]="dismissLabel()"
     (click)="dismiss()"
   >
-    <lucide-icon name="X" />
+    <svg lucideIcon="X" />
   </button>
 }

@@ -13,7 +13,7 @@
         [disabled]="isFirstPage()"
         (click)="onFirst()"
       >
-        <lucide-icon class="icon" name="ChevronsLeft" />
+        <svg lucideIcon="ChevronsLeft" class="icon" />
       </button>
     </li>
     <li class="slot">
@@ -25,7 +25,7 @@
         [disabled]="isFirstPage()"
         (click)="onPrev()"
       >
-        <lucide-icon class="icon" name="ChevronLeft" />
+        <svg lucideIcon="ChevronLeft" class="icon" />
       </button>
     </li>
 
@@ -56,7 +56,7 @@
         [disabled]="isLastPage()"
         (click)="onNext()"
       >
-        <lucide-icon class="icon" name="ChevronRight" />
+        <svg lucideIcon="ChevronRight" class="icon" />
       </button>
     </li>
     <li class="slot">
@@ -68,7 +68,7 @@
         [disabled]="isLastPage()"
         (click)="onLast()"
       >
-        <lucide-icon class="icon" name="ChevronsRight" />
+        <svg lucideIcon="ChevronsRight" class="icon" />
       </button>
     </li>
   </ul>

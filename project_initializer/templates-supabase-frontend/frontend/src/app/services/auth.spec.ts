@@ -3,14 +3,22 @@
  * transport strings such as "Invalid login credentials" or "Failed to fetch") must never reach the
  * UI: every failure maps to fixed copy that says what went wrong and how to fix it, and success
  * copy follows the same punctuation rule (no period on a single sentence).
+ * Also covers logout(): a global sign-out the server could not confirm falls back to a local one,
+ * every failed sign-out is reported to Angular's ErrorHandler, and the signed-in state is cleared
+ * whatever the outcome.
  */
+import { ErrorHandler } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
 import {
   AuthApiError,
   AuthRetryableFetchError,
   AuthSessionMissingError,
   AuthWeakPasswordError,
+  User,
 } from '@supabase/supabase-js';
+import { type MockInstance, vi } from 'vitest';
 import {
+  AuthService,
   AUTH_FAILURE_MESSAGES,
   AUTH_SUCCESS_MESSAGES,
   AuthAction,
@@ -114,5 +122,93 @@ describe('auth copy punctuation', () => {
 
   it.each(allCopy)('%s has no apology or "please"', (copy) => {
     expect(copy.toLowerCase()).not.toMatch(/\b(sorry|please|oops)\b/);
+  });
+});
+
+describe('AuthService.logout', () => {
+  const handleError = vi.fn<(error: unknown) => void>();
+  let service: AuthService;
+  let signOut: MockInstance<AuthService['supabase']['auth']['signOut']>;
+
+  beforeAll(async () => {
+    // One client for the whole block: each further client of the same storage key makes
+    // supabase-js log "Multiple GoTrueClient instances detected". The service injects the
+    // ErrorHandler, so it is built in an injection context; the stub outlives TestBed's reset.
+    TestBed.configureTestingModule({
+      providers: [{ provide: ErrorHandler, useValue: { handleError } }],
+    });
+    service = TestBed.runInInjectionContext(() => new AuthService());
+    // The client reports the stored session on a later tick; letting it finish first keeps it
+    // from overwriting the signed-in state set in beforeEach.
+    await service.waitUntilInitialized();
+    await new Promise<void>((resolve) => setTimeout(resolve));
+  });
+
+  beforeEach(() => {
+    handleError.mockClear();
+    signOut = vi.spyOn(service['supabase'].auth, 'signOut').mockResolvedValue({ error: null });
+    service.isAuthenticated.set(true);
+    service.currentUser.set({ id: 'user-1' } as User);
+    service.isPasswordRecovery.set(true);
+    service['cachedAccessToken'] = 'access-token';
+  });
+
+  afterEach(() => {
+    signOut.mockRestore();
+  });
+
+  function expectSignedOutState(): void {
+    expect(service.isAuthenticated()).toBe(false);
+    expect(service.currentUser()).toBeNull();
+    expect(service.isPasswordRecovery()).toBe(false);
+    expect(service.getAccessToken()).toBeNull();
+  }
+
+  it('when the global sign-out succeeds, no local sign-out follows, nothing is reported and the state is cleared', async () => {
+    await service.logout();
+
+    expect(signOut).toHaveBeenCalledTimes(1);
+    expect(signOut).toHaveBeenCalledWith();
+    expect(handleError).not.toHaveBeenCalled();
+    expectSignedOutState();
+  });
+
+  it('when the global sign-out returns an error, it is reported, a local sign-out follows and the state is cleared', async () => {
+    const globalError = new AuthRetryableFetchError('Failed to fetch', 0);
+    signOut.mockResolvedValueOnce({ error: globalError });
+
+    await service.logout();
+
+    expect(signOut).toHaveBeenCalledTimes(2);
+    expect(signOut).toHaveBeenNthCalledWith(1);
+    expect(signOut).toHaveBeenNthCalledWith(2, { scope: 'local' });
+    expect(handleError).toHaveBeenCalledTimes(1);
+    expect(handleError).toHaveBeenCalledWith(globalError);
+    expectSignedOutState();
+  });
+
+  it('when the local sign-out also returns an error, both are reported and logout still resolves and clears the state', async () => {
+    const globalError = new AuthRetryableFetchError('Failed to fetch', 0);
+    const localError = new AuthApiError('raw API text', 500, 'unexpected_failure');
+    signOut.mockResolvedValueOnce({ error: globalError }).mockResolvedValueOnce({ error: localError });
+
+    await expect(service.logout()).resolves.toBeUndefined();
+
+    expect(signOut).toHaveBeenCalledTimes(2);
+    expect(handleError).toHaveBeenCalledTimes(2);
+    expect(handleError).toHaveBeenNthCalledWith(1, globalError);
+    expect(handleError).toHaveBeenNthCalledWith(2, localError);
+    expectSignedOutState();
+  });
+
+  it('when the global sign-out rejects, the failure surfaces unreported and the state is cleared', async () => {
+    const failure = new Error('boom');
+    signOut.mockRejectedValueOnce(failure);
+
+    await expect(service.logout()).rejects.toBe(failure);
+
+    expect(signOut).toHaveBeenCalledTimes(1);
+    expect(handleError).not.toHaveBeenCalled();
+    expectSignedOutState();
   });
 });

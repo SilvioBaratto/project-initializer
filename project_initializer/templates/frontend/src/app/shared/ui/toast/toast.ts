@@ -7,7 +7,7 @@ import {
   MatSnackBarLabel,
   MatSnackBarRef,
 } from '@angular/material/snack-bar';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideDynamicIcon } from '@lucide/angular';
 
 import type { ToastData, ToastVariant } from './toast.service';
 
@@ -34,7 +34,7 @@ const VARIANTS: Record<ToastVariant, ToastVariantConfig> = {
  */
 @Component({
   selector: 'app-toast',
-  imports: [LucideAngularModule, MatIconButton, MatSnackBarLabel, MatSnackBarActions, MatSnackBarAction],
+  imports: [LucideDynamicIcon, MatIconButton, MatSnackBarLabel, MatSnackBarActions, MatSnackBarAction],
   templateUrl: './toast.html',
   styleUrl: './toast.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

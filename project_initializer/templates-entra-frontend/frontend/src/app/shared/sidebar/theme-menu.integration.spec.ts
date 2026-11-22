@@ -7,7 +7,6 @@ import { MatSelectionListHarness } from '@angular/material/list/testing';
 import { MatMenuHarness } from '@angular/material/menu/testing';
 import { provideRouter } from '@angular/router';
 import { vi } from 'vitest';
-import { LucideIconConfig } from 'lucide-angular';
 
 import { AuthService } from '../../core/services/auth.service';
 import { ICON_PROVIDER } from '../../icons';
@@ -48,7 +47,6 @@ describe('Theme menu (integration, Entra)', () => {
       providers: [
         provideRouter([]),
         ICON_PROVIDER,
-        LucideIconConfig,
         { provide: AuthService, useValue: authSpy },
         { provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } },
       ],

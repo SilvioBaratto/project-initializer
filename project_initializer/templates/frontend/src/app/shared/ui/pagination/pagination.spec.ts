@@ -59,7 +59,11 @@ function collect(f: ComponentFixture<PaginationComponent>): number[] {
   return emitted;
 }
 
-/** Last value a top-level style rule matching `node` declares for `property` ('' when none). */
+/**
+ * Last value a top-level style rule matching `node` declares for `property` ('' when none), as authored.
+ * Declarations are read in document order: specificity, `!important` and inheritance are ignored, and
+ * grouping rules (@media, @supports, @layer, @container) are skipped.
+ */
 function declaredValue(node: Element, property: string): string {
   let value = '';
   for (const sheet of Array.from(document.styleSheets)) {
@@ -75,7 +79,7 @@ function declaredValue(node: Element, property: string): string {
       try {
         matches = node.matches(rule.selectorText);
       } catch {
-        // Selectors jsdom can't parse (for example :dir()) don't apply to this check.
+        // A selector this engine cannot evaluate does not apply to this check.
       }
       const declared = matches ? rule.style.getPropertyValue(property).trim() : '';
       if (declared) value = declared;
@@ -218,7 +222,7 @@ describe('PaginationComponent — aria-current="page"', () => {
     expect(declaredValue(currentPageBtn(f), weightToken)).toBe(
       'var(--mat-sys-label-large-weight-prominent)',
     );
-    expect(declaredValue(el(f, 'Page 3'), weightToken)).toBe('');
+    expect(getComputedStyle(el(f, 'Page 3')).getPropertyValue(weightToken).trim()).toBe('');
   });
 
   it('when page changes, the prominent label weight follows the current page', async () => {
@@ -229,7 +233,7 @@ describe('PaginationComponent — aria-current="page"', () => {
     expect(declaredValue(el(f, 'Page 3'), weightToken)).toBe(
       'var(--mat-sys-label-large-weight-prominent)',
     );
-    expect(declaredValue(el(f, 'Page 2'), weightToken)).toBe('');
+    expect(getComputedStyle(el(f, 'Page 2')).getPropertyValue(weightToken).trim()).toBe('');
   });
 
   it('when the current page button is clicked, pageChange does not emit', async () => {
@@ -262,9 +266,13 @@ describe('PaginationComponent — directional controls', () => {
 
   it('when rendered, the chevron icons are hidden from assistive technology', async () => {
     const f = await setup(2, 5);
-    const icons = Array.from((f.nativeElement as HTMLElement).querySelectorAll('lucide-icon'));
-    expect(icons.length).toBe(4);
-    icons.forEach((icon) => expect(icon.getAttribute('aria-hidden')).toBe('true'));
+    const icons = Array.from((f.nativeElement as HTMLElement).querySelectorAll('svg.lucide'));
+    const shapes = ['lucide-chevrons-left', 'lucide-chevron-left', 'lucide-chevron-right', 'lucide-chevrons-right'];
+    expect(icons.length).toBe(shapes.length);
+    icons.forEach((icon, index) => {
+      expect(icon.classList).toContain(shapes[index]);
+      expect(icon.getAttribute('aria-hidden')).toBe('true');
+    });
   });
 
   it('when prev is clicked on page 2, pageChange emits 1', async () => {

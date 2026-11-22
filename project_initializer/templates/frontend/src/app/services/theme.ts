@@ -1,11 +1,11 @@
-import { Injectable, DestroyRef, computed, effect, inject, signal } from '@angular/core';
+import { Service, DestroyRef, computed, effect, inject, signal } from '@angular/core';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
 const STORAGE_KEY = 'app-theme';
 const TRANSITION_MS = 150;
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class ThemeService {
   private readonly destroyRef = inject(DestroyRef);
 

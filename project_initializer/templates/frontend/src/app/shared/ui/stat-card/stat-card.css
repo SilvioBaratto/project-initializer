@@ -72,9 +72,8 @@ app-card {
   color: var(--mat-sys-error);
 }
 
-/* The chevron strokes in currentColor. As a block-level box it leaves no baseline gap under the svg on the 20px line. */
+/* The chevron strokes in currentColor, so it takes the direction's color role from .stat-card-delta. */
 .stat-card-delta-icon {
-  display: flex;
   flex-shrink: 0;
 }
 

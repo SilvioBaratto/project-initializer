@@ -11,7 +11,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideDynamicIcon } from '@lucide/angular';
 
 /**
  * Most page slots (page numbers plus gaps) shown at once. With the four directional buttons the
@@ -51,7 +51,7 @@ function visiblePages(page: number, total: number): number[] {
 @Component({
   selector: 'ui-pagination',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatButtonModule, LucideAngularModule],
+  imports: [MatButtonModule, LucideDynamicIcon],
   templateUrl: './pagination.html',
   styleUrl: './pagination.css',
 })

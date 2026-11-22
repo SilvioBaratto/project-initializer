@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideDynamicIcon } from '@lucide/angular';
 
 export type BadgeVariant = 'default' | 'primary' | 'info' | 'success' | 'warning' | 'danger';
 
@@ -29,7 +29,7 @@ const STATUS_ICONS: Partial<Record<BadgeVariant, string>> = {
 @Component({
   selector: 'app-badge',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule],
+  imports: [LucideDynamicIcon],
   templateUrl: './badge.html',
   styleUrl: './badge.css',
   host: {

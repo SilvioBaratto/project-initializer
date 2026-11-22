@@ -51,11 +51,14 @@ function checkboxComponent(fixture: ComponentFixture<unknown>): CheckboxComponen
 }
 
 /**
- * The value that style rules matching `el` declare for a custom property, as
- * authored (for example "var(--mat-sys-error)"); the last matching rule in
- * document order wins. CSSOM rule declarations keep var() references in jsdom
- * and in real browsers alike, whereas getComputedStyle substitutes them in a
- * real browser, so this stays valid under either test environment.
+ * The value that the top-level style rules matching `el` declare for a custom
+ * property, as authored (for example "var(--mat-sys-error)"). Declarations are
+ * read in document order and the last non-empty one wins: specificity,
+ * `!important` and inheritance are ignored, and grouping rules (@media,
+ * @supports, @layer, @container) are skipped. CSSOM rule declarations keep var()
+ * references in jsdom and in real browsers alike, whereas getComputedStyle
+ * substitutes them in both, and no theme defines the system tokens in a spec, so
+ * the computed value would not name the token.
  */
 function declaredValue(el: Element, property: string): string {
   let value = '';
@@ -273,7 +276,9 @@ describe('CheckboxComponent', () => {
   it('when errorText is provided, the checkbox switches to the error color tokens', async () => {
     const matCheckbox = fixture.nativeElement.querySelector('mat-checkbox') as HTMLElement;
     expect(matCheckbox.classList.contains('checkbox-invalid')).toBe(false);
-    expect(declaredValue(matCheckbox, '--mat-checkbox-selected-icon-color')).toBe('');
+    expect(
+      getComputedStyle(matCheckbox).getPropertyValue('--mat-checkbox-selected-icon-color').trim(),
+    ).toBe('');
 
     host.errorText.set('Accept the terms to continue');
     await fixture.whenStable();

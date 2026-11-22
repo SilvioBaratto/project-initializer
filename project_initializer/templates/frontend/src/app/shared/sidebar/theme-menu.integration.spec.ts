@@ -5,7 +5,6 @@ import { MATERIAL_ANIMATIONS } from '@angular/material/core';
 import { MatSelectionListHarness } from '@angular/material/list/testing';
 import { MatMenuHarness } from '@angular/material/menu/testing';
 import { provideRouter } from '@angular/router';
-import { LucideIconConfig } from 'lucide-angular';
 
 import { ICON_PROVIDER } from '../../icons';
 import { ThemeService } from '../../services/theme';
@@ -41,7 +40,6 @@ describe('Theme menu (integration)', () => {
       providers: [
         provideRouter([]),
         ICON_PROVIDER,
-        LucideIconConfig,
         { provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } },
       ],
     }).compileComponents();

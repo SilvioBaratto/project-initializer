@@ -187,53 +187,61 @@ describe('HamburgerComponent — aria-label', () => {
 describe('HamburgerComponent — icon', () => {
   function svg(r: Rendered): SVGElement | null {
     r.fixture.detectChanges();
-    return r.el().querySelector('lucide-icon svg');
+    return r.el().querySelector('svg.lucide');
   }
 
   it('when open is false, the Menu icon is rendered', async () => {
     const r = await setup({ open: false });
-    expect(svg(r)?.classList).toContain('lucide-Menu');
+    expect(svg(r)?.classList).toContain('lucide-menu');
   });
 
   it('when open is true, the X icon is rendered', async () => {
     const r = await setup({ open: true });
-    expect(svg(r)?.classList).toContain('lucide-X');
+    expect(svg(r)?.classList).toContain('lucide-x');
   });
 
   it('when open changes, the icon swaps from Menu to X', async () => {
     const r = await setup({ open: false });
     r.fixture.componentRef.setInput('open', true);
-    expect(svg(r)?.classList).toContain('lucide-X');
-    expect(svg(r)?.classList).not.toContain('lucide-Menu');
+    expect(svg(r)?.classList).toContain('lucide-x');
+    expect(svg(r)?.classList).not.toContain('lucide-menu');
   });
 
   it('when the rail variant is collapsed, the Menu icon is rendered', async () => {
     const r = await setup({ variant: 'rail', open: false });
-    expect(svg(r)?.classList).toContain('lucide-Menu');
+    expect(svg(r)?.classList).toContain('lucide-menu');
   });
 
   it('when the rail variant is expanded, the PanelLeftClose icon is rendered', async () => {
     const r = await setup({ variant: 'rail', open: true });
-    expect(svg(r)?.classList).toContain('lucide-PanelLeftClose');
+    expect(svg(r)?.classList).toContain('lucide-panel-left-close');
   });
 
   it('when the rail variant expands, the icon swaps from Menu to PanelLeftClose', async () => {
     const r = await setup({ variant: 'rail', open: false });
     r.fixture.componentRef.setInput('open', true);
-    expect(svg(r)?.classList).toContain('lucide-PanelLeftClose');
-    expect(svg(r)?.classList).not.toContain('lucide-Menu');
+    expect(svg(r)?.classList).toContain('lucide-panel-left-close');
+    expect(svg(r)?.classList).not.toContain('lucide-menu');
   });
 
   it('when the rail variant is expanded, its directional PanelLeftClose icon is marked to mirror in RTL', async () => {
     const r = await setup({ variant: 'rail', open: true });
     r.fixture.detectChanges();
-    expect(r.el().querySelector('lucide-icon')?.classList).toContain('hamburger-icon-directional');
+    expect(r.el().querySelector('svg.lucide')?.classList).toContain('hamburger-icon-directional');
+  });
+
+  it('when the rail variant expands, the PanelLeftClose icon that replaces Menu is marked to mirror in RTL', async () => {
+    const r = await setup({ variant: 'rail', open: false });
+    r.fixture.componentRef.setInput('open', true);
+    r.fixture.detectChanges();
+    expect(r.el().querySelector('svg.lucide')?.classList).toContain('lucide-panel-left-close');
+    expect(r.el().querySelector('svg.lucide')?.classList).toContain('hamburger-icon-directional');
   });
 
   it('when the rail variant is collapsed, its symmetric Menu icon is not marked to mirror', async () => {
     const r = await setup({ variant: 'rail', open: false });
     r.fixture.detectChanges();
-    expect(r.el().querySelector('lucide-icon')?.classList).not.toContain('hamburger-icon-directional');
+    expect(r.el().querySelector('svg.lucide')?.classList).not.toContain('hamburger-icon-directional');
   });
 
   it('when the modal variant renders, its symmetric icons are not marked to mirror', async () => {
@@ -241,12 +249,12 @@ describe('HamburgerComponent — icon', () => {
     for (const open of [false, true]) {
       r.fixture.componentRef.setInput('open', open);
       r.fixture.detectChanges();
-      expect(r.el().querySelector('lucide-icon')?.classList).not.toContain('hamburger-icon-directional');
+      expect(r.el().querySelector('svg.lucide')?.classList).not.toContain('hamburger-icon-directional');
     }
   });
 
   it('when rendered, the icon is hidden from assistive technology', async () => {
     const r = await setup();
-    expect(r.el().querySelector('lucide-icon')?.getAttribute('aria-hidden')).toBe('true');
+    expect(r.el().querySelector('svg.lucide')?.getAttribute('aria-hidden')).toBe('true');
   });
 });

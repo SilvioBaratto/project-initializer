@@ -85,14 +85,14 @@ describe('BadgeComponent', () => {
   it.each([
     ['info', 'lucide-info'],
     ['success', 'lucide-circle-check-big'],
-    ['warning', 'lucide-triangle-alert'],
-    ['danger', 'lucide-circle-alert'],
+    ['warning', 'lucide-triangle-exclamation-point'],
+    ['danger', 'lucide-circle-exclamation-point'],
   ] as const)('when variant is %s, a distinct %s status icon leads the label', async (variant, iconClass) => {
     await setVariant(variant);
 
-    const icon = badge().querySelector('lucide-icon');
+    const icon = badge().querySelector('svg.lucide');
     expect(icon).not.toBeNull();
-    expect(icon!.querySelector('svg')?.classList).toContain(iconClass);
+    expect(icon!.classList).toContain(iconClass);
     expect(badge().classList).toContain('app-badge--with-icon');
     expect(badge().firstElementChild).toBe(icon);
   });
@@ -102,17 +102,17 @@ describe('BadgeComponent', () => {
     async (variant) => {
       await setVariant(variant);
 
-      expect(badge().querySelector('lucide-icon')).toBeNull();
+      expect(badge().querySelector('svg.lucide')).toBeNull();
       expect(badge().classList).not.toContain('app-badge--with-icon');
     },
   );
 
   it('when the variant changes from a status to default, the icon is removed', async () => {
     await setVariant('warning');
-    expect(badge().querySelector('lucide-icon')).not.toBeNull();
+    expect(badge().querySelector('svg.lucide-triangle-exclamation-point')).not.toBeNull();
 
     await setVariant('default');
-    expect(badge().querySelector('lucide-icon')).toBeNull();
+    expect(badge().querySelector('svg.lucide')).toBeNull();
   });
 
   // --- Accessibility ---
@@ -120,7 +120,7 @@ describe('BadgeComponent', () => {
   it('when a status icon renders, it is hidden from assistive technology', async () => {
     await setVariant('success');
 
-    expect(badge().querySelector('lucide-icon')?.getAttribute('aria-hidden')).toBe('true');
+    expect(badge().querySelector('svg.lucide-circle-check-big')?.getAttribute('aria-hidden')).toBe('true');
     expect(badge().textContent?.trim()).toBe('Paid');
   });
 

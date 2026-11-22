@@ -19,7 +19,7 @@
   <ul class="nav-preview" role="list" [id]="id" [class.nav-preview-collapsed]="collapsed">
     @for (destination of destinations; track destination.label) {
       <li class="nav-preview-item">
-        <lucide-icon class="nav-preview-icon" [name]="destination.icon" aria-hidden="true" />
+        <svg [lucideIcon]="destination.icon" class="nav-preview-icon" aria-hidden="true" />
         <span>{{ destination.label }}</span>
       </li>
     }

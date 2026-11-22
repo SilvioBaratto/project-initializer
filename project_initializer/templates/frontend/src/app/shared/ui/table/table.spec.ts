@@ -96,6 +96,51 @@ function mediumQueryBody(css: string): string {
 }
 
 /**
+ * The value that the top-level style rules matching `el` declare for `property`, as authored ('' when
+ * none declares it). Declarations are read in document order and the last non-empty one wins:
+ * specificity, `!important` and inheritance are ignored, and grouping rules (@media, @supports, @layer,
+ * @container) are skipped, so this is the mobile-first baseline a compact window gets.
+ */
+function declaredValue(el: Element, property: string): string {
+  let value = '';
+  for (const sheet of Array.from(document.styleSheets)) {
+    let rules: CSSRule[];
+    try {
+      rules = Array.from(sheet.cssRules);
+    } catch {
+      continue; // cross-origin sheet
+    }
+    for (const rule of rules) {
+      if (!(rule instanceof CSSStyleRule)) continue;
+      try {
+        if (!el.matches(rule.selectorText)) continue;
+      } catch {
+        continue; // selector this engine cannot evaluate
+      }
+      value = rule.style.getPropertyValue(property).trim() || value;
+    }
+  }
+  return value;
+}
+
+/**
+ * The prelude of every top-level rule of the component's stylesheet that is not a plain style rule,
+ * for example "@media (min-width: 600px)", whitespace collapsed and each listed once.
+ */
+function groupingRulePreludes(): string[] {
+  const preludes = new Set<string>();
+  for (const style of Array.from(document.querySelectorAll('style'))) {
+    if (!(style.textContent ?? '').includes('.table-region') || !style.sheet) continue;
+    for (const rule of Array.from(style.sheet.cssRules)) {
+      if (rule instanceof CSSStyleRule) continue;
+      const brace = rule.cssText.indexOf('{');
+      preludes.add(rule.cssText.slice(0, brace < 0 ? undefined : brace).replace(/\s+/g, ' ').trim());
+    }
+  }
+  return [...preludes];
+}
+
+/**
  * Declarations of the rule for `className` inside a CSS chunk. Emulated encapsulation may append an
  * attribute selector (`.table-data[_ngcontent-abc]`), so anything up to the brace is allowed.
  */
@@ -261,11 +306,18 @@ describe('TableComponent — stacked cards below 600px', () => {
     });
   });
 
-  it('when rendered in a window without media query support (compact baseline), only the cards are displayed', async () => {
-    // jsdom does not evaluate `(min-width: 600px)`, so it computes the mobile-first baseline.
+  it('when the window is below 600px (the mobile-first baseline), only the cards are displayed', async () => {
+    // jsdom evaluates `@media` against a fixed 1024px-wide window, so getComputedStyle always reports
+    // the wide layout; the compact one is what the rules outside the media query declare. That holds
+    // only while the 600px block is the stylesheet's one grouping rule: declaredValue() skips them all,
+    // so a `max-width` query or an `@supports` block could otherwise hide the cards unseen.
     const { el } = await setup();
-    expect(getComputedStyle(el.querySelector('table')!).display).toBe('none');
-    expect(getComputedStyle(el.querySelector('ul')!).display).not.toBe('none');
+    expect(
+      groupingRulePreludes(),
+      'declaredValue() skips grouping rules, so list a new one here once it cannot hide .table-cards',
+    ).toEqual(['@media (min-width: 600px)']);
+    expect(declaredValue(el.querySelector('table')!, 'display')).toBe('none');
+    expect(declaredValue(el.querySelector('ul')!, 'display')).not.toBe('none');
   });
 
   it('when the stylesheet is loaded, the layout switches at the M3 600px breakpoint, never 768px', async () => {
@@ -276,12 +328,14 @@ describe('TableComponent — stacked cards below 600px', () => {
   });
 
   it('when the window is 600px or wider, the stylesheet shows the table and hides the cards', async () => {
-    // jsdom never applies the media query, so read what the 600px block declares.
-    await setup();
+    // The 600px block is read as text, and jsdom's fixed 1024px-wide window applies it to the elements.
+    const { el } = await setup();
     const medium = mediumQueryBody(componentStyles());
     expect(medium).not.toBe('');
     expect(ruleFor(medium, 'table-data')).toMatch(/display:\s*table\s*(;|$)/);
     expect(ruleFor(medium, 'table-cards')).toMatch(/display:\s*none\s*(;|$)/);
+    expect(getComputedStyle(el.querySelector('table')!).display).toBe('table');
+    expect(getComputedStyle(el.querySelector('ul')!).display).toBe('none');
   });
 });
 
@@ -502,7 +556,7 @@ describe('TableComponent — horizontal-scroll region', () => {
 });
 
 // ===========================================================================
-// Criterion — Signal inputs (Angular 21)
+// Criterion — Signal inputs
 // ===========================================================================
 
 describe('TableComponent — signal inputs', () => {

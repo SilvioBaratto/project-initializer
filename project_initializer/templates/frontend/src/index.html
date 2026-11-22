@@ -26,8 +26,8 @@
 <body>
   <!-- Content-Security-Policy nonce. The value is a placeholder that the server replaces with a
        fresh random nonce on every response, allowed by its script-src and style-src (nginx.conf).
-       The build copies it onto inline <script> and <style> tags, and Angular adds it to every
-       component style it injects. -->
+       The build copies it onto <script> and <style> tags and onto <link rel="stylesheet"> and
+       <link rel="modulepreload"> tags, and Angular adds it to every component style it injects. -->
   <app-root ngCspNonce="CSP_NONCE"></app-root>
 </body>
 </html>

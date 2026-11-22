@@ -8,7 +8,6 @@ import { MatMenuHarness } from '@angular/material/menu/testing';
 import { MATERIAL_ANIMATIONS } from '@angular/material/core';
 import { Router, Routes, provideRouter } from '@angular/router';
 import { vi } from 'vitest';
-import { LucideIconConfig } from 'lucide-angular';
 
 import { ICON_PROVIDER } from '../../icons';
 import { ThemeMode, ThemeService } from '../../services/theme';
@@ -44,7 +43,6 @@ describe('SidebarComponent', () => {
       providers: [
         provideRouter(routes),
         ICON_PROVIDER,
-        LucideIconConfig,
         { provide: ThemeService, useValue: themeSpy },
         { provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } },
       ],
@@ -97,11 +95,23 @@ describe('SidebarComponent', () => {
       expect(current[0].textContent).toContain('Settings');
     });
 
-    it('when the rail renders, each item carries a decorative lucide-icon', async () => {
+    it('when the rail renders, each item carries its own decorative icon', async () => {
       const el = await render();
-      const icons = el.querySelectorAll('mat-nav-list lucide-icon');
+      const icons = Array.from(el.querySelectorAll('mat-nav-list svg.lucide'));
       expect(icons.length).toBe(NAV_ITEMS.length);
-      icons.forEach((icon) => expect(icon.getAttribute('aria-hidden')).toBe('true'));
+      icons.forEach((icon, index) => {
+        expect(icon.classList).toContain(`lucide-${NAV_ITEMS[index].icon}`);
+        expect(icon.getAttribute('aria-hidden')).toBe('true');
+      });
+    });
+
+    it("when the rail renders, each destination icon sits in Material's leading slot", async () => {
+      const el = await render();
+      const icons = Array.from(el.querySelectorAll('mat-nav-list svg.lucide'));
+      expect(icons.length).toBe(NAV_ITEMS.length);
+      for (const icon of icons) {
+        expect(icon.closest('.mat-mdc-list-item-icon.mdc-list-item__start')).not.toBeNull();
+      }
     });
 
     it('when a destination is clicked, closeSidebar is emitted', async () => {
@@ -136,6 +146,16 @@ describe('SidebarComponent', () => {
       expect(button.hasAttribute('aria-label')).toBe(false);
       expect(button.querySelector('.mat-mdc-list-item-line')).toBeNull();
       expect(button.classList.contains('mdc-list-item--with-two-lines')).toBe(false);
+    });
+
+    it("when the expanded rail renders, the Change theme icons keep Material's leading and trailing slots", async () => {
+      const el = await render();
+      const button = el.querySelector<HTMLButtonElement>('button.sidebar-theme-toggle')!;
+      const leading = button.querySelector('svg.lucide-sun-moon');
+      const trailing = button.querySelector('svg.lucide-chevron-up');
+      expect(leading?.closest('.mat-mdc-list-item-icon.mdc-list-item__start')).not.toBeNull();
+      expect(trailing?.closest('.mat-mdc-list-item-meta.mdc-list-item__end')).not.toBeNull();
+      expect(button.classList).toContain('mdc-list-item--with-trailing-meta');
     });
 
     it('when the menu opens, it offers System, Light and Dark as radio items with the current mode checked', async () => {
@@ -222,7 +242,7 @@ describe('SidebarComponent', () => {
       expect(links.map((a) => a.textContent?.trim())).toEqual(NAV_ITEMS.map((i) => i.name));
       for (const link of links) {
         expect(link.hasAttribute('aria-label')).toBe(false);
-        expect(link.querySelector('.rail-indicator lucide-icon')?.getAttribute('aria-hidden')).toBe('true');
+        expect(link.querySelector('.rail-indicator svg.lucide')?.getAttribute('aria-hidden')).toBe('true');
       }
     });
 
@@ -242,10 +262,11 @@ describe('SidebarComponent', () => {
       expect(await host.getAttribute('aria-haspopup')).toBe('menu');
       expect(el.querySelector('.sidebar-logout')).toBeNull();
 
-      // The icon host is a grid box (.sidebar-icon), so the 24px svg centres in the 40px state layer
-      // instead of sitting on an inline baseline.
-      const icon = el.querySelector('button.sidebar-theme-toggle lucide-icon');
+      // The svg carries .sidebar-icon, which takes it off the inline baseline, so the 24px icon
+      // centres in the 40px state layer.
+      const icon = el.querySelector('button.sidebar-theme-toggle svg.lucide');
       expect(icon?.classList.contains('sidebar-icon')).toBe(true);
+      expect(icon?.classList).toContain('lucide-sun-moon');
       expect(icon?.getAttribute('aria-hidden')).toBe('true');
 
       // The icon stands for the action, so it stays the same whatever the current mode.
@@ -253,7 +274,9 @@ describe('SidebarComponent', () => {
       themeSpy.theme.set('dark');
       fixture.detectChanges();
       await fixture.whenStable();
-      expect(el.querySelector('button.sidebar-theme-toggle lucide-icon')?.innerHTML).toBe(markup);
+      const after = el.querySelector('button.sidebar-theme-toggle svg.lucide');
+      expect(after?.classList).toContain('lucide-sun-moon');
+      expect(after?.innerHTML).toBe(markup);
 
       await (await themeMenu()).clickItem({ text: 'System' });
       expect(themeSpy.setTheme).toHaveBeenCalledWith('system');
@@ -280,6 +303,17 @@ describe('SidebarComponent', () => {
       const list = el.querySelector('mat-selection-list')!;
       expect(list.getAttribute('aria-multiselectable')).toBe('false');
       expect(el.querySelector(`#${list.getAttribute('aria-labelledby')}`)?.textContent?.trim()).toBe('Theme');
+    });
+
+    it("when modal, each theme choice icon sits in Material's leading slot", async () => {
+      const el = await render('modal');
+      const icons = Array.from(el.querySelectorAll('mat-list-option svg.lucide'));
+      expect(icons.map((icon) => icon.classList.contains('lucide-monitor'))).toEqual([true, false, false]);
+      expect(icons.map((icon) => icon.classList.contains('lucide-sun'))).toEqual([false, true, false]);
+      expect(icons.map((icon) => icon.classList.contains('lucide-moon'))).toEqual([false, false, true]);
+      for (const icon of icons) {
+        expect(icon.closest('.mat-mdc-list-item-icon.mdc-list-item__start')).not.toBeNull();
+      }
     });
 
     it('when a mode is selected in the sheet, ThemeService.setTheme receives it', async () => {

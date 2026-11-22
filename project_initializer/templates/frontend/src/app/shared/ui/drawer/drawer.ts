@@ -15,7 +15,7 @@ import {
 import { Directionality } from '@angular/cdk/bidi';
 import { MatIconButton } from '@angular/material/button';
 import { MatDialog, MatDialogRef, MatDialogTitle } from '@angular/material/dialog';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideDynamicIcon } from '@lucide/angular';
 
 /**
  * Edge the sheet opens from. `left` is the leading edge and `right` the trailing edge, so both
@@ -45,7 +45,7 @@ const TRAILING_EDGE_CLASS = `${DRAWER_PANEL_CLASS}--end`;
 @Component({
   selector: 'app-drawer',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule, MatDialogTitle, MatIconButton],
+  imports: [LucideDynamicIcon, MatDialogTitle, MatIconButton],
   templateUrl: './drawer.html',
   styleUrl: './drawer.css',
 })

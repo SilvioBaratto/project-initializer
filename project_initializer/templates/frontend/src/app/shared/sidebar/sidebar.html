@@ -13,7 +13,7 @@
             (click)="onNavClick()"
           >
             <span class="rail-indicator" matRipple [matRippleTrigger]="link">
-              <lucide-icon class="rail-icon" [name]="item.icon" aria-hidden="true" />
+              <svg [lucideIcon]="item.icon" class="rail-icon" aria-hidden="true" />
             </span>
             <span class="rail-label">{{ item.name }}</span>
           </a>
@@ -31,7 +31,7 @@
             [activated]="rla.isActive"
             (click)="onNavClick()"
           >
-            <lucide-icon matListItemIcon class="sidebar-icon" [name]="item.icon" aria-hidden="true" />
+            <span matListItemIcon class="sidebar-icon"><svg [lucideIcon]="item.icon" aria-hidden="true" /></span>
             <span matListItemTitle>{{ item.name }}</span>
           </a>
         }
@@ -51,7 +51,7 @@
         [matMenuTriggerFor]="themeMenu"
       >
         <!-- One icon for the action in every mode: the menu, not the icon, shows the current choice. -->
-        <lucide-icon class="sidebar-icon" name="SunMoon" aria-hidden="true" />
+        <svg lucideIcon="SunMoon" class="sidebar-icon" aria-hidden="true" />
       </button>
       @if (canSignOut()) {
         <button
@@ -63,13 +63,13 @@
           matTooltipPosition="after"
           (click)="onLogout()"
         >
-          <lucide-icon class="sidebar-icon sidebar-icon-directional" name="LogOut" aria-hidden="true" />
+          <svg lucideIcon="LogOut" class="sidebar-icon sidebar-icon-directional" aria-hidden="true" />
         </button>
       }
     } @else {
       @if (accountName(); as name) {
         <div class="sidebar-account">
-          <lucide-icon class="sidebar-icon" name="User" aria-hidden="true" />
+          <svg lucideIcon="User" class="sidebar-icon" aria-hidden="true" />
           <span class="sidebar-account-name">{{ name }}</span>
         </div>
       }
@@ -84,7 +84,7 @@
         >
           @for (option of themeOptions; track option.mode) {
             <mat-list-option [value]="option.mode" [selected]="theme() === option.mode">
-              <lucide-icon matListItemIcon class="sidebar-icon" [name]="option.icon" aria-hidden="true" />
+              <span matListItemIcon class="sidebar-icon"><svg [lucideIcon]="option.icon" aria-hidden="true" /></span>
               <span matListItemTitle>{{ option.label }}</span>
             </mat-list-option>
           }
@@ -94,15 +94,15 @@
         <mat-action-list class="sidebar-list">
           @if (!modal()) {
             <button mat-list-item type="button" class="sidebar-theme-toggle" [matMenuTriggerFor]="themeMenu">
-              <lucide-icon matListItemIcon class="sidebar-icon" name="SunMoon" aria-hidden="true" />
+              <span matListItemIcon class="sidebar-icon"><svg lucideIcon="SunMoon" aria-hidden="true" /></span>
               <span matListItemTitle>Change theme</span>
               <!-- Points where the menu opens, so the row reads as a menu button rather than a destination. -->
-              <lucide-icon matListItemMeta class="sidebar-icon" name="ChevronUp" aria-hidden="true" />
+              <span matListItemMeta class="sidebar-icon"><svg lucideIcon="ChevronUp" aria-hidden="true" /></span>
             </button>
           }
           @if (canSignOut()) {
             <button mat-list-item type="button" class="sidebar-logout" (click)="onLogout()">
-              <lucide-icon matListItemIcon class="sidebar-icon sidebar-icon-directional" name="LogOut" aria-hidden="true" />
+              <span matListItemIcon class="sidebar-icon sidebar-icon-directional"><svg lucideIcon="LogOut" aria-hidden="true" /></span>
               <span matListItemTitle>Sign out</span>
             </button>
           }
@@ -123,10 +123,10 @@
       (click)="setTheme(option.mode)"
     >
       <!-- The current mode shows a check mark in place of its icon, as on the Settings page. -->
-      <lucide-icon
+      <svg
+        [lucideIcon]="theme() === option.mode ? 'Check' : option.icon"
         matMenuItemIcon
         class="sidebar-menu-icon"
-        [name]="theme() === option.mode ? 'Check' : option.icon"
         aria-hidden="true"
       />
       {{ option.label }}

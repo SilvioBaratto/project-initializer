@@ -111,15 +111,15 @@ describe('SettingsComponent', () => {
     const system = toggleEl(el, 'system');
     const light = toggleEl(el, 'light');
     expect(system.querySelector('mat-pseudo-checkbox')).not.toBeNull();
-    expect(system.querySelector('lucide-icon')).toBeNull();
-    expect(light.querySelector('lucide-icon')).not.toBeNull();
+    expect(system.querySelector('svg.lucide')).toBeNull();
+    expect(light.querySelector('svg.lucide-sun')).not.toBeNull();
 
     const lightHarness = await loader.getHarness(MatButtonToggleHarness.with({ text: 'Light' }));
     await lightHarness.check();
     fixture.detectChanges();
     await fixture.whenStable();
-    expect(light.querySelector('lucide-icon')).toBeNull();
-    expect(system.querySelector('lucide-icon')).not.toBeNull();
+    expect(light.querySelector('svg.lucide')).toBeNull();
+    expect(system.querySelector('svg.lucide-monitor')).not.toBeNull();
   });
 
   it('when ArrowRight is pressed on the selected option, the next theme is selected and focused', async () => {

@@ -32,7 +32,7 @@ import { MatError, MatFormField, MatHint, MatLabel } from '@angular/material/for
 import { MatInput } from '@angular/material/input';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { RouterLink } from '@angular/router';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { AuthService } from '../../services/auth';
 import { MIN_PASSWORD_LENGTH } from '../password-rules';
 
@@ -51,7 +51,7 @@ const passwordsMatch: ValidatorFn = (group: AbstractControl): ValidationErrors |
   imports: [
     ReactiveFormsModule,
     RouterLink,
-    LucideAngularModule,
+    LucideDynamicIcon,
     MatButton,
     MatCard,
     MatCardContent,

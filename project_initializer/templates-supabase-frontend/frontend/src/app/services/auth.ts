@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { ErrorHandler, Service, inject, signal } from '@angular/core';
 import {
   createClient,
   isAuthError,
@@ -91,10 +91,9 @@ export function authFailureMessage(error: unknown, action: AuthAction): string {
   return failure === 'unexpected' ? UNEXPECTED_FAILURE_MESSAGES[action] : AUTH_FAILURE_MESSAGES[failure];
 }
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class AuthService {
+  private readonly errorHandler = inject(ErrorHandler);
   private readonly supabase: SupabaseClient;
   private initPromise: Promise<void>;
   private cachedAccessToken: string | null = null;
@@ -201,9 +200,31 @@ export class AuthService {
     return true;
   }
 
+  /**
+   * Signs the user out and clears the signed-in state.
+   *
+   * The sign-out covers every device when the server confirms it and this device only when it
+   * cannot; each sign-out that fails is reported to Angular's `ErrorHandler`. A rejection from
+   * supabase-js still surfaces, after the state is cleared.
+   */
   async logout(): Promise<void> {
     try {
-      await this.supabase.auth.signOut();
+      const { error } = await this.supabase.auth.signOut();
+      if (error) {
+        // A failed global revoke leaves the session valid on the server for the user's other
+        // devices, which is a security-relevant event the app should surface. supabase-js goes
+        // through fetch, not HttpClient, so the HTTP error interceptor never sees it; the
+        // ErrorHandler is the one reporting path left.
+        this.errorHandler.handleError(error);
+        // supabase-js 2.119 keeps the stored session when the server fails a global sign-out, and
+        // its auto-refresh would sign the user back in after a reload. The local scope removes the
+        // session before it contacts the server, so this device is signed out even when that
+        // request fails too.
+        const { error: localError } = await this.supabase.auth.signOut({ scope: 'local' });
+        if (localError) {
+          this.errorHandler.handleError(localError);
+        }
+      }
     } finally {
       this.isAuthenticated.set(false);
       this.currentUser.set(null);

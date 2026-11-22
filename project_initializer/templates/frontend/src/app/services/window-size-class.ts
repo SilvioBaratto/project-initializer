@@ -1,4 +1,4 @@
-import { Injectable, computed, inject } from '@angular/core';
+import { Service, computed, inject } from '@angular/core';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
@@ -22,7 +22,7 @@ export type WindowSizeClass = keyof typeof WINDOW_SIZE_QUERIES;
 
 const ORDER: readonly WindowSizeClass[] = ['compact', 'medium', 'expanded', 'large', 'extraLarge'];
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class WindowSizeClassService {
   private readonly observer = inject(BreakpointObserver);
 

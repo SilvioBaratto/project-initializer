@@ -151,7 +151,7 @@ describe('SlideOverComponent — ARIA contract', () => {
     const close = await loader.getHarness(CLOSE_BUTTON);
     expect(await close.getVariant()).toBe('icon');
     expect(await (await close.host()).getAttribute('aria-label')).toBe('Close panel');
-    expect(dialogs()[0].querySelector('.drawer-close lucide-icon')?.getAttribute('aria-hidden')).toBe('true');
+    expect(dialogs()[0].querySelector('.drawer-close svg.lucide-x')?.getAttribute('aria-hidden')).toBe('true');
   });
 });
 

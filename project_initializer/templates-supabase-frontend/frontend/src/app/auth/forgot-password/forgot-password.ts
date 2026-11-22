@@ -22,7 +22,7 @@ import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { RouterLink } from '@angular/router';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { AuthService } from '../../services/auth';
 
 /** Shown when the reset request fails without an error message of its own. */
@@ -33,7 +33,7 @@ const UNEXPECTED_ERROR_MESSAGE = "Couldn't send the reset link. Try again.";
   imports: [
     ReactiveFormsModule,
     RouterLink,
-    LucideAngularModule,
+    LucideDynamicIcon,
     MatButton,
     MatCard,
     MatCardActions,

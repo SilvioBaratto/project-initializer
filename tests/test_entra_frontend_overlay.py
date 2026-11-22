@@ -3,7 +3,7 @@ Source-blind tests for issue #5:
 feat(entra-frontend): scaffold overlay foundation — MSAL deps and public-only environment
 
 Criteria verified (derived from acceptance criteria, not from implementation):
-- [UNIT] package.json lists @azure/msal-angular and @azure/msal-browser at v4, removes
+- [UNIT] package.json lists @azure/msal-angular at v6 and @azure/msal-browser at v5, removes
   @supabase/supabase-js, and preserves base scripts + prettier config
 - [UNIT] environment.model.ts declares AppEnvironment with apiUrl, entraTenantId,
   entraSpaClientId, authority, scope — and no secret-bearing field
@@ -30,29 +30,35 @@ ENVIRONMENTS = FRONTEND_DIR / "src" / "environments"
 # ---------------------------------------------------------------------------
 
 
-def test_when_entra_frontend_package_json_is_read_then_msal_angular_v4_is_listed():
-    """@azure/msal-angular must be declared at major version 4 to align with Angular 21."""
+def test_when_entra_frontend_package_json_is_read_then_msal_angular_v6_is_listed():
+    """@azure/msal-angular must be declared at major version 6, the first line that supports Angular 22.
+
+    Validates project_initializer/templates-entra-frontend/frontend/package.json.
+    """
     pkg = json.loads((FRONTEND_DIR / "package.json").read_text(encoding="utf-8"))
     deps = pkg.get("dependencies", {})
     assert "@azure/msal-angular" in deps, (
         "@azure/msal-angular missing from dependencies"
     )
     ver = deps["@azure/msal-angular"]
-    assert re.match(r"[\^~]?4\.", ver), (
-        f"@azure/msal-angular version '{ver}' must be major 4 to align with Angular 21"
+    assert re.match(r"[\^~]?6\.", ver), (
+        f"@azure/msal-angular version '{ver}' must be major 6 to support Angular 22"
     )
 
 
-def test_when_entra_frontend_package_json_is_read_then_msal_browser_v4_is_listed():
-    """@azure/msal-browser must be declared at major version 4 to pair with msal-angular v4."""
+def test_when_entra_frontend_package_json_is_read_then_msal_browser_v5_is_listed():
+    """@azure/msal-browser must be declared at major version 5, the line msal-angular 6 peers.
+
+    Validates project_initializer/templates-entra-frontend/frontend/package.json.
+    """
     pkg = json.loads((FRONTEND_DIR / "package.json").read_text(encoding="utf-8"))
     deps = pkg.get("dependencies", {})
     assert "@azure/msal-browser" in deps, (
         "@azure/msal-browser missing from dependencies"
     )
     ver = deps["@azure/msal-browser"]
-    assert re.match(r"[\^~]?4\.", ver), (
-        f"@azure/msal-browser version '{ver}' must be major 4"
+    assert re.match(r"[\^~]?5\.", ver), (
+        f"@azure/msal-browser version '{ver}' must be major 5 to pair with msal-angular 6"
     )
 
 

@@ -73,6 +73,36 @@ function accessibleName(element: Element): string {
 const NAMED_ROLES = 'nav, [role="navigation"], [role="region"], [role="tablist"]';
 
 /**
+ * The value that the top-level style rules matching `el` declare for `property`, as authored (for
+ * example "var(--mat-sys-surface)"). Declarations are read in document order and the last non-empty one
+ * wins: specificity, `!important` and inheritance are ignored, and grouping rules (@media, @supports,
+ * @layer, @container) are skipped. getComputedStyle substitutes var() and no theme defines the system
+ * tokens in a spec, so the computed color would not name the token, whereas CSSOM rule declarations
+ * keep the reference in jsdom and real browsers alike.
+ */
+function declaredValue(el: Element, property: string): string {
+  let value = '';
+  for (const sheet of Array.from(document.styleSheets)) {
+    let rules: CSSRule[];
+    try {
+      rules = Array.from(sheet.cssRules);
+    } catch {
+      continue; // cross-origin sheet
+    }
+    for (const rule of rules) {
+      if (!(rule instanceof CSSStyleRule)) continue;
+      try {
+        if (!el.matches(rule.selectorText)) continue;
+      } catch {
+        continue; // selector this engine cannot evaluate
+      }
+      value = rule.style.getPropertyValue(property).trim() || value;
+    }
+  }
+  return value;
+}
+
+/**
  * Budget for the one-time warm-up render. The first catalog render in a test file pays costs later
  * renders don't (first instantiation of every section's components, Material and CDK setup, first
  * style parsing in jsdom). That can exceed Vitest's 5 s per-test timeout on a saturated machine.
@@ -239,9 +269,8 @@ describe('ComponentsComponent', () => {
 
       expect(regions).toHaveLength(6);
       for (const region of Array.from(regions)) {
-        const style = getComputedStyle(region);
-        expect(style.backgroundColor).toContain('--mat-sys-surface');
-        expect(style.color).toContain('--mat-sys-on-surface');
+        expect(declaredValue(region, 'background-color')).toContain('--mat-sys-surface');
+        expect(declaredValue(region, 'color')).toContain('--mat-sys-on-surface');
       }
     });
 
@@ -503,7 +532,7 @@ describe('ComponentsComponent', () => {
         expect(preview?.getAttribute('role')).toBe('list');
         expect(preview?.closest('.preview-region')).toBe(toggle.closest('.preview-region'));
         expect(preview?.querySelectorAll('li')).toHaveLength(3);
-        expect(preview?.querySelectorAll('lucide-icon[aria-hidden="true"]')).toHaveLength(3);
+        expect(preview?.querySelectorAll('svg.lucide[aria-hidden="true"]')).toHaveLength(3);
         return preview?.id;
       });
       expect(new Set(ids).size).toBe(2);

@@ -82,6 +82,36 @@ function radioComponents(fixture: ComponentFixture<unknown>): RadioComponent[] {
     .map((el) => el.componentInstance as RadioComponent);
 }
 
+/**
+ * The value that the top-level style rules matching `el` declare for `property`, as authored (for
+ * example "var(--mat-sys-error)"). Declarations are read in document order and the last non-empty one
+ * wins: specificity, `!important` and inheritance are ignored, and grouping rules (@media, @supports,
+ * @layer, @container) are skipped. getComputedStyle substitutes var() and no theme defines the system
+ * tokens in a spec, so a computed token that references one is empty, whereas CSSOM rule declarations
+ * keep the reference in jsdom and real browsers alike.
+ */
+function declaredValue(el: Element, property: string): string {
+  let value = '';
+  for (const sheet of Array.from(document.styleSheets)) {
+    let rules: CSSRule[];
+    try {
+      rules = Array.from(sheet.cssRules);
+    } catch {
+      continue; // cross-origin sheet
+    }
+    for (const rule of rules) {
+      if (!(rule instanceof CSSStyleRule)) continue;
+      try {
+        if (!el.matches(rule.selectorText)) continue;
+      } catch {
+        continue; // selector this engine cannot evaluate
+      }
+      value = rule.style.getPropertyValue(property).trim() || value;
+    }
+  }
+  return value;
+}
+
 describe('RadioComponent', () => {
   let fixture: ComponentFixture<RadioTestHost>;
   let host: RadioTestHost;
@@ -281,9 +311,7 @@ describe('RadioComponent', () => {
     await fixture.whenStable();
 
     expect(matRadio.classList.contains('radio-invalid')).toBe(true);
-    expect(
-      getComputedStyle(matRadio).getPropertyValue('--mat-radio-selected-icon-color').trim(),
-    ).toBe('var(--mat-sys-error)');
+    expect(declaredValue(matRadio, '--mat-radio-selected-icon-color')).toBe('var(--mat-sys-error)');
   });
 
   // -- ControlValueAccessor --------------------------------------------------

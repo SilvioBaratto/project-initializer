@@ -119,9 +119,7 @@
   letter-spacing: var(--mat-sys-label-large-tracking);
 }
 
-/* Decorative chevron; `display: flex` lets the transform apply and drops the svg baseline gap. */
 .separator {
-  display: flex;
   flex-shrink: 0;
   color: var(--mat-sys-on-surface-variant);
 }

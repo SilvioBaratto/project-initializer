@@ -19,7 +19,7 @@ import { MatIconButton } from '@angular/material/button';
 import { MatSidenav, MatSidenavContainer, MatSidenavContent } from '@angular/material/sidenav';
 import { Title } from '@angular/platform-browser';
 import { NavigationEnd, NavigationStart, Router, RouterOutlet, TitleStrategy } from '@angular/router';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { filter, map } from 'rxjs/operators';
 
 import { WindowSizeClassService } from '../../services/window-size-class';
@@ -89,7 +89,7 @@ type ShellFocusTarget =
     MatSidenav,
     MatSidenavContent,
     MatIconButton,
-    LucideAngularModule,
+    LucideDynamicIcon,
     SidebarComponent,
     BottomTabBarComponent,
     NavbarComponent,

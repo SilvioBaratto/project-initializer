@@ -1,14 +1,14 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideDynamicIcon } from '@lucide/angular';
 
 import { ThemeMode, ThemeService } from '../../services/theme';
 import { THEME_OPTIONS } from '../../shared/theme-options';
 
 @Component({
   selector: 'app-settings',
-  imports: [LucideAngularModule, MatButtonToggleModule, MatCardModule],
+  imports: [LucideDynamicIcon, MatButtonToggleModule, MatCardModule],
   templateUrl: './settings.html',
   styleUrl: './settings.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

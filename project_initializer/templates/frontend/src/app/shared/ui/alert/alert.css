@@ -69,7 +69,6 @@
 }
 
 .alert-icon {
-  display: flex;
   flex-shrink: 0;
   /* 24px icon centred on the 20px first line of body-medium. */
   margin-block: -2px;

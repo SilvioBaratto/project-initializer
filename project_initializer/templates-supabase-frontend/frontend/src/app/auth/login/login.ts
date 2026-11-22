@@ -23,7 +23,7 @@ import { ErrorStateMatcher } from '@angular/material/core';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideDynamicIcon } from '@lucide/angular';
 
 import { AuthService } from '../../services/auth';
 import { MIN_PASSWORD_LENGTH } from '../password-rules';
@@ -69,7 +69,7 @@ const passwordsMatch: ValidatorFn = (group: AbstractControl): ValidationErrors |
     MatCardModule,
     MatInputModule,
     MatProgressSpinnerModule,
-    LucideAngularModule,
+    LucideDynamicIcon,
   ],
   templateUrl: './login.html',
   styleUrl: './login.css',

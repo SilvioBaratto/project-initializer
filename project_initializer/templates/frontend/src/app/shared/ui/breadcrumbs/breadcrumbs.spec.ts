@@ -1,6 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
-import { LucideIconConfig } from 'lucide-angular';
 
 import { ICON_PROVIDER } from '../../../icons';
 import { BreadcrumbsComponent, CrumbItem } from './breadcrumbs';
@@ -19,15 +18,6 @@ async function setup(items: CrumbItem[] = []): Promise<ComponentFixture<Breadcru
         { path: '', children: [] },
       ]),
       ICON_PROVIDER,
-      {
-        provide: LucideIconConfig,
-        useFactory: () => {
-          const cfg = new LucideIconConfig();
-          cfg.size = 24;
-          cfg.strokeWidth = 2;
-          return cfg;
-        },
-      },
     ],
   }).compileComponents();
 
@@ -219,8 +209,8 @@ describe('BreadcrumbsComponent — ancestor without a route', () => {
 
   it('when a middle crumb has no routerLink, a separator still follows it', async () => {
     const f = await setup(NO_ROUTE);
-    expect(crumbs(f)[1].querySelector('lucide-icon[aria-hidden="true"]')).not.toBeNull();
-    expect(f.nativeElement.querySelectorAll('lucide-icon[aria-hidden="true"]').length).toBe(2);
+    expect(crumbs(f)[1].querySelector('svg.lucide-chevron-right[aria-hidden="true"]')).not.toBeNull();
+    expect(f.nativeElement.querySelectorAll('svg.lucide-chevron-right[aria-hidden="true"]').length).toBe(2);
   });
 });
 
@@ -264,14 +254,14 @@ describe('BreadcrumbsComponent — separators are aria-hidden', () => {
 
   it('when three crumbs render, two separators are present', async () => {
     const f = await setup(THREE_CRUMBS);
-    // Two separators between 3 crumbs — each is a lucide-icon with aria-hidden
-    const separators = f.nativeElement.querySelectorAll('lucide-icon[aria-hidden="true"]');
+    // Two separators between 3 crumbs — each is a ChevronRight icon with aria-hidden
+    const separators = f.nativeElement.querySelectorAll('svg.lucide-chevron-right[aria-hidden="true"]');
     expect(separators.length).toBe(2);
   });
 
   it('when one crumb renders, no separator is present', async () => {
     const f = await setup([{ label: 'Home' }]);
-    const separators = f.nativeElement.querySelectorAll('lucide-icon[aria-hidden="true"]');
+    const separators = f.nativeElement.querySelectorAll('svg.lucide-chevron-right[aria-hidden="true"]');
     expect(separators.length).toBe(0);
   });
 
@@ -279,12 +269,13 @@ describe('BreadcrumbsComponent — separators are aria-hidden', () => {
     const f = await setup(THREE_CRUMBS);
     const firstLi: HTMLElement = f.nativeElement.querySelector('li');
     const anchor = firstLi.querySelector('a')!;
-    expect(anchor.nextElementSibling?.tagName.toLowerCase()).toBe('lucide-icon');
+    expect(anchor.nextElementSibling?.tagName.toLowerCase()).toBe('svg');
+    expect(anchor.nextElementSibling?.classList).toContain('separator');
   });
 
   it('when breadcrumbs render, separator chevrons render at 18px', async () => {
     const f = await setup(THREE_CRUMBS);
-    const svg = f.nativeElement.querySelector('lucide-icon svg') as SVGElement | null;
+    const svg = f.nativeElement.querySelector('svg.separator') as SVGElement | null;
     expect(svg).not.toBeNull();
     expect(svg!.getAttribute('width')).toBe('18');
     expect(svg!.getAttribute('height')).toBe('18');

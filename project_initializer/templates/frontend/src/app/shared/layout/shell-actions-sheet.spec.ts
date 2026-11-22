@@ -4,7 +4,6 @@ import { MatBottomSheet, MatBottomSheetRef } from '@angular/material/bottom-shee
 import { MATERIAL_ANIMATIONS } from '@angular/material/core';
 import { provideRouter } from '@angular/router';
 import { vi } from 'vitest';
-import { LucideIconConfig } from 'lucide-angular';
 
 import { ICON_PROVIDER } from '../../icons';
 import { SidebarComponent } from '../sidebar/sidebar';
@@ -40,7 +39,6 @@ describe('ShellActionsSheetComponent', () => {
       providers: [
         provideRouter([]),
         ICON_PROVIDER,
-        LucideIconConfig,
         { provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } },
       ],
     }).compileComponents();

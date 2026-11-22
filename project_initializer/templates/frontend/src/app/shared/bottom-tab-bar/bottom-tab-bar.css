@@ -91,11 +91,6 @@
   outline-offset: 2px;
 }
 
-.nav-bar-icon {
-  /* Grid host: the 24px svg leaves no inline baseline gap. */
-  display: grid;
-}
-
 /* Enlarged text wraps at a hyphenation point first (index.html sets lang), mid-word only as a last resort. */
 .nav-bar-label {
   max-inline-size: 100%;

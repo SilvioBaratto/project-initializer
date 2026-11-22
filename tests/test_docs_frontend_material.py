@@ -128,13 +128,17 @@ _CONVENTIONS = [
     ("`templateUrl`", None, None),
     ("`styleUrl`", None, None),
     ("`<name>.css`", None, None),
-    ("`src/app/icons.ts`", "src/app/icons.ts", "LUCIDE_ICONS"),
+    ("`src/app/icons.ts`", "src/app/icons.ts", "provideLucideIcons"),
+    ('`<svg lucideIcon="Name">`', "src/app/shared/sidebar/sidebar.html", '<svg lucideIcon="'),
+    ("`LucideDynamicIcon`", "src/app/shared/sidebar/sidebar.ts", "LucideDynamicIcon"),
     ("`matButtonIcon`", None, None),
     ('`[size]="18"`', None, None),
-    # Material's button icon margins target .mat-icon only (button.mjs, 21.2).
+    # Material's button icon margins target .mat-icon only (button.mjs, 22.3).
     ("`margin-inline: -8px 8px`", None, None),
-    # lucide-angular 0.577 throws, rather than logs, for an unregistered name.
-    ("has not been provided by any available icon providers", None, None),
+    # @lucide/angular 1.77 throws, rather than logs, for an unregistered name.
+    ("Unable to resolve icon", None, None),
+    # The icon owns its class attribute, so the doc steers classes to the class input.
+    ("never `[class.x]`", "src/app/shared/ui/hamburger/hamburger.html", '[class]="'),
     # mat-menu aliases panelClass to class, so the doc must steer menus to class.
     ("On `mat-menu`, use a static `class`", None, None),
     ("`.cdk-visually-hidden`", "src/styles.scss", "cdk.a11y-visually-hidden()"),
@@ -153,6 +157,10 @@ _CONVENTIONS = [
 def test_when_frontend_claude_generated_then_material_convention_is_documented_and_real(
     doc_fragment, template, template_fragment
 ):
+    """Each convention the generated frontend CLAUDE.md names exists in the template it points at.
+
+    Validates project_initializer/docs_generator.py generate_frontend_claude().
+    """
     assert doc_fragment in generate_frontend_claude(), (
         f"frontend/.claude/CLAUDE.md must document {doc_fragment!r}"
     )

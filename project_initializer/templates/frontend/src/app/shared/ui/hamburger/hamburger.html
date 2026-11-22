@@ -7,10 +7,10 @@
   [attr.aria-label]="label()"
   (click)="toggle.emit()"
 >
-  <lucide-icon
+  <svg
+    [lucideIcon]="icon()"
     class="hamburger-icon"
-    [class.hamburger-icon-directional]="directional()"
-    [name]="icon()"
+    [class]="directional() ? 'hamburger-icon-directional' : ''"
     aria-hidden="true"
   />
 </button>

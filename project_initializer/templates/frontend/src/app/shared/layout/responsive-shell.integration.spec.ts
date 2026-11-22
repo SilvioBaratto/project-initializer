@@ -10,7 +10,6 @@ import { MatSidenavHarness } from '@angular/material/sidenav/testing';
 import { By } from '@angular/platform-browser';
 import { Router, Routes, provideRouter } from '@angular/router';
 import { vi } from 'vitest';
-import { LucideIconConfig } from 'lucide-angular';
 
 import { ICON_PROVIDER } from '../../icons';
 import { WINDOW_SIZE_QUERIES, WindowSizeClass } from '../../services/window-size-class';
@@ -24,9 +23,10 @@ class RouteStubComponent {}
 type MediaListener = (event: { matches: boolean; media: string }) => void;
 
 /**
- * MediaMatcher driven by a settable M3 window size class. jsdom evaluates no media
- * queries, so each class is simulated by which WINDOW_SIZE_QUERIES entry matches;
- * setSize() notifies BreakpointObserver like a real resize.
+ * MediaMatcher driven by a settable M3 window size class. jsdom has no
+ * window.matchMedia and evaluates stylesheet media queries only against a fixed
+ * 1024x768 window, so each class is simulated by which WINDOW_SIZE_QUERIES entry
+ * matches; setSize() notifies BreakpointObserver like a real resize.
  */
 class FakeMediaMatcher {
   private readonly notifiers: Array<() => void> = [];
@@ -105,7 +105,6 @@ describe('Responsive shell (integration)', () => {
       providers: [
         provideRouter(routes),
         ICON_PROVIDER,
-        LucideIconConfig,
         { provide: MediaMatcher, useValue: matcher },
         { provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } },
       ],
@@ -148,9 +147,8 @@ describe('Responsive shell (integration)', () => {
   }
 
   function pressEscape(target: HTMLElement): void {
-    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
-    // MatDrawer and MatBottomSheet check the legacy keyCode, which jsdom's KeyboardEvent init does not set.
-    Object.defineProperty(event, 'keyCode', { get: () => 27 });
+    // MatDrawer and MatBottomSheet check the legacy keyCode, so the event carries it next to key.
+    const event = new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true, cancelable: true });
     target.dispatchEvent(event);
   }
 
