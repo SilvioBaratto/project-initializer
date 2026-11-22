@@ -87,6 +87,12 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_when_api_claude_md_read_canonical_sync_example_cited",
         }
     ),
+    "test_entra_frontend_overlay.py": frozenset(
+        {
+            "test_when_entra_frontend_package_json_is_read_then_msal_angular_v6_is_listed",
+            "test_when_entra_frontend_package_json_is_read_then_msal_browser_v5_is_listed",
+        }
+    ),
     "test_entra_nestjs_overlay.py": frozenset(
         {
             "test_when_overlay_is_present_then_inherited_file_is_not_duplicated",
@@ -280,12 +286,6 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_when_token_auth_scaffolded_auth_guard_is_registered_as_app_guard",
             "test_when_supabase_auth_scaffolded_auth_guard_is_registered_as_app_guard",
             "test_when_nestjs_base_scaffolded_logger_config_has_a_companion_spec",
-        }
-    ),
-    "test_entra_frontend_overlay.py": frozenset(
-        {
-            "test_when_entra_frontend_package_json_is_read_then_msal_angular_v6_is_listed",
-            "test_when_entra_frontend_package_json_is_read_then_msal_browser_v5_is_listed",
         }
     ),
     "test_issue_7_entra_auth_service.py": frozenset(
