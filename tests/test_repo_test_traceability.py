@@ -62,6 +62,8 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
     "test_ci_workflow_scope.py": frozenset(
         {
             "test_when_api_only_steps_are_gated_against_frontend_scope",
+            "test_when_the_workflow_runs_the_api_suite_then_python_floor_and_image_version_are_both_tested",
+            "test_when_the_suites_matrix_is_read_then_nestjs_runs_once_and_every_suite_name_is_unique",
         }
     ),
     "test_docker_runtime_invariants.py": frozenset(
@@ -74,6 +76,14 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_nestjs_production_image_ships_the_prisma_config_the_entrypoint_needs",
             "test_no_compose_file_hardcodes_container_names",
             "test_every_published_host_port_is_parametrized",
+            "test_when_the_fastapi_compose_is_read_then_postgres_19_mounts_the_cluster_root_and_no_image_floats",
+            "test_when_the_fastapi_dockerfile_is_read_then_both_stages_share_one_python_slim_tag",
+        }
+    ),
+    "test_docs_generator_selfcheck.py": frozenset(
+        {
+            "test_when_supabase_then_docker_table_omits_local_db",
+            "test_when_non_supabase_then_docker_table_has_local_db",
         }
     ),
     "test_docs_sync_async.py": frozenset(

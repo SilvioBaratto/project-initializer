@@ -99,19 +99,25 @@ def test_when_api_claude_generated_then_it_names_the_right_orm_layer(framework):
 
 
 def test_when_supabase_then_docker_table_omits_local_db():
-    """Supabase variants have no local db/adminer service in the generated README."""
+    """Supabase variants have no local db/adminer service in the generated README.
+
+    Validates project_initializer/docs_generator.py _docker_services_table().
+    """
     for framework in FRAMEWORKS:
         doc = generate_root_readme(framework, "supabase")
-        assert "PostgreSQL 16" not in doc
+        assert "PostgreSQL 19" not in doc
         assert "adminer" not in doc.lower()
 
 
 def test_when_non_supabase_then_docker_table_has_local_db():
-    """Non-supabase variants keep the local db + adminer rows."""
+    """Non-supabase variants keep the local db + adminer rows, naming the compose image's PostgreSQL.
+
+    Validates project_initializer/docs_generator.py _docker_services_table().
+    """
     for framework in FRAMEWORKS:
         for auth in (None, "token", "entra"):
             doc = generate_root_readme(framework, auth)
-            assert "PostgreSQL 16" in doc
+            assert "PostgreSQL 19" in doc
             assert "adminer" in doc.lower()
 
 

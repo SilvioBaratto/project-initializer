@@ -15,9 +15,11 @@ they only surface at container runtime:
    database the application uses, and the images ship what the entrypoints need.
 """
 
+import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 _TEMPLATES = Path(__file__).resolve().parent.parent / "project_initializer"
 
@@ -201,6 +203,48 @@ def test_fastapi_dockerfile_installs_the_client_the_entrypoint_needs():
     Validates project_initializer/templates-api-fastapi/api/Dockerfile.
     """
     assert "postgresql-client" in _text(_FASTAPI_DOCKERFILE)
+
+
+@pytest.mark.unit
+def test_when_the_fastapi_compose_is_read_then_postgres_19_mounts_the_cluster_root_and_no_image_floats():
+    """From PostgreSQL 18 the image declares ``VOLUME /var/lib/postgresql``.
+
+    The cluster lives in ``/var/lib/postgresql/<major>/docker``, so a volume mounted
+    at the old ``.../data`` path makes the entrypoint exit 1 on an existing volume.
+    A floating or missing tag would let the database or the admin UI change under a
+    scaffold without a template edit.
+
+    Validates project_initializer/templates-api-fastapi/docker-compose.yml.
+    """
+    compose = yaml.safe_load(_text(_FASTAPI_COMPOSE_FILES[0]))
+    services = compose["services"]
+
+    assert services["db"]["image"] == "postgres:19-alpine"
+    assert services["db"]["volumes"] == ["postgres_data:/var/lib/postgresql"]
+    floating = {
+        name: service["image"]
+        for name, service in services.items()
+        if "image" in service
+        and (":" not in service["image"] or service["image"].endswith(":latest"))
+    }
+    assert floating == {}, f"images without a pinned tag: {floating}"
+
+
+@pytest.mark.unit
+def test_when_the_fastapi_dockerfile_is_read_then_both_stages_share_one_python_slim_tag():
+    """The builder installs into ``/install``; the runtime stage copies it into its own prefix.
+
+    A builder and a runtime on different minors put the packages in a ``site-packages``
+    directory the runtime interpreter does not read.
+
+    Validates project_initializer/templates-api-fastapi/api/Dockerfile.
+    """
+    tags = re.findall(
+        r"^FROM (python:\d+\.\d+-slim)\b", _text(_FASTAPI_DOCKERFILE), re.MULTILINE
+    )
+
+    assert len(tags) == 2, "expected a builder and a runtime stage on python:N.M-slim"
+    assert tags[0] == tags[1]
 
 
 @pytest.mark.unit

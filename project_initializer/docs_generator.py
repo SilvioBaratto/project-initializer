@@ -197,7 +197,7 @@ def _docker_services_table(framework: str, auth: str | None, *, frontend: bool) 
     """Compose services table — omits db/adminer for supabase."""
     rows = ["| Service | Port | Description |", "|---------|------|-------------|"]
     if auth != "supabase":
-        rows.append("| `db` | 5433:5432 | PostgreSQL 16 |")
+        rows.append("| `db` | 5433:5432 | PostgreSQL 19 |")
     rows.append(
         f"| `api` | 8000:8000 | {_framework_label(framework)} with hot reload |"
     )
