@@ -59,7 +59,11 @@ function collect(f: ComponentFixture<PaginationComponent>): number[] {
   return emitted;
 }
 
-/** Last value a top-level style rule matching `node` declares for `property` ('' when none). */
+/**
+ * Last value a top-level style rule matching `node` declares for `property` ('' when none), as authored.
+ * Declarations are read in document order: specificity, `!important` and inheritance are ignored, and
+ * grouping rules (@media, @supports, @layer, @container) are skipped.
+ */
 function declaredValue(node: Element, property: string): string {
   let value = '';
   for (const sheet of Array.from(document.styleSheets)) {
@@ -75,7 +79,7 @@ function declaredValue(node: Element, property: string): string {
       try {
         matches = node.matches(rule.selectorText);
       } catch {
-        // Selectors jsdom can't parse (for example :dir()) don't apply to this check.
+        // A selector this engine cannot evaluate does not apply to this check.
       }
       const declared = matches ? rule.style.getPropertyValue(property).trim() : '';
       if (declared) value = declared;

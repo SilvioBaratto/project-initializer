@@ -73,10 +73,12 @@ function accessibleName(element: Element): string {
 const NAMED_ROLES = 'nav, [role="navigation"], [role="region"], [role="tablist"]';
 
 /**
- * The value that style rules matching `el` declare for `property`, as authored (for example
- * "var(--mat-sys-surface)"); the last matching rule in document order wins. getComputedStyle substitutes
- * var() and no theme defines the system tokens in a spec, so the computed color would not name the
- * token, whereas CSSOM rule declarations keep the reference in jsdom and real browsers alike.
+ * The value that the top-level style rules matching `el` declare for `property`, as authored (for
+ * example "var(--mat-sys-surface)"). Declarations are read in document order and the last non-empty one
+ * wins: specificity, `!important` and inheritance are ignored, and grouping rules (@media, @supports,
+ * @layer, @container) are skipped. getComputedStyle substitutes var() and no theme defines the system
+ * tokens in a spec, so the computed color would not name the token, whereas CSSOM rule declarations
+ * keep the reference in jsdom and real browsers alike.
  */
 function declaredValue(el: Element, property: string): string {
   let value = '';

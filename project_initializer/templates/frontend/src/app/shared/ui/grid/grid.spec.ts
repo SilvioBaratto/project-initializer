@@ -56,9 +56,11 @@ function rulesFor(selector: string, atRule: FoundRule['atRule'], condition = '')
 }
 
 /**
- * The value that the top-level style rules matching `el` declare for `property`, as authored (for example
- * "span var(--app-grid-cell-span)"); the last matching rule in document order wins. getComputedStyle
- * substitutes var(), so it would report the resolved span instead of the rule that resolves it.
+ * The value that the top-level style rules matching `el` declare for `property`, as authored (for
+ * example "span var(--app-grid-cell-span)"). Declarations are read in document order and the last
+ * non-empty one wins: specificity, `!important` and inheritance are ignored, and grouping rules
+ * (@media, @supports, @layer, @container) are skipped. getComputedStyle substitutes var(), so it would
+ * report the resolved span instead of the rule that resolves it.
  */
 function declaredValue(el: Element, property: string): string {
   let value = '';

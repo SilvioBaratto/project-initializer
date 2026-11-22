@@ -96,9 +96,10 @@ function mediumQueryBody(css: string): string {
 }
 
 /**
- * The value that the top-level style rules matching `el` declare for `property`, as authored; the
- * last matching rule in document order wins and '' means none declares it. Rules inside `@media`
- * blocks are skipped, so this is the mobile-first baseline a compact window gets.
+ * The value that the top-level style rules matching `el` declare for `property`, as authored ('' when
+ * none declares it). Declarations are read in document order and the last non-empty one wins:
+ * specificity, `!important` and inheritance are ignored, and grouping rules (@media, @supports, @layer,
+ * @container) are skipped, so this is the mobile-first baseline a compact window gets.
  */
 function declaredValue(el: Element, property: string): string {
   let value = '';
@@ -120,6 +121,23 @@ function declaredValue(el: Element, property: string): string {
     }
   }
   return value;
+}
+
+/**
+ * The prelude of every top-level rule of the component's stylesheet that is not a plain style rule,
+ * for example "@media (min-width: 600px)", whitespace collapsed and each listed once.
+ */
+function groupingRulePreludes(): string[] {
+  const preludes = new Set<string>();
+  for (const style of Array.from(document.querySelectorAll('style'))) {
+    if (!(style.textContent ?? '').includes('.table-region') || !style.sheet) continue;
+    for (const rule of Array.from(style.sheet.cssRules)) {
+      if (rule instanceof CSSStyleRule) continue;
+      const brace = rule.cssText.indexOf('{');
+      preludes.add(rule.cssText.slice(0, brace < 0 ? undefined : brace).replace(/\s+/g, ' ').trim());
+    }
+  }
+  return [...preludes];
 }
 
 /**
@@ -290,8 +308,11 @@ describe('TableComponent — stacked cards below 600px', () => {
 
   it('when the window is below 600px (the mobile-first baseline), only the cards are displayed', async () => {
     // jsdom evaluates `@media` against a fixed 1024px-wide window, so getComputedStyle always reports
-    // the wide layout; the compact one is what the rules outside the media query declare.
+    // the wide layout; the compact one is what the rules outside the media query declare. That holds
+    // only while the 600px block is the stylesheet's one grouping rule: declaredValue() skips them all,
+    // so a `max-width` query or an `@supports` block could otherwise hide the cards unseen.
     const { el } = await setup();
+    expect(groupingRulePreludes()).toEqual(['@media (min-width: 600px)']);
     expect(declaredValue(el.querySelector('table')!, 'display')).toBe('none');
     expect(declaredValue(el.querySelector('ul')!, 'display')).not.toBe('none');
   });

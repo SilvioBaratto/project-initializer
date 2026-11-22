@@ -38,9 +38,9 @@ describe('StackComponent', () => {
   /**
    * The gap stack.css actually applies to the host. Browsers and jsdom substitute var() in computed
    * values (`8px`); a DOM shim that returns the declared `var(--name, fallback)` text instead gets that
-   * reference resolved against the host's own custom property. Either
-   * way the result is the applied px value, so the assertion holds in every runner and fails if the
-   * stylesheet stops reading the bound property.
+   * reference resolved against the host's own custom property. Either way the result is the applied px
+   * value, so the assertion holds in every runner and fails if the stylesheet stops reading the bound
+   * property.
    */
   const appliedGap = () => {
     const declared = layout('gap').trim();

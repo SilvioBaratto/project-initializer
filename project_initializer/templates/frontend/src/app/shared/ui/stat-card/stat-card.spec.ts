@@ -43,9 +43,11 @@ function readText(el: Element | null): string {
 }
 
 /**
- * The value that style rules matching `el` declare for `property`, as authored (for example
- * "var(--app-success)"); the last matching rule in document order wins. CSSOM rule declarations keep
- * var() references in jsdom and in real browsers alike, whereas getComputedStyle substitutes them.
+ * The value that the top-level style rules matching `el` declare for `property`, as authored (for
+ * example "var(--app-success)"). Declarations are read in document order and the last non-empty one
+ * wins: specificity, `!important` and inheritance are ignored, and grouping rules (@media, @supports,
+ * @layer, @container) are skipped. CSSOM rule declarations keep var() references in jsdom and in real
+ * browsers alike, whereas getComputedStyle substitutes them.
  */
 function declaredValue(el: Element, property: string): string {
   let value = '';

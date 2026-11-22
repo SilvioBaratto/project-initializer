@@ -147,9 +147,8 @@ describe('Responsive shell (integration)', () => {
   }
 
   function pressEscape(target: HTMLElement): void {
-    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
-    // MatDrawer and MatBottomSheet check the legacy keyCode, which jsdom's KeyboardEvent init does not set.
-    Object.defineProperty(event, 'keyCode', { get: () => 27 });
+    // MatDrawer and MatBottomSheet check the legacy keyCode, so the event carries it next to key.
+    const event = new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true, cancelable: true });
     target.dispatchEvent(event);
   }
 

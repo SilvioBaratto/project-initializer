@@ -58,10 +58,12 @@ class ButtonFormHost {
 }
 
 /**
- * The value that style rules matching `el` declare for a custom property, as authored (for example
- * "var(--mat-sys-error)"); the last matching rule in document order wins. getComputedStyle substitutes
- * var() and no theme defines the system tokens in a spec, so a computed token that references one is
- * empty, whereas CSSOM rule declarations keep the reference in jsdom and real browsers alike.
+ * The value that the top-level style rules matching `el` declare for `property`, as authored (for
+ * example "var(--mat-sys-error)"). Declarations are read in document order and the last non-empty one
+ * wins: specificity, `!important` and inheritance are ignored, and grouping rules (@media, @supports,
+ * @layer, @container) are skipped. getComputedStyle substitutes var() and no theme defines the system
+ * tokens in a spec, so a computed token that references one is empty; read through this only what a
+ * computed value cannot show.
  */
 function declaredValue(el: Element, property: string): string {
   let value = '';
@@ -98,9 +100,8 @@ describe('ButtonComponent', () => {
     return appButton().querySelector('button')!;
   }
 
-  /** The Material token button.css sets on the inner button, as authored ('' when it sets none). */
   function token(name: string): string {
-    return declaredValue(button(), name);
+    return getComputedStyle(button()).getPropertyValue(name).trim();
   }
 
   async function set(changes: Partial<{
@@ -173,9 +174,10 @@ describe('ButtonComponent', () => {
 
   it('when variant is danger, the filled container and label tokens use the error roles', async () => {
     await set({ variant: 'danger' });
-    expect(token('--mat-button-filled-container-color')).toBe('var(--mat-sys-error)');
-    expect(token('--mat-button-filled-label-text-color')).toBe('var(--mat-sys-on-error)');
-    expect(token('--mat-button-filled-state-layer-color')).toBe('var(--mat-sys-on-error)');
+    // The computed tokens are empty: the error roles they reference are undefined without a theme.
+    expect(declaredValue(button(), '--mat-button-filled-container-color')).toBe('var(--mat-sys-error)');
+    expect(declaredValue(button(), '--mat-button-filled-label-text-color')).toBe('var(--mat-sys-on-error)');
+    expect(declaredValue(button(), '--mat-button-filled-state-layer-color')).toBe('var(--mat-sys-on-error)');
   });
 
   it('when variant is primary, the filled tokens are left to the theme', async () => {

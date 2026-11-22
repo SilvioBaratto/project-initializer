@@ -83,10 +83,12 @@ function radioComponents(fixture: ComponentFixture<unknown>): RadioComponent[] {
 }
 
 /**
- * The value that style rules matching `el` declare for a custom property, as authored (for example
- * "var(--mat-sys-error)"); the last matching rule in document order wins. getComputedStyle substitutes
- * var() and no theme defines the system tokens in a spec, so a computed token that references one is
- * empty, whereas CSSOM rule declarations keep the reference in jsdom and real browsers alike.
+ * The value that the top-level style rules matching `el` declare for `property`, as authored (for
+ * example "var(--mat-sys-error)"). Declarations are read in document order and the last non-empty one
+ * wins: specificity, `!important` and inheritance are ignored, and grouping rules (@media, @supports,
+ * @layer, @container) are skipped. getComputedStyle substitutes var() and no theme defines the system
+ * tokens in a spec, so a computed token that references one is empty, whereas CSSOM rule declarations
+ * keep the reference in jsdom and real browsers alike.
  */
 function declaredValue(el: Element, property: string): string {
   let value = '';
