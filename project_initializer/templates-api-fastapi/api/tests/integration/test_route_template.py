@@ -1,11 +1,11 @@
 """Integration tests of the route template the real application logs.
 
-FastAPI 0.137 keeps the prefix handed to ``include_router`` out of
+FastAPI 0.165 keeps the prefix handed to ``include_router`` out of
 ``scope["route"].path``, so a log line written from that attribute alone names
 ``/items/{item_id}`` instead of ``/api/v1/items/{item_id}``. The unit tests use
 probe applications with direct routes and cannot see it; these requests go
 through the routers exactly as ``create_application`` includes them. It also
-stopped setting ``scope["route"]`` for plain Starlette routes, such as the
+does not set ``scope["route"]`` for plain Starlette routes, such as the
 ``/openapi.json`` route FastAPI registers itself.
 """
 

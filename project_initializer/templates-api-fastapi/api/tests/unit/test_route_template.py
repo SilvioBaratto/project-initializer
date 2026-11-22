@@ -135,8 +135,8 @@ def test_when_the_scope_holds_no_route_then_the_fixed_label_is_returned():
 def test_when_a_plain_route_answers_then_the_template_is_its_declared_path(caplog):
     """when a plain Starlette route serves the request, the log names its path.
 
-    FastAPI 0.137 no longer puts such a route in ``scope["route"]``, which left
-    the label at ``unmatched`` for them, ``/openapi.json`` included.
+    FastAPI 0.165 does not put such a route in ``scope["route"]``, which would
+    leave the label at ``unmatched`` for them, ``/openapi.json`` included.
 
     Validates app.api.errors.route_template().
     """
