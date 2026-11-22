@@ -16,7 +16,10 @@ COPY . .
 RUN npm run build -- --configuration=production
 
 # Stage 2: Serve with nginx
-FROM nginx:alpine
+# The stable branch, not the moving `alpine` tag: that one follows mainline, so a
+# rebuild could change nginx branch. Stable keeps a plain random draw behind
+# $request_id, which nginx.conf uses as the CSP nonce.
+FROM nginx:1.30-alpine
 
 # Remove default nginx config
 RUN rm -rf /etc/nginx/conf.d/*

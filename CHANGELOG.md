@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking changes for newly scaffolded projects
+
+- **The frontend image serves from `nginx:1.30-alpine` instead of the moving `nginx:alpine` tag.** The runtime stage follows the stable nginx branch, so a rebuild no longer changes nginx branch by itself. `nginx.conf` is unchanged: the non-root user, the pid file, the healthcheck and the CSP nonce swap behave as before.
+- **The scaffolded `test-package.yml` workflow uses `actions/checkout@v7` and `actions/setup-node@v7`.** This repo's own workflow moves the same way. The Node versions the workflows install are unchanged.
+
+### Repo tests
+
+- `tests/test_frontend_dependency_upgrade.py` pins the nginx runtime tag of the frontend Dockerfile to a version, and `actions/checkout@v7` and `actions/setup-node@v7` on every `uses:` line of both workflow files.
+
 ## [0.6.0] - 2026-11-21
 
 Python projects now keep their dependencies and their version in `pyproject.toml` and nowhere else. The first three changes below alter what a **newly scaffolded** FastAPI project contains; a project scaffolded earlier is not touched.

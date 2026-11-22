@@ -34,6 +34,7 @@ NEW_MODULES = (
     "test_env_generator_secrets.py",
     "test_fastapi_dependencies.py",
     "test_fastapi_migrations.py",
+    "test_frontend_dependency_upgrade.py",
     "test_nestjs_auth_seam.py",
     "test_nestjs_migrations.py",
     "test_no_ai_framework_in_templates.py",
