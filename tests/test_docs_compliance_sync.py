@@ -153,6 +153,7 @@ _NESTJS_ALL = [
     "`P2010`",
     "`P2024` and `P2037`",
     "unmapped database error `P2039`",
+    "any other `P2039` is logged with its SQLSTATE only",
     "`stripSslParameters`",
     "`DB_POOL_MAX`",
     "`API_DOCS_ENABLED`",
@@ -576,7 +577,7 @@ def test_when_the_docs_list_the_p2039_outages_then_they_are_the_classifiers(auth
     breaker = _source(_NESTJS_BASE, "src/prisma/database-circuit-breaker.ts")
     code_class = re.search(r"CONNECTION_EXCEPTION_SQLSTATE_CLASS = '(\w+)'", breaker)
     code_set = re.search(
-        r"SERVER_SHUTDOWN_SQLSTATES = new Set\(\[(.*?)\]\)", breaker, re.S
+        r"SERVER_STOPPING_OR_STARTING_SQLSTATES = new Set\(\[(.*?)\]\)", breaker, re.S
     )
     documented = re.search(r"`P2039`(.*?)\)", generate_api_claude("nestjs", auth))
 

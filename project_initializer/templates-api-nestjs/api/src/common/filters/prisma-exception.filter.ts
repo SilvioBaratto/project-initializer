@@ -1,7 +1,11 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpStatus, Logger } from '@nestjs/common';
 import { Prisma } from '@generated/prisma';
 import type { Request, Response } from 'express';
-import { isDatabaseUnavailableError } from '../../prisma/database-circuit-breaker';
+import {
+  isDatabaseUnavailableError,
+  UNMAPPED_DATABASE_ERROR_CODE,
+  unmappedPostgresSqlStateOf,
+} from '../../prisma/database-circuit-breaker';
 import {
   buildErrorBody,
   describeRequest,
@@ -14,6 +18,9 @@ interface PrismaErrorMapping {
   status: HttpStatus;
   message: string;
 }
+
+/** Logged in place of the SQLSTATE when an unmapped database error carries none. */
+const UNKNOWN_SQLSTATE = 'unknown';
 
 /**
  * Client-facing answer for each Prisma error code that a caller can cause.
@@ -40,7 +47,8 @@ function findMapping(code: string): PrismaErrorMapping | undefined {
  * connections, refusing sessions while it restarts, as {@link isDatabaseUnavailableError}
  * defines) answer 503, exactly as a call rejected by the open circuit does, so a client sees one
  * answer for one outage; they log one warning line. Any other code is an unexpected database
- * failure: it answers 500 with a fixed message and logs the error with its stack.
+ * failure: it answers 500 with a fixed message and logs the error with its stack, except an
+ * unmapped database error ({@link UNMAPPED_DATABASE_ERROR_CODE}), which logs its SQLSTATE only.
  */
 @Catch(Prisma.PrismaClientKnownRequestError)
 export class PrismaClientExceptionFilter implements ExceptionFilter<Prisma.PrismaClientKnownRequestError> {
@@ -68,10 +76,20 @@ export class PrismaClientExceptionFilter implements ExceptionFilter<Prisma.Prism
       );
       return { status: HttpStatus.SERVICE_UNAVAILABLE, message: SERVICE_UNAVAILABLE_MESSAGE };
     }
-    this.logger.error(
-      { err: exception },
-      `Unmapped Prisma error ${exception.code} on ${describeRequest(request)}`,
-    );
+    this.logUnexpected(exception, request);
     return { status: HttpStatus.INTERNAL_SERVER_ERROR, message: INTERNAL_ERROR_MESSAGE };
+  }
+
+  private logUnexpected(exception: Prisma.PrismaClientKnownRequestError, request: Request): void {
+    const summary = `Unmapped Prisma error ${exception.code} on ${describeRequest(request)}`;
+    if (exception.code === UNMAPPED_DATABASE_ERROR_CODE) {
+      // Postgres puts the values of the failing row into the detail of such an error (a check or
+      // exclusion constraint) and the rejected input into the message of others; the error's
+      // message, stack and meta all carry them, so none of those may reach the log.
+      const sqlState = unmappedPostgresSqlStateOf(exception) ?? UNKNOWN_SQLSTATE;
+      this.logger.error(`${summary}: SQLSTATE ${sqlState}`);
+      return;
+    }
+    this.logger.error({ err: exception }, summary);
   }
 }

@@ -124,9 +124,12 @@ const validatedEnv = validate({
   DIRECT_URL: 'postgresql://localhost:5432/test',
   ...AUTH_TEST_ENV,
 });
-const configService = {
-  get: (key: keyof Env) => validatedEnv[key],
-} as unknown as ConfigService<Env, true>;
+function configServiceWith(overrides: Partial<Env> = {}): ConfigService<Env, true> {
+  const env: Env = { ...validatedEnv, ...overrides };
+  return { get: (key: keyof Env) => env[key] } as unknown as ConfigService<Env, true>;
+}
+
+const configService = configServiceWith();
 
 async function rejection(attempt: Promise<unknown>): Promise<unknown> {
   try {
@@ -172,18 +175,6 @@ describe('AuthService.verify', () => {
       const token = signToken({ signOptions: { audience: TEST_ENTRA_API_CLIENT_ID } });
 
       await expect(createService().verify(token)).resolves.toMatchObject({ id: USER_OBJECT_ID });
-    });
-
-    it('when the configured audience is the client id itself, then a token addressed to it is accepted', async () => {
-      const sameAudienceConfig = {
-        get: (key: keyof Env) =>
-          key === 'ENTRA_API_AUDIENCE' ? TEST_ENTRA_API_CLIENT_ID : validatedEnv[key],
-      } as unknown as ConfigService<Env, true>;
-      const token = signToken({ signOptions: { audience: TEST_ENTRA_API_CLIENT_ID } });
-
-      await expect(
-        new AuthService(sameAudienceConfig, keyResolver).verify(token),
-      ).resolves.toMatchObject({ id: USER_OBJECT_ID });
     });
 
     it('when the username claim and roles are absent, then email is undefined and roles is empty', async () => {
@@ -245,6 +236,30 @@ describe('AuthService.verify', () => {
         expect(keyResolver).not.toHaveBeenCalled();
       },
     );
+  });
+
+  describe('when the configured audience is the client id itself', () => {
+    function createSameAudienceService(): AuthService {
+      return new AuthService(
+        configServiceWith({ ENTRA_API_AUDIENCE: TEST_ENTRA_API_CLIENT_ID }),
+        keyResolver,
+      );
+    }
+
+    it('then a token addressed to the client id is accepted', async () => {
+      const token = signToken({ signOptions: { audience: TEST_ENTRA_API_CLIENT_ID } });
+
+      await expect(createSameAudienceService().verify(token)).resolves.toMatchObject({
+        id: USER_OBJECT_ID,
+      });
+    });
+
+    it('then a token addressed to the usual api:// audience is rejected with the generic 401', async () => {
+      const error = await rejection(createSameAudienceService().verify(signToken()));
+
+      expect(error).toBeInstanceOf(UnauthorizedException);
+      expect(error).toHaveProperty('message', INVALID_CREDENTIALS_MESSAGE);
+    });
   });
 
   describe('tokens rejected after the key lookup', () => {

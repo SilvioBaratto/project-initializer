@@ -8,6 +8,7 @@ format and coverage-gate tooling. Reads the real template files so the fixtures 
 """
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -189,8 +190,11 @@ def test_when_prisma_packages_read_then_they_are_one_exact_7x_release(path):
 
     assert len(versions) == 1, f"Prisma packages diverged: {versions}"
     (version,) = versions
-    assert not version.startswith(("^", "~")), "Prisma must be pinned exactly"
-    assert int(version.split(".")[0]) == SUPPORTED_PRISMA_MAJOR
+    exact = re.fullmatch(r"(\d+)\.\d+\.\d+", version)
+    assert exact, f"Prisma must be pinned to one exact version, not {version!r}"
+    assert int(exact.group(1)) == SUPPORTED_PRISMA_MAJOR, (
+        f"Prisma must stay on major {SUPPORTED_PRISMA_MAJOR}, not {version!r}"
+    )
 
 
 @pytest.mark.parametrize("path", TOOLED_PACKAGE_JSONS, ids=TOOLED_IDS)

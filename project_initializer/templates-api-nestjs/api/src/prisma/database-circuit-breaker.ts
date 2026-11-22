@@ -23,10 +23,10 @@ const CAPACITY_ERROR_CODES = new Set(['P2024', 'P2037']);
 const RAW_QUERY_ERROR_CODE = 'P2010';
 
 /**
- * Since Prisma 7.9, a failed query whose database error the driver adapter has no kind for gets
- * this code, so a server that is shutting down or starting up surfaces under it too.
+ * Prisma code of a failed query whose database error the driver adapter has no kind for (Prisma
+ * 7.9 and later), so a server that is shutting down or starting up surfaces under it too.
  */
-const UNMAPPED_DATABASE_ERROR_CODE = 'P2039';
+export const UNMAPPED_DATABASE_ERROR_CODE = 'P2039';
 
 /** Kind the pg adapter gives every Postgres error it does not map; the SQLSTATE is in `code`. */
 const UNMAPPED_POSTGRES_ERROR_KIND = 'postgres';
@@ -38,7 +38,7 @@ const CONNECTION_EXCEPTION_SQLSTATE_CLASS = '08';
  * SQLSTATEs that mean the server itself is going away or not yet back: administrator shutdown
  * (`57P01`), crash shutdown (`57P02`) and "cannot connect now" while it starts or stops (`57P03`).
  */
-const SERVER_SHUTDOWN_SQLSTATES = new Set(['57P01', '57P02', '57P03']);
+const SERVER_STOPPING_OR_STARTING_SQLSTATES = new Set(['57P01', '57P02', '57P03']);
 
 /**
  * Driver adapter error kinds that describe the connection and not the query: the server cannot be
@@ -84,18 +84,23 @@ function driverErrorKindOf(error: Prisma.PrismaClientKnownRequestError): string 
 }
 
 /**
- * Reads the SQLSTATE of a Postgres error the pg adapter did not map to a kind of its own.
+ * Reads the SQLSTATE of a Postgres error the pg adapter did not map to a kind of its own, the
+ * kind of error Prisma reports as {@link UNMAPPED_DATABASE_ERROR_CODE}.
  *
- * @returns the SQLSTATE (for example `57P03`), or `undefined` for any other error.
+ * @param error - a known request error thrown by a Prisma call.
+ * @returns the SQLSTATE (for example `57P03`), or `undefined` when the error carries no unmapped
+ *   Postgres error or that error has no text SQLSTATE.
  */
-function unmappedPostgresSqlStateOf(
+export function unmappedPostgresSqlStateOf(
   error: Prisma.PrismaClientKnownRequestError,
 ): string | undefined {
-  if (driverErrorKindOf(error) !== UNMAPPED_POSTGRES_ERROR_KIND) {
-    return undefined;
-  }
   const cause = driverErrorCauseOf(error);
-  if (cause === undefined || !('code' in cause)) {
+  if (
+    cause === undefined ||
+    !('kind' in cause) ||
+    cause.kind !== UNMAPPED_POSTGRES_ERROR_KIND ||
+    !('code' in cause)
+  ) {
     return undefined;
   }
   return typeof cause.code === 'string' ? cause.code : undefined;
@@ -117,7 +122,7 @@ function isUnmappedConnectionFailure(error: Prisma.PrismaClientKnownRequestError
   }
   return (
     sqlState.startsWith(CONNECTION_EXCEPTION_SQLSTATE_CLASS) ||
-    SERVER_SHUTDOWN_SQLSTATES.has(sqlState)
+    SERVER_STOPPING_OR_STARTING_SQLSTATES.has(sqlState)
   );
 }
 

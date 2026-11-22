@@ -1,6 +1,7 @@
 /** Validates src/common/filters/prisma-exception.filter.ts: PrismaClientExceptionFilter. */
 import { HttpStatus, Logger } from '@nestjs/common';
 import { Prisma } from '@generated/prisma';
+import pino from 'pino';
 import {
   createFakeResponse,
   httpHostOf,
@@ -25,6 +26,13 @@ function prismaError(
     clientVersion: 'test',
     meta,
   });
+}
+
+/** What pino writes for the arguments of one logger call, errors through its own serializer. */
+function asPinoWrites(args: unknown[]): string {
+  return JSON.stringify(args, (_key, value: unknown) =>
+    value instanceof Error ? pino.stdSerializers.err(value) : value,
+  );
 }
 
 describe('PrismaClientExceptionFilter', () => {
@@ -158,6 +166,49 @@ describe('PrismaClientExceptionFilter', () => {
       expect(response.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
       expect(errorLog).toHaveBeenCalledTimes(1);
       expect(warnLog).not.toHaveBeenCalled();
+    });
+
+    it('then an unmapped database error is logged with its SQLSTATE and without the row values', () => {
+      // Shape of a failed check constraint on Prisma 7.10: the failing row is in `detail`, and
+      // Postgres puts input values in the message of other unmapped errors.
+      const rowValue = 'ada@example.com';
+      const checkViolation = new Prisma.PrismaClientKnownRequestError(
+        `Database error. Code: \`23514\`. Message: \`row (${rowValue}) violates a check\``,
+        {
+          code: 'P2039',
+          clientVersion: 'test',
+          meta: {
+            driverAdapterError: {
+              name: 'DriverAdapterError',
+              cause: {
+                originalCode: '23514',
+                originalMessage: `row (${rowValue}) violates a check`,
+                kind: 'postgres',
+                code: '23514',
+                severity: 'ERROR',
+                message: `row (${rowValue}) violates a check`,
+                detail: `Failing row contains (${rowValue}, -1).`,
+              },
+            },
+          },
+        },
+      );
+
+      handle(checkViolation);
+
+      expect(errorLog).toHaveBeenCalledTimes(1);
+      const written = asPinoWrites(errorLog.mock.calls[0] as unknown[]);
+      expect(written).not.toContain(rowValue);
+      expect(written).toContain('P2039');
+      expect(written).toContain('23514');
+    });
+
+    it('then an unmapped database error without a SQLSTATE is logged as unknown', () => {
+      handle(prismaError('P2039'));
+
+      expect(errorLog).toHaveBeenCalledWith(
+        `Unmapped Prisma error P2039 on DELETE ${REQUEST_PATH} (requestId: ${REQUEST_ID}): SQLSTATE unknown`,
+      );
     });
   });
 
