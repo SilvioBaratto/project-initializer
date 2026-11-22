@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - Python 3.11+
-- Node.js 20+
+- Node.js 26
 - Docker and Docker Compose
 
 ## Development Setup

@@ -5,7 +5,13 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { PinoLogger } from 'nestjs-pino';
 import { AUTH_GUARDS } from './app.auth';
 import { AppModule } from './app.module';
-import { configureApp, isOpenApiEnabled, readPackageVersion, setupOpenApi } from './app.setup';
+import {
+  answerUnmatchedRequests,
+  configureApp,
+  isOpenApiEnabled,
+  readPackageVersion,
+  setupOpenApi,
+} from './app.setup';
 import type { BaseEnv } from './config/env.base';
 import { ENV_FILE_PATHS } from './config/env-files';
 import { createLogLevelSink, installLogLevelReload } from './config/log-level-reload';
@@ -22,17 +28,12 @@ function createStartupLogger(): ConsoleLogger | undefined {
   return process.env.NODE_ENV === PRODUCTION_ENV ? new ConsoleLogger({ json: true }) : undefined;
 }
 
-// Resolved rather than injected because PinoLogger is transient. Outside a request its `logger` is
-// the root that writes everything not tied to one; `PinoLogger.root` is the one requests descend
-// from.
-async function enableLogLevelReload(app: NestExpressApplication): Promise<void> {
-  const pinoLogger = await app.resolve(PinoLogger);
+// `PinoLogger.root` alone is enough: request loggers are its children and lines written outside a
+// request go to it directly, so moving it moves the whole application.
+function enableLogLevelReload(app: NestExpressApplication): void {
   const removeHandler = installLogLevelReload({
     envFilePaths: ENV_FILE_PATHS,
-    sink: createLogLevelSink(
-      () => [pinoLogger.logger, PinoLogger.root],
-      new Logger(LOG_LEVEL_RELOAD_LOG_CONTEXT),
-    ),
+    sink: createLogLevelSink(() => [PinoLogger.root], new Logger(LOG_LEVEL_RELOAD_LOG_CONTEXT)),
   });
   app.getHttpServer().once('close', removeHandler);
 }
@@ -50,8 +51,11 @@ async function startApplication(app: NestExpressApplication): Promise<void> {
       bearerAuthRequired: AUTH_GUARDS.length > 0,
     });
   }
+  // init() registers the routes, so the unmatched-request handler can go in after all of them.
+  await app.init();
+  answerUnmatchedRequests(app);
   await app.listen(config.get('PORT', { infer: true }));
-  await enableLogLevelReload(app);
+  enableLogLevelReload(app);
 }
 
 async function failStartup(app: NestExpressApplication, error: unknown): Promise<void> {

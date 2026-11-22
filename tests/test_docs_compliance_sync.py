@@ -20,6 +20,7 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
+from project_initializer.cli import copy_template
 from project_initializer.docs_generator import (
     generate_api_claude,
     generate_api_readme,
@@ -152,12 +153,29 @@ _NESTJS_ALL = [
     "`HealthCheckExceptionFilter`",
     "`P2010`",
     "`P2024` and `P2037`",
+    "unmapped database error `P2039`",
+    "any other `P2039` is logged with its SQLSTATE only",
     "`stripSslParameters`",
     "`DB_POOL_MAX`",
     "`API_DOCS_ENABLED`",
     "`DB_WAIT_TIMEOUT_SECONDS`",
     "`prisma.config.ts`",
-    "`@ZodResponse`",
+    "`@ResponseSchema(status, schema)`",
+    "`StandardSchemaValidationPipe`",
+    "`StandardSchemaSerializerInterceptor`",
+    "`SchemaValidationException`",
+    "`@Body({ schema })`",
+    "a forgotten `schema` switches validation off",
+    "`createSchemaValidationPipe()`",
+    "finds the controller classes exported from the `*.controller.ts` files under `src/`, checks their own and inherited handlers",
+    "It also requires `HealthController` among them, so a discovery that finds nothing fails",
+    "a compile error (TS1241)",
+    "only the element type is checked, so a handler may return one value while the document says array",
+    "answers 404 `Route not found` with the same body, under `/api/v1` and outside it",
+    "`answerUnmatchedRequests(app)`",
+    "keeps its own `@HttpCode(HttpStatus.OK)`",
+    "a 415 for an unsupported charset",
+    "recognises it by its `cause`",
     "`Too many requests`",
     "`migration_backup.",
     "microsecond",
@@ -218,6 +236,16 @@ _NESTJS_ROLE_SOURCES = {
 _STALE_NESTJS = [
     "❌ RBAC / CASL",
     "5. ZodValidationPipe (global)",
+    "nestjs-zod",
+    "ZodValidationPipe",
+    "ZodSerializerInterceptor",
+    "@ZodResponse",
+    "createZodDto",
+    "cleanupOpenApiDoc",
+    "Express's own 404 page",
+    "a repo test fails on it",
+    "finds every controller under `src/`",
+    "checks every controller for request parameters",
 ]
 
 _NESTJS_BY_AUTH = {
@@ -472,14 +500,35 @@ def test_when_the_nestjs_root_docs_are_generated_then_tls_reload_roles_and_audit
 def test_when_the_nestjs_api_claude_is_generated_then_the_guard_order_matches_the_module(
     auth,
 ):
-    """The documented middleware stack names the roles guard as the last global guard.
+    """The documented middleware stack names the roles guard as the last global guard, ahead of
+    the native validation pipe and the serializer.
 
     Validates project_initializer/docs_generator.py generate_api_claude().
     """
     doc = generate_api_claude("nestjs", auth)
 
     assert doc.index("4. Access-token guard") < doc.index("5. `RolesGuard`")
-    assert doc.index("5. `RolesGuard`") < doc.index("6. ZodValidationPipe")
+    assert doc.index("5. `RolesGuard`") < doc.index("6. `StandardSchemaValidationPipe`")
+    assert doc.index("6. `StandardSchemaValidationPipe`") < doc.index(
+        "7. `StandardSchemaSerializerInterceptor`"
+    )
+
+
+@pytest.mark.parametrize("auth", AUTHS)
+def test_when_a_nestjs_project_is_scaffolded_then_the_validation_coverage_spec_the_docs_name_ships(
+    tmp_path, auth
+):
+    """The generated api CLAUDE.md points at a spec that guards against forgotten schemas; the
+    scaffold of every auth variant must contain that spec, or the docs promise a guard the
+    project does not have.
+
+    Validates project_initializer/cli.py copy_template() and project_initializer/docs_generator.py generate_api_claude().
+    """
+    spec = "src/common/validation-coverage.spec.ts"
+    copy_template(tmp_path, auth=auth, framework="nestjs", scope="api")
+
+    assert f"`{spec}`" in generate_api_claude("nestjs", auth)
+    assert (tmp_path / "api" / spec).is_file()
 
 
 @pytest.mark.parametrize("auth", AUTHS)
@@ -561,6 +610,38 @@ def test_when_the_docs_name_a_setting_then_the_templates_read_it():
     ]
 
     assert missing == []
+
+
+@pytest.mark.parametrize("auth", AUTHS)
+def test_when_the_docs_list_the_p2039_outages_then_they_are_the_classifiers(auth):
+    """The SQLSTATEs the docs give for a 503 on ``P2039`` are the ones the classifier uses.
+
+    ``PrismaClientExceptionFilter`` answers 503 for whatever ``isDatabaseUnavailableError``
+    calls an outage, so the documented set is read back from the classifier's constants.
+
+    Validates project_initializer/templates-api-nestjs/api/src/prisma/database-circuit-breaker.ts and project_initializer/docs_generator.py generate_api_claude().
+    """
+    breaker = _source(_NESTJS_BASE, "src/prisma/database-circuit-breaker.ts")
+    code_class = re.search(r"CONNECTION_EXCEPTION_SQLSTATE_CLASS = '(\w+)'", breaker)
+    code_set = re.search(
+        r"SERVER_STOPPING_OR_STARTING_SQLSTATES = new Set\(\[(.*?)\]\)", breaker, re.S
+    )
+    documented = re.search(r"`P2039`(.*?)\)", generate_api_claude("nestjs", auth))
+
+    assert code_class is not None, (
+        "CONNECTION_EXCEPTION_SQLSTATE_CLASS is missing from database-circuit-breaker.ts"
+    )
+    assert code_set is not None, (
+        "SERVER_STOPPING_OR_STARTING_SQLSTATES is missing from database-circuit-breaker.ts"
+    )
+    assert documented is not None, (
+        "the generated api CLAUDE.md has no sentence that follows `P2039`"
+    )
+    sentence = documented.group(1)
+    assert re.findall(r"class `(\w+)`", sentence) == [code_class.group(1)]
+    assert set(re.findall(r"`(\d\d[0-9A-Z]{3})`", sentence)) == set(
+        re.findall(r"'(\w+)'", code_set.group(1))
+    )
 
 
 def test_when_the_docs_name_the_tls_modes_then_the_templates_accept_exactly_those():

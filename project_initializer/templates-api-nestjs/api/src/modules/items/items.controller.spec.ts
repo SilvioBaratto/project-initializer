@@ -2,15 +2,31 @@
  * Validates src/modules/items/items.controller.ts through real routing, validation and serialization.
  */
 import type { Server } from 'node:http';
-import { CanActivate, ExecutionContext, INestApplication, NotFoundException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  INestApplication,
+  NotFoundException,
+  StandardSchemaSerializerInterceptor,
+} from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
-import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
 import request from 'supertest';
+import {
+  documentedStatusesOf,
+  openApiDocumentOf,
+  requestBodySchemaOf,
+  responseSchemaOf,
+} from '../../../test/support/openapi-document';
 import { ANONYMOUS_ACTOR_ID } from '../../common/audit/audit-logger';
 import type { AuthenticatedRequest } from '../../common/auth/authenticated-user';
+import { createSchemaValidationPipe } from '../../common/filters/schema-validation.exception';
 import type { Item } from './item.entity';
-import { ITEM_NOT_FOUND_MESSAGE, MAX_ITEM_NAME_LENGTH } from './item.constants';
+import {
+  ITEM_NOT_FOUND_MESSAGE,
+  MAX_ITEM_DESCRIPTION_LENGTH,
+  MAX_ITEM_NAME_LENGTH,
+} from './item.constants';
 import { ItemsController } from './items.controller';
 import { ItemsService } from './items.service';
 
@@ -65,8 +81,8 @@ describe('ItemsController', () => {
       providers: [
         { provide: ItemsService, useValue: service },
         { provide: APP_GUARD, useValue: identityStub },
-        { provide: APP_PIPE, useClass: ZodValidationPipe },
-        { provide: APP_INTERCEPTOR, useClass: ZodSerializerInterceptor },
+        { provide: APP_PIPE, useFactory: createSchemaValidationPipe },
+        { provide: APP_INTERCEPTOR, useClass: StandardSchemaSerializerInterceptor },
       ],
     }).compile();
     app = moduleRef.createNestApplication();
@@ -254,6 +270,64 @@ describe('ItemsController', () => {
       await request(httpServer()).delete('/items/nope').expect(400);
 
       expect(service.remove).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('OpenAPI document', () => {
+    const itemSchema = {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        name: { type: 'string' },
+        description: { type: 'string', nullable: true },
+        created_at: { type: 'string', format: 'date-time' },
+        updated_at: { type: 'string', format: 'date-time' },
+      },
+      required: ['id', 'name', 'description', 'created_at', 'updated_at'],
+    };
+
+    it('when GET /items is documented, then its 200 body is an array of the item schema', () => {
+      expect(responseSchemaOf(openApiDocumentOf(app), '/items', 'get', '200')).toMatchObject({
+        type: 'array',
+        items: itemSchema,
+      });
+    });
+
+    it('when POST /items is documented, then it answers 201 with the item schema and no 200', () => {
+      const document = openApiDocumentOf(app);
+
+      expect(responseSchemaOf(document, '/items', 'post', '201')).toMatchObject(itemSchema);
+      expect(documentedStatusesOf(document, '/items', 'post')).not.toContain('200');
+    });
+
+    it.each([
+      ['get', '/items/{id}'],
+      ['put', '/items/{id}'],
+    ] as const)(
+      'when %s %s is documented, then its 200 body is the item schema',
+      (method, path) => {
+        expect(responseSchemaOf(openApiDocumentOf(app), path, method, '200')).toMatchObject(
+          itemSchema,
+        );
+      },
+    );
+
+    it('when POST /items is documented, then its request body comes from the create schema', () => {
+      expect(requestBodySchemaOf(openApiDocumentOf(app), '/items', 'post')).toMatchObject({
+        type: 'object',
+        properties: {
+          name: { type: 'string', minLength: 1, maxLength: MAX_ITEM_NAME_LENGTH },
+          description: { maxLength: MAX_ITEM_DESCRIPTION_LENGTH },
+        },
+        required: ['name'],
+      });
+    });
+
+    it('when DELETE /items/{id} is documented, then it declares 204 without a body', () => {
+      const document = openApiDocumentOf(app);
+
+      expect(documentedStatusesOf(document, '/items/{id}', 'delete')).toContain('204');
+      expect(responseSchemaOf(document, '/items/{id}', 'delete', '204')).toBeUndefined();
     });
   });
 });

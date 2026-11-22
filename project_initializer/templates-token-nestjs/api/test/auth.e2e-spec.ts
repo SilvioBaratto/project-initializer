@@ -8,6 +8,12 @@ import { AUTH_PROBE_RATE_LIMIT } from '../src/config/rate-limit';
 import { TOKEN_CLIENT } from '../src/modules/auth/auth.service';
 import { TEST_AUTH_TOKEN } from './support/auth-test-env';
 import { createE2eApp, E2eApp, httpServerOf } from './support/create-e2e-app';
+import {
+  documentedStatusesOf,
+  openApiDocumentOf,
+  requestBodySchemaOf,
+  responseSchemaOf,
+} from './support/openapi-document';
 
 const PING_PATH = '/api/v1/test/ping';
 const VALIDATE_PATH = '/api/v1/auth/validate';
@@ -190,6 +196,29 @@ describe('Token authentication (e2e)', () => {
         .send({ token: WRONG_TOKEN });
 
       expect(blocked.status).toBe(429);
+    });
+
+    it('when the route is documented, then it answers 200 with the typed result and no 201', async () => {
+      const { app } = await startApp();
+      const document = openApiDocumentOf(app);
+
+      expect(responseSchemaOf(document, VALIDATE_PATH, 'post', '200')).toEqual({
+        type: 'object',
+        properties: { authenticated: { type: 'boolean' }, message: { type: 'string' } },
+        required: ['authenticated', 'message'],
+        additionalProperties: false,
+      });
+      expect(documentedStatusesOf(document, VALIDATE_PATH, 'post')).not.toContain('201');
+    });
+
+    it('when the route is documented, then its request body comes from the token request schema', async () => {
+      const { app } = await startApp();
+
+      expect(requestBodySchemaOf(openApiDocumentOf(app), VALIDATE_PATH, 'post')).toMatchObject({
+        type: 'object',
+        properties: { token: { type: 'string', maxLength: MAX_BEARER_TOKEN_LENGTH } },
+        required: ['token'],
+      });
     });
   });
 });

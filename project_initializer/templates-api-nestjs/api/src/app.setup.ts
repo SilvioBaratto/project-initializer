@@ -1,13 +1,18 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { INestApplication } from '@nestjs/common';
+import { HttpStatus, type INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import type { Request, Response } from 'express';
 import helmet from 'helmet';
-import { cleanupOpenApiDoc } from 'nestjs-zod';
 import { Logger } from 'nestjs-pino';
 import { z } from 'zod';
+import {
+  buildErrorBody,
+  ROUTE_NOT_FOUND_MESSAGE,
+  sendErrorBody,
+} from './common/filters/error-body';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { rejectMalformedJson } from './common/filters/malformed-json.middleware';
 import { PrismaClientExceptionFilter } from './common/filters/prisma-exception.filter';
@@ -92,6 +97,25 @@ export function configureApp(app: INestApplication): void {
 }
 
 /**
+ * Answers every request that nothing else handled with the shared 404 error body.
+ *
+ * NestJS 12 answers an unknown path itself only under the global prefix; anywhere else Express
+ * would send its own HTML page, which echoes the path. Call this after `init()`, so the handler is
+ * the last one Express tries: every route, the OpenAPI UI and Nest's own not-found and error
+ * handlers come first. `main.ts` and the e2e harness both call it.
+ *
+ * @param app - An initialised application on the Express platform.
+ */
+export function answerUnmatchedRequests(app: INestApplication): void {
+  app.use((request: Request, response: Response) => {
+    sendErrorBody(
+      response,
+      buildErrorBody({ status: HttpStatus.NOT_FOUND, message: ROUTE_NOT_FOUND_MESSAGE, request }),
+    );
+  });
+}
+
+/**
  * Decides whether the OpenAPI UI is published.
  *
  * @param env.API_DOCS_ENABLED - Explicit choice; wins over the environment default.
@@ -104,7 +128,9 @@ export function isOpenApiEnabled(env: Pick<BaseEnv, 'API_DOCS_ENABLED' | 'NODE_E
 }
 
 /**
- * Publishes the OpenAPI document and its UI at {@link OPENAPI_PATH}.
+ * Publishes the OpenAPI document and its UI at {@link OPENAPI_PATH}. Request and response bodies
+ * are documented from the zod schemas that `@Body({ schema })` and `@ResponseSchema` declare,
+ * converted by the Swagger module itself.
  *
  * @param app - The configured application.
  * @param options.version - API version shown in the document.
@@ -125,7 +151,7 @@ export function setupOpenApi(
     builder.addSecurityRequirements(BEARER_SECURITY_NAME);
   }
   const document = SwaggerModule.createDocument(app, builder.build());
-  SwaggerModule.setup(OPENAPI_PATH, app, cleanupOpenApiDoc(document));
+  SwaggerModule.setup(OPENAPI_PATH, app, document);
 }
 
 /**

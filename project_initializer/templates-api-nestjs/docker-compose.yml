@@ -1,13 +1,16 @@
 services:
   # PostgreSQL Database
   db:
-    image: postgres:16-alpine
+    image: postgres:19-alpine
     environment:
       POSTGRES_DB: app_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # From PostgreSQL 18 the image declares VOLUME /var/lib/postgresql and keeps the
+      # cluster in /var/lib/postgresql/<major>/docker. A volume still mounted at
+      # .../data makes the entrypoint exit 1, so the volume must hold the parent.
+      - postgres_data:/var/lib/postgresql
     ports:
       - "${DB_HOST_PORT:-5433}:5432"
     healthcheck:
@@ -67,7 +70,7 @@ services:
 
   # Database Admin UI
   adminer:
-    image: adminer:latest
+    image: adminer:6.3.0
     restart: always
     depends_on:
       - db

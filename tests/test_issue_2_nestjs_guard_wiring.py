@@ -278,7 +278,8 @@ def _assert_no_passthrough_in_overlay(template_root: Path, overlay_name: str) ->
 def test_when_token_overlay_source_is_read_then_no_response_schema_uses_passthrough():
     """
     Criterion: Response schemas whitelist fields so Prisma rows cannot leak secret
-    columns (e.g. password) through the ZodSerializerInterceptor in the token overlay.
+    columns (e.g. password) through the StandardSchemaSerializerInterceptor in the token
+    overlay.
 
     Validates project_initializer/templates-token-nestjs/api/src/**/*.ts.
     """

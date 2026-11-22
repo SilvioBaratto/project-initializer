@@ -1,4 +1,3 @@
-import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { MAX_BEARER_TOKEN_LENGTH } from '../../../common/auth/bearer-token';
 
@@ -16,7 +15,7 @@ export const AuthResponseSchema = z.object({
   message: z.string(),
 });
 
-/** Request DTO of `POST /auth/validate`. */
-export class AuthRequestDto extends createZodDto(AuthRequestSchema) {}
-/** Response DTO of `POST /auth/validate`. */
-export class AuthResponseDto extends createZodDto(AuthResponseSchema) {}
+/** Validated body of `POST /auth/validate`. */
+export type AuthRequestDto = z.infer<typeof AuthRequestSchema>;
+/** Response body of `POST /auth/validate`. */
+export type AuthResponseDto = z.infer<typeof AuthResponseSchema>;

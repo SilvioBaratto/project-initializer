@@ -3,14 +3,28 @@
 Parses ``.github/workflows/test-package.yml`` (no PyYAML dependency — the repo
 avoids it) and asserts the matrix exercises ``--scope api`` and
 ``--scope frontend`` and that scope-specific steps are gated so single-half
-jobs do not fail on the missing half.
+jobs do not fail on the missing half. It also keeps the Node version of every
+``setup-node`` step, in this repo's workflow and in the scaffolded copy, equal to
+the Node the NestJS API Dockerfile runs.
 """
 
 import re
 from pathlib import Path
 
+import pytest
+
+from tests.nestjs_runtime import nestjs_dockerfile_node_majors
+
 WORKFLOW = (
     Path(__file__).resolve().parent.parent
+    / ".github"
+    / "workflows"
+    / "test-package.yml"
+)
+SCAFFOLDED_WORKFLOW = (
+    Path(__file__).resolve().parent.parent
+    / "project_initializer"
+    / "templates"
     / ".github"
     / "workflows"
     / "test-package.yml"
@@ -112,6 +126,33 @@ def test_when_verify_steps_are_split_and_gated_per_half():
     ]
     assert api_verify, "expected a gated API verify step"
     assert fe_verify, "expected a gated frontend verify step"
+
+
+@pytest.mark.parametrize(
+    "workflow", [WORKFLOW, SCAFFOLDED_WORKFLOW], ids=["repo", "scaffolded"]
+)
+def test_when_the_workflows_set_up_node_then_the_version_matches_the_dockerfile(
+    workflow,
+):
+    """Every setup-node step runs the Node major of the generated API Dockerfile.
+
+    The Dockerfile is the one place a Node bump edits (its own test pins the
+    major). An unquoted or missing ``node-version`` is counted out, so a step that
+    falls back to the runner's default Node fails here too.
+
+    Validates .github/workflows/test-package.yml and project_initializer/templates/.github/workflows/test-package.yml against project_initializer/templates-api-nestjs/api/Dockerfile.
+    """
+    text = workflow.read_text(encoding="utf-8")
+    setup_node_steps = re.findall(r"uses:\s*actions/setup-node@", text)
+    versions = re.findall(r'node-version:\s*"([^"]*)"', text)
+    dockerfile_majors = nestjs_dockerfile_node_majors()
+
+    assert setup_node_steps, "expected at least one setup-node step"
+    assert len(dockerfile_majors) == 1, (
+        "the Dockerfile stages disagree on the Node major"
+    )
+    node_major = str(next(iter(dockerfile_majors)))
+    assert versions == [node_major] * len(setup_node_steps)
 
 
 _DOCKERFILE = (

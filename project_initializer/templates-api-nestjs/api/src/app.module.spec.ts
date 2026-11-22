@@ -1,15 +1,23 @@
 /** Validates src/app.module.ts: the metadata AppModule declares, read without booting the app. */
 import 'reflect-metadata';
-import { DynamicModule, FactoryProvider, Provider, Type } from '@nestjs/common';
+import {
+  DynamicModule,
+  FactoryProvider,
+  Provider,
+  StandardSchemaSerializerInterceptor,
+  StandardSchemaValidationPipe,
+  Type,
+} from '@nestjs/common';
 import { MODULE_METADATA } from '@nestjs/common/constants';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { getOptionsToken, ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
-import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
+import { z } from 'zod';
 import { AUTH_GUARDS, AUTH_MODULES } from './app.auth';
 import { AppModule } from './app.module';
 import { RolesGuard } from './common/auth/roles.guard';
+import { SchemaValidationException } from './common/filters/schema-validation.exception';
 import { THROTTLER_MODULE_OPTIONS } from './config/rate-limit';
 import { HealthModule } from './modules/health/health.module';
 import { ItemsModule } from './modules/items/items.module';
@@ -58,6 +66,24 @@ function isAppGuardProvider(provider: unknown): boolean {
     'provide' in provider &&
     provider.provide === APP_GUARD
   );
+}
+
+function isAppPipeFactory(provider: unknown): provider is FactoryProvider {
+  return (
+    typeof provider === 'object' &&
+    provider !== null &&
+    'provide' in provider &&
+    provider.provide === APP_PIPE &&
+    'useFactory' in provider
+  );
+}
+
+function globalPipe(): unknown {
+  const provider = metadataOf(MODULE_METADATA.PROVIDERS).find(isAppPipeFactory);
+  if (!provider) {
+    throw new Error('AppModule registers no factory for the global pipe');
+  }
+  return provider.useFactory();
 }
 
 function configWith(values: Record<string, unknown>): { get: (key: string) => unknown } {
@@ -131,13 +157,23 @@ describe('AppModule providers', () => {
     ]);
   });
 
-  it('when providers are read, then request bodies are validated and responses serialised through Zod', () => {
-    const providers = metadataOf(MODULE_METADATA.PROVIDERS);
-
-    expect(providers).toContainEqual({ provide: APP_PIPE, useClass: ZodValidationPipe });
-    expect(providers).toContainEqual({
+  it('when providers are read, then responses are serialised by the native Standard Schema interceptor', () => {
+    expect(metadataOf(MODULE_METADATA.PROVIDERS)).toContainEqual({
       provide: APP_INTERCEPTOR,
-      useClass: ZodSerializerInterceptor,
+      useClass: StandardSchemaSerializerInterceptor,
     });
+  });
+
+  it('when the global pipe is built, then it is the native Standard Schema validation pipe', () => {
+    expect(globalPipe()).toBeInstanceOf(StandardSchemaValidationPipe);
+  });
+
+  it('when the global pipe rejects a value, then it throws the exception the error filter turns into field errors', async () => {
+    const pipe = globalPipe() as StandardSchemaValidationPipe;
+    const schema = z.object({ name: z.string() });
+
+    await expect(pipe.transform({}, { type: 'body', schema })).rejects.toBeInstanceOf(
+      SchemaValidationException,
+    );
   });
 });

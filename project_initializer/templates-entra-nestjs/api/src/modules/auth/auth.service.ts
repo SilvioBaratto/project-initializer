@@ -146,7 +146,7 @@ export class AuthService implements AccessTokenVerifier {
   private readonly logger = new Logger(AuthService.name);
   private readonly tenantId: string;
   private readonly issuer: string;
-  private readonly audiences: string[];
+  private readonly audiences: [string, ...string[]];
   private readonly requiredScope: string;
 
   constructor(
@@ -158,12 +158,9 @@ export class AuthService implements AccessTokenVerifier {
     // A v2.0 access token names the API's client id in `aud`. The configured audience (normally
     // the `api://` URI of the registration) is accepted as well, so a registration that reports
     // its application ID URI still verifies.
-    this.audiences = [
-      ...new Set([
-        config.get('ENTRA_API_CLIENT_ID', { infer: true }),
-        config.get('ENTRA_API_AUDIENCE', { infer: true }),
-      ]),
-    ];
+    const clientId = config.get('ENTRA_API_CLIENT_ID', { infer: true });
+    const audience = config.get('ENTRA_API_AUDIENCE', { infer: true });
+    this.audiences = audience === clientId ? [clientId] : [clientId, audience];
     this.requiredScope = config.get('ENTRA_API_SCOPE', { infer: true });
   }
 

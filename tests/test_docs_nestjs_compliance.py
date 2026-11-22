@@ -127,6 +127,30 @@ def test_when_api_claude_generated_then_lint_format_and_coverage_gate_are_docume
         assert needle in doc, f"{needle} missing from the NestJS api CLAUDE.md"
 
 
+@pytest.mark.parametrize("auth", AUTHS)
+def test_when_nestjs_docs_generated_then_the_jest_flag_is_documented(auth):
+    """Every doc that lists the test commands says why the scripts pass the flag.
+
+    A direct ``npx jest`` or an IDE runner skips the scripts, so the docs are the
+    only place a scaffold user learns that it needs the flag too. ``jwks-rsa`` is
+    named only in the Entra docs, the one variant that depends on it.
+
+    Validates project_initializer/docs_generator.py generate_root_readme(), generate_api_readme() and generate_api_claude().
+    """
+    docs = (
+        generate_root_readme("nestjs", auth),
+        generate_api_readme("nestjs", auth=auth),
+        generate_api_claude("nestjs", auth),
+    )
+    for doc in docs:
+        assert "`--experimental-vm-modules`" in doc
+        assert "`NODE_OPTIONS=--experimental-vm-modules`" in doc
+        assert "Node 24.9" in doc
+        assert "`@nestjs/common`" in doc and "`@nestjs/core`" in doc
+        assert "`@nestjs/config`" in doc and "`@nestjs/terminus`" in doc
+        assert ("`jwks-rsa`" in doc) == (auth == "entra")
+
+
 def test_when_supabase_then_rls_and_init_rollback_replacement_are_documented():
     """Supabase docs cover RLS and the init down.sql that replaces the base one.
 

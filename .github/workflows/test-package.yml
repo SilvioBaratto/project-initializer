@@ -54,9 +54,9 @@ jobs:
           python-version: "3.12"
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "26"
 
       - name: Install project-initializer package
         run: pip install -e .
@@ -250,12 +250,14 @@ jobs:
         working-directory: /tmp/suite-project/api
         run: pytest -q
 
-      # Prisma 7 and ESLint 10 need Node 20.19+; the generated Dockerfile runs 22.
+      # Jest loads the ESM-only @nestjs packages, and the jose that jwks-rsa loads, only on Node
+      # 24.9+ and with the --experimental-vm-modules flag the npm scripts pass; the generated
+      # Dockerfile runs 26.
       - name: Set up Node.js
         if: matrix.stack == 'nestjs'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: "22"
+          node-version: "26"
 
       - name: Install NestJS dependencies
         if: matrix.stack == 'nestjs'

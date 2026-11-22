@@ -407,10 +407,10 @@ The templates ship no requirement IDs. The generated docs describe the `[REQ-<AR
 
 ### package-lock.json — regenerate on linux
 
-The API Dockerfile runs `npm ci`, which hard-fails on **any** drift between `package.json` and its lock, so a stale lock means the image never builds. After changing a NestJS dependency, regenerate the lock **inside the build's own platform** — a lock resolved on macOS/arm64 pins different native/optional packages (`@emnapi/*`, …) and `npm ci` then rejects it on `node:22-alpine`:
+The API Dockerfile runs `npm ci`, which hard-fails on **any** drift between `package.json` and its lock, so a stale lock means the image never builds. After changing a NestJS dependency, regenerate the lock **inside the build's own platform** — a lock resolved on macOS/arm64 pins different native/optional packages (`@emnapi/*`, …) and `npm ci` then rejects it on `node:26-alpine`:
 
 ```bash
-docker run --rm -v "$PWD:/w" -w /w node:22-alpine npm install --package-lock-only --ignore-scripts
+docker run --rm -v "$PWD:/w" -w /w node:26-alpine npm install --package-lock-only --ignore-scripts
 ```
 
 Which overlay owns a lock follows its `package.json`: `templates-api-nestjs` (base) and the overlays that ship their own `package.json` (`templates-supabase-nestjs`, `templates-entra-nestjs`) each carry one. `templates-token-nestjs` ships no `package.json`, so it must **not** carry a lock — it inherits the base pair. `tests/test_nestjs_lockfile_sync.py` checks the **layered** result for every auth mode, which is the only place the drift is visible, and pins which layers own a lock. A change to a dependency shared by all variants (anything in the base `package.json`) has to be made in the base, supabase and entra manifests, and in all three locks.
@@ -449,7 +449,7 @@ Non-supabase variants:
 
 | Service | Host port | Description |
 |---------|-----------|-------------|
-| `db` | `${DB_HOST_PORT:-5433}`:5432 | PostgreSQL 19 in FastAPI scaffolds, 16 in NestJS scaffolds until their compose file moves |
+| `db` | `${DB_HOST_PORT:-5433}`:5432 | PostgreSQL 19 |
 | `adminer` | `${ADMINER_HOST_PORT:-8080}`:8080 | Database management UI |
 | `api` | `${API_HOST_PORT:-8000}`:8000 | Backend with hot reload |
 | `frontend` | `${FRONTEND_HOST_PORT:-4200}`:80 | Angular + nginx (proxies `/api/` to backend) |

@@ -131,10 +131,22 @@ _FASTAPI_COMPOSE_FILES = (
     _TEMPLATES / "templates-api-fastapi" / "docker-compose.yml",
     _TEMPLATES / "templates-supabase-fastapi" / "docker-compose.yml",
 )
+_NESTJS_COMPOSE = _TEMPLATES / "templates-api-nestjs" / "docker-compose.yml"
+_NESTJS_SUPABASE_COMPOSE = _TEMPLATES / "templates-supabase-nestjs" / "docker-compose.yml"
 
 
 def _text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
+
+
+def _floating_images(services: dict) -> dict[str, str]:
+    """Services whose image has no tag or the moving ``latest`` tag."""
+    return {
+        name: service["image"]
+        for name, service in services.items()
+        if "image" in service
+        and (":" not in service["image"] or service["image"].endswith(":latest"))
+    }
 
 
 @pytest.mark.unit
@@ -262,6 +274,55 @@ def test_nestjs_entrypoint_waits_on_the_database_the_application_will_use():
     assert 'nc -z -w "$DB_CONNECT_TIMEOUT_SECONDS" "$db_host" "$db_port"' in entrypoint
     assert "exit 1" in entrypoint
     assert "prisma migrate deploy" in entrypoint
+
+
+@pytest.mark.unit
+def test_when_the_nestjs_dockerfile_is_read_then_every_stage_is_node_26_alpine():
+    """The dev and production stages run the Node 26 LTS; ``builder`` inherits ``dev``.
+
+    A stage left on an older Node would build and run the API on a runtime the
+    manifests' ``@types/node`` no longer describes.
+
+    Validates project_initializer/templates-api-nestjs/api/Dockerfile.
+    """
+    images = re.findall(r"^FROM (node:\S+)", _text(_NESTJS_DOCKERFILE), re.M)
+
+    assert images == ["node:26-alpine", "node:26-alpine"]
+
+
+@pytest.mark.unit
+def test_when_the_nestjs_compose_is_read_then_postgres_19_mounts_the_cluster_root_and_no_image_floats():
+    """From PostgreSQL 18 the image declares ``VOLUME /var/lib/postgresql``.
+
+    The cluster lives in ``/var/lib/postgresql/<major>/docker``, so a volume mounted
+    at the old ``.../data`` path makes the entrypoint exit 1 on an existing volume.
+    A floating or missing tag would let the database or the admin UI change under a
+    scaffold without a template edit.
+
+    Validates project_initializer/templates-api-nestjs/docker-compose.yml.
+    """
+    services = yaml.safe_load(_text(_NESTJS_COMPOSE))["services"]
+
+    assert services["db"]["image"] == "postgres:19-alpine"
+    assert services["db"]["volumes"] == ["postgres_data:/var/lib/postgresql"]
+    assert _floating_images(services) == {}
+
+
+@pytest.mark.unit
+def test_when_the_nestjs_supabase_compose_is_read_then_it_has_no_local_db_and_no_image_floats():
+    """The hosted Supabase database replaces the local ``db`` and the ``adminer`` service.
+
+    Without a ``db`` there is no PostgreSQL image or volume to pin; whatever image
+    the file does name must still carry a fixed tag.
+
+    Validates project_initializer/templates-supabase-nestjs/docker-compose.yml.
+    """
+    services = yaml.safe_load(_text(_NESTJS_SUPABASE_COMPOSE))["services"]
+
+    assert services, "the supabase compose defines no service"
+    assert "db" not in services
+    assert "adminer" not in services
+    assert _floating_images(services) == {}
 
 
 @pytest.mark.unit

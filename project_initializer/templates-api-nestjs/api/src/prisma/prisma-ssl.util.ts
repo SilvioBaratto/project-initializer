@@ -47,7 +47,7 @@ const SSL_URL_PARAMETERS = [
  *    and stay plaintext; a public DNS name gets encrypted, unverified TLS.
  *
  * The single-label rule is what makes Docker work. Compose points the API at
- * `postgresql://...@db:5432/...` with no `sslmode`, and the `postgres:16-alpine` image serves no
+ * `postgresql://...@db:5432/...` with no `sslmode`, and the `postgres:19-alpine` image serves no
  * TLS at all, so connecting with TLS fails outright: "The server does not support SSL
  * connections". A bare `db` is never a public DNS name, so it is treated like localhost.
  *
