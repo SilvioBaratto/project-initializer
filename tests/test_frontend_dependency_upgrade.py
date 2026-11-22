@@ -164,17 +164,33 @@ def _action_refs(text: str, action: str) -> list[str]:
     ]
 
 
+def _step_block(live: str, uses: re.Match[str]) -> str:
+    """Return the lines of the workflow step whose ``uses:`` key ``uses`` matched.
+
+    The step ends at the first non-blank line indented less than its ``uses:`` key,
+    which is the next list item or the next job.
+    """
+    key_indent = uses.start() - (live.rfind("\n", 0, uses.start()) + 1)
+    block = []
+    for line in live[uses.end() :].splitlines()[1:]:
+        if line.strip() and len(line) - len(line.lstrip(" ")) < key_indent:
+            break
+        block.append(line)
+    return "\n".join(block)
+
+
 def _node_version_before(text: str, step: str) -> str | None:
     """Return the ``node-version`` of the last live setup-node step in front of ``step``.
 
-    Returns ``None`` when no setup-node step precedes ``step`` or the step names no version.
+    Returns ``None`` when no setup-node step precedes ``step`` or that step names no
+    version of its own: a ``node-version`` further down the file belongs to another step.
     """
     live = _without_yaml_comments(text)
     step_start = live.index(f"name: {step}")
     setups = [m for m in _SETUP_NODE_USE.finditer(live) if m.start() < step_start]
     if not setups:
         return None
-    version = _NODE_VERSION.search(live, setups[-1].end())
+    version = _NODE_VERSION.search(_step_block(live, setups[-1]))
     return version["version"] if version else None
 
 
@@ -249,28 +265,60 @@ def test_when_a_workflow_has_commented_out_or_quoted_uses_lines_then_only_the_li
 
 
 @pytest.mark.unit
-def test_when_a_workflow_has_a_commented_out_setup_node_then_the_node_version_comes_from_the_live_step():
-    """The Node version is read from the live setup-node step in front of the named step.
+def test_when_a_workflow_has_other_setup_node_steps_then_the_node_version_comes_from_the_last_live_one_before_the_step():
+    """The Node version is read from the last live setup-node step in front of the named step.
 
-    A commented-out earlier setup-node, an unquoted version and a later job that
-    sets another Node up must not change the answer.
+    An earlier job on another Node, an unquoted version, a commented-out setup-node
+    between the live step and the named one, and a later job on yet another Node
+    must not change the answer.
 
     Validates tests/test_frontend_dependency_upgrade.py _node_version_before().
     """
     workflow = (
-        "  # - uses: actions/setup-node@v4\n"
-        "  #   with:\n"
-        '  #     node-version: "18"\n'
-        "  - uses: actions/setup-node@v7\n"
-        "    with:\n"
-        "      node-version: 26 # the Angular build\n"
-        "  - name: Build Angular frontend\n"
-        "  - uses: actions/setup-node@v7\n"
-        '    with:\n      node-version: "22"\n'
+        "jobs:\n"
+        "  lint:\n"
+        "    steps:\n"
+        "      - uses: actions/setup-node@v7\n"
+        "        with:\n"
+        '          node-version: "18"\n'
+        "  build:\n"
+        "    steps:\n"
+        "      - uses: actions/setup-node@v7\n"
+        "        with:\n"
+        "          node-version: 26 # the Angular build\n"
+        "      # - uses: actions/setup-node@v4\n"
+        "      #   with:\n"
+        '      #     node-version: "20"\n'
+        "      - name: Build Angular frontend\n"
+        "  later:\n"
+        "    steps:\n"
+        "      - uses: actions/setup-node@v7\n"
+        "        with:\n"
+        '          node-version: "22"\n'
     )
 
     assert _node_version_before(workflow, "Build Angular frontend") == "26"
-    assert _node_version_before("  - name: Build\n", "Build") is None
+
+
+@pytest.mark.unit
+def test_when_the_setup_node_step_names_no_version_then_a_later_node_version_is_not_read():
+    """A step without its own ``node-version`` reports none, whatever a later step names.
+
+    If the frontend step lost its version, the Node-26 guard must fail instead of
+    reading the next ``node-version`` further down the file, such as another job's.
+
+    Validates tests/test_frontend_dependency_upgrade.py _node_version_before().
+    """
+    workflow = (
+        "      - uses: actions/setup-node@v7\n"
+        "      - name: Build Angular frontend\n"
+        "      - uses: actions/setup-node@v7\n"
+        "        with:\n"
+        '          node-version: "26"\n'
+    )
+
+    assert _node_version_before(workflow, "Build Angular frontend") is None
+    assert _node_version_before("      - name: Build\n", "Build") is None
 
 
 @pytest.mark.unit
