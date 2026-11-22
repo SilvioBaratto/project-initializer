@@ -107,16 +107,19 @@ def generate_frontend_compose() -> str:
     return _FRONTEND_COMPOSE
 
 
-# Pinned to match SQLAlchemy==2.0.50 already in the base dependencies; the
-# extras form pulls greenlet for the async path. asyncpg is the async driver.
+# Pinned to match SQLAlchemy==2.1.9 already in the base dependencies; the
+# extras form pulls greenlet for the async path, and since SQLAlchemy 2.1 it is
+# the only thing that installs it. asyncpg is the async driver.
 _ASYNC_DEPENDENCIES = (
     "\n"
     "    # Async DB path (--async-db): opt-in asyncpg driver + asyncio extras\n"
-    '    "asyncpg==0.31.0",\n'
-    '    "sqlalchemy[asyncio]==2.0.50",\n'
+    '    "asyncpg==0.32.0",\n'
+    '    "sqlalchemy[asyncio]==2.1.9",\n'
 )
-# aiosqlite runs the async unit tests on in-memory SQLite.
-_ASYNC_DEV_DEPENDENCIES = '    "aiosqlite==0.20.0",\n'
+# aiosqlite runs the async unit tests on in-memory SQLite. 0.22.1 is the floor:
+# it adds the synchronous ``stop()`` that SQLAlchemy's aiosqlite dialect calls
+# when it terminates a connection, which earlier releases lack.
+_ASYNC_DEV_DEPENDENCIES = '    "aiosqlite==0.22.1",\n'
 
 
 def _extend_toml_array(text: str, key: str, entries: str) -> str:

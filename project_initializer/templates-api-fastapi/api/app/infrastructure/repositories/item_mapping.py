@@ -62,7 +62,7 @@ def apply_changes(record: ItemRecord, changes: ItemChanges) -> None:
         setattr(record, field_name, value)
 
 
-def page_statement(*, offset: int, limit: int) -> Select[tuple[ItemRecord]]:
+def page_statement(*, offset: int, limit: int) -> Select[ItemRecord]:
     """Select one page of rows, newest first.
 
     Args:
@@ -81,6 +81,6 @@ def page_statement(*, offset: int, limit: int) -> Select[tuple[ItemRecord]]:
     )
 
 
-def count_statement() -> Select[tuple[int]]:
+def count_statement() -> Select[int]:
     """Select the total number of item rows."""
     return select(func.count()).select_from(ItemRecord)

@@ -53,8 +53,9 @@ class UserCreate(UserBase):
 
     Attributes:
         password: Plain-text password, at most ``PASSWORD_MAX_BYTES`` bytes
-            because bcrypt silently ignores anything beyond that. A NUL
-            character is refused for the same reason: bcrypt stops reading at it.
+            because the bcrypt algorithm ignores anything beyond that. A NUL
+            character is refused like in every text field of this module,
+            although bcrypt hashes it as an ordinary byte.
     """
 
     password: NulFreeStr = Field(

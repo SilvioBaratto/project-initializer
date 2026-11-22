@@ -23,6 +23,12 @@ from __future__ import annotations
 
 _LICENSE = "MIT"
 
+# The PostgreSQL major each framework's compose `db` image runs. The two stacks
+# upgrade independently, so one number would document a version a scaffold does
+# not run; tests/test_docs_generator_selfcheck.py derives the expected major from
+# each compose file and fails when this table drifts from it.
+_COMPOSE_POSTGRES_MAJOR = {"fastapi": 19, "nestjs": 16}
+
 # The NestJS production-readiness checklist is static, framework-fixed reference
 # content (9 concern sections + legend + global-criteria table + filter-DI note),
 # appended verbatim to the generated api/.claude/CLAUDE.md so the depth the
@@ -197,7 +203,7 @@ def _docker_services_table(framework: str, auth: str | None, *, frontend: bool) 
     """Compose services table — omits db/adminer for supabase."""
     rows = ["| Service | Port | Description |", "|---------|------|-------------|"]
     if auth != "supabase":
-        rows.append("| `db` | 5433:5432 | PostgreSQL 16 |")
+        rows.append(f"| `db` | 5433:5432 | PostgreSQL {_COMPOSE_POSTGRES_MAJOR[framework]} |")
     rows.append(
         f"| `api` | 8000:8000 | {_framework_label(framework)} with hot reload |"
     )
@@ -895,7 +901,7 @@ _FASTAPI_TEST_TRACEABILITY_SECTION = [
     "Each test names the code it validates, and a test that covers a requirement also names the requirement, so a reviewer can walk from a requirement to its tests and on to the code:",
     "",
     "- **Code**: a docstring line, `Validates app.application.services.item_service.ItemService.create_item().`",
-    '- **Requirement**: the `requirement` pytest marker, `@pytest.mark.requirement("<id>")`. It is registered in `pytest.ini`, which runs with `--strict-markers`, so a misspelled marker fails the run.',
+    '- **Requirement**: the `requirement` pytest marker, `@pytest.mark.requirement("<id>")`. It is registered in `pytest.ini`, which sets `strict_markers = true`, so a misspelled marker fails the run.',
     "",
     "The requirement IDs come from your project's own requirements source. The template ships none, because it has no requirements of its own, and you should not invent them. List the tests that carry a requirement with `pytest --collect-only -q -m requirement`, and a requirement's tests with `grep -rn 'requirement(\"<id>\")' tests`.",
 ]
@@ -920,7 +926,7 @@ def _fastapi_auth_section(auth: str | None) -> list[str]:
             "Two modes live side by side and never accept each other's tokens.",
             "",
             "- **Static token.** Callers send `Authorization: Bearer <AUTH_TOKEN>`. It guards item writes and `GET /auth/me`. The check compares SHA-256 digests in constant time, and an empty `AUTH_TOKEN` matches nothing. Every holder is the same principal (`token-user`), so this mode suits service-to-service calls. `POST /auth/validate` is a public probe: it answers **200 with `authenticated: false`** for a wrong token, and 401 is reserved for the guarded routes. Each rejection is logged as `auth.validate_rejected` with its reason and without the token, so a burst of guesses is visible.",
-            "- **JWT login.** `POST /auth/register` creates an account (201); a duplicate email or username answers a generic 409 that does not say which one matched. `POST /auth/token` (OAuth2 form, `username` is the email) returns a signed access token with `Cache-Control: no-store`; an unknown email, a wrong password and an inactive account all answer the same 401. `GET /auth/me/jwt` returns the same current-user shape as `/auth/me`; the account is re-read on every call, so a deactivated account loses access at once (401). Login input is length-bounded (422), and a password needs 8+ characters and at most 72 bytes, because bcrypt ignores the rest.",
+            "- **JWT login.** `POST /auth/register` creates an account (201); a duplicate email or username answers a generic 409 that does not say which one matched. `POST /auth/token` (OAuth2 form, `username` is the email) returns a signed access token with `Cache-Control: no-store`; an unknown email, a wrong password and an inactive account all answer the same 401. `GET /auth/me/jwt` returns the same current-user shape as `/auth/me`; the account is re-read on every call, so a deactivated account loses access at once (401). Login input is length-bounded (422), and a password needs 8+ characters and at most 72 bytes, because the bcrypt algorithm uses no more than that (the library refuses a longer password instead of truncating it).",
             "- **Accounts.** Emails are stored and matched in lower case, so `Jane@Example.com` and `jane@example.com` are one account. A blank `username` means none, so a form that submits an empty optional field does not claim the empty handle. `RegistrationService` (`app/application/services/registration.py`) creates accounts and needs no token issuer; `AuthService` handles login and resolves access tokens.",
             "- **Audit.** A successful `POST /auth/register` writes the audit action `user.register` and a successful `POST /auth/token` writes `user.login`, each queued as a background task so the response is not delayed. Both name the account by its id (`resource_id` and `actor_id` are the user id) and carry no email or username; a failed login is only warn-logged by the exception handler. `AuthService.authenticate` returns an `AccessTokenDTO` that gained `user_id` for this purpose. It stays internal: `TokenResponse` does not expose it, so clients still receive only `access_token` and `token_type`.",
             "- **Signing key off.** While `JWT_SECRET_KEY` is empty, `POST /auth/token` and `GET /auth/me/jwt` answer **503** before they look at the credentials, so the status never tells whether they were right. Registration keeps working.",

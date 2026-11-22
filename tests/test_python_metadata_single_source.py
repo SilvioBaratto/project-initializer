@@ -10,6 +10,7 @@ import ast
 import fnmatch
 import os
 import re
+import tomllib
 from collections.abc import Callable, Iterator
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -27,7 +28,7 @@ _REQUIREMENTS_PATTERN = "requirements*.txt"
 _FASTAPI_TEMPLATES_PATTERN = "templates*fastapi*"
 _SKIPPED_DIRECTORIES = frozenset({"node_modules", "__pycache__", ".angular"})
 
-# Whole-string match: a pin such as "asyncpg==0.31.0" or an address such as "0.0.0.0"
+# Whole-string match: a pin such as "asyncpg==0.32.0" or an address such as "0.0.0.0"
 # is not a version, and must not trip the guards.
 _BARE_VERSION = re.compile(r"\d+\.\d+\.\d+(?:(?:a|b|rc)\d+|-[0-9A-Za-z.]+)?")
 _REQUIREMENT_NAME = re.compile(r"[A-Za-z0-9_.-]+")
@@ -71,8 +72,6 @@ def _matching(root: Path, predicate: Callable[[Path], bool]) -> list[str]:
 
 
 def _read_toml(path: Path) -> dict:
-    # tomllib is stdlib from Python 3.11 and the package still supports 3.10.
-    tomllib = pytest.importorskip("tomllib")
     return tomllib.loads(path.read_text(encoding="utf-8"))
 
 
@@ -247,6 +246,25 @@ def test_when_the_root_pyproject_is_read_then_it_declares_the_version_statically
 
     assert _BARE_VERSION.fullmatch(project["version"])
     assert "version" not in project.get("dynamic", [])
+
+
+def test_when_the_root_pyproject_is_read_then_the_python_floor_is_3_11_and_classifiers_match():
+    """The supported interpreters named in the classifiers agree with the floor.
+
+    typer 0.29 and hypothesis 6.169 no longer install on 3.10, which is end of life,
+    so a 3.10 classifier or a ``>=3.10`` floor would advertise an install that fails.
+
+    Validates pyproject.toml.
+    """
+    project = _read_toml(_REPO / "pyproject.toml")["project"]
+    classifiers = set(project["classifiers"])
+    supported = {
+        f"Programming Language :: Python :: 3.{minor}" for minor in range(11, 16)
+    }
+
+    assert project["requires-python"] == ">=3.11"
+    assert supported <= classifiers
+    assert "Programming Language :: Python :: 3.10" not in classifiers
 
 
 # --- the FastAPI scaffolds -----------------------------------------------------

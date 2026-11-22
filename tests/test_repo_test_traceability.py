@@ -52,6 +52,7 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_when_pyproject_already_has_asyncpg_then_transform_returns_it_unchanged",
             "test_when_pyproject_lacks_an_array_then_transform_raises_value_error",
             "test_when_scaffolded_with_async_db_then_pyproject_declares_async_deps",
+            "test_when_async_dependencies_are_appended_then_the_sqlalchemy_extra_matches_the_base_pin",
             "test_when_scaffolded_with_async_db_then_no_requirements_txt_exists",
             "test_when_supabase_scaffolded_with_async_db_then_pyproject_gains_async_deps",
             "test_when_scaffolded_with_async_db_async_files_exist",
@@ -61,6 +62,8 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
     "test_ci_workflow_scope.py": frozenset(
         {
             "test_when_api_only_steps_are_gated_against_frontend_scope",
+            "test_when_the_workflow_runs_the_api_suite_then_python_floor_and_image_version_are_both_tested",
+            "test_when_the_suites_matrix_is_read_then_nestjs_runs_once_and_every_suite_name_is_unique",
         }
     ),
     "test_docker_runtime_invariants.py": frozenset(
@@ -73,6 +76,14 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_nestjs_production_image_ships_the_prisma_config_the_entrypoint_needs",
             "test_no_compose_file_hardcodes_container_names",
             "test_every_published_host_port_is_parametrized",
+            "test_when_the_fastapi_compose_is_read_then_postgres_19_mounts_the_cluster_root_and_no_image_floats",
+            "test_when_the_fastapi_dockerfile_is_read_then_both_stages_share_one_python_slim_tag",
+        }
+    ),
+    "test_docs_generator_selfcheck.py": frozenset(
+        {
+            "test_when_supabase_then_docker_table_omits_local_db",
+            "test_when_non_supabase_then_docker_table_has_local_db",
         }
     ),
     "test_docs_sync_async.py": frozenset(
@@ -317,6 +328,11 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
     "test_nestjs_lockfile_sync.py": frozenset(
         {
             "test_nestjs_layer_owns_a_lock_exactly_when_it_ships_a_package_json",
+        }
+    ),
+    "test_package_data.py": frozenset(
+        {
+            "test_when_pyproject_package_data_is_read_then_runtime_data_file_is_listed",
         }
     ),
     "test_scope_scaffold.py": frozenset(

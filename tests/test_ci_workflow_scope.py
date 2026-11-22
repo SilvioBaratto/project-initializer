@@ -112,3 +112,88 @@ def test_when_verify_steps_are_split_and_gated_per_half():
     ]
     assert api_verify, "expected a gated API verify step"
     assert fe_verify, "expected a gated frontend verify step"
+
+
+_DOCKERFILE = (
+    Path(__file__).resolve().parent.parent
+    / "project_initializer"
+    / "templates-api-fastapi"
+    / "api"
+    / "Dockerfile"
+)
+_PYTHON_FLOOR = "3.12"
+
+
+def _suite_job() -> str:
+    """Return the text of the ``test-variant-suites`` job."""
+    return _text().split("\n  test-variant-suites:", 1)[1]
+
+
+def _suite_entries() -> list[dict]:
+    """Return each ``include:`` entry of the suites job as {suite, stack, flags, python}."""
+    block = _suite_job().split("include:", 1)[1].split("\n    name:", 1)[0]
+    entries = []
+    for suite, rest in re.findall(
+        r'- suite:\s*"([^"]+)"(.*?)(?=\n\s*- suite:|\Z)', block, re.S
+    ):
+        fields = {
+            key: re.search(rf'\n\s*{key}:\s*"([^"]*)"', rest)
+            for key in ("stack", "flags", "python")
+        }
+        entries.append(
+            {
+                "suite": suite,
+                **{key: m.group(1) if m else None for key, m in fields.items()},
+            }
+        )
+    return entries
+
+
+def test_when_the_workflow_runs_the_api_suite_then_python_floor_and_image_version_are_both_tested():
+    """Every FastAPI suite runs on the 3.12 floor and on the Python the image ships.
+
+    The twin entries carry the same flags, so the 3.15 row proves the same scaffold
+    on the interpreter of ``python:3.N-slim`` while the floor row keeps guarding
+    ``requires-python``. The matrix has no axes: a version exists only where an
+    entry carries a ``python`` key, and a step after the scaffolding switches the
+    API suite to it, so the CLI itself stays on the floor.
+
+    Validates .github/workflows/test-package.yml test-variant-suites matrix.
+    """
+    image_python = re.search(
+        r"^FROM python:(\d+\.\d+)-slim", _DOCKERFILE.read_text("utf-8"), re.M
+    ).group(1)
+    assert re.search(
+        r"name: Set up Python for the API suite\n\s+if: matrix\.python\n"
+        r"\s+uses: actions/setup-python@v\d+\n\s+with:\n"
+        r"\s+python-version: \$\{\{ matrix\.python \}\}",
+        _suite_job(),
+    ), "no step switches the suite to matrix.python when an entry sets it"
+
+    versions_by_flags: dict[str, set[str]] = {}
+    for entry in _suite_entries():
+        if entry["stack"] == "fastapi":
+            versions_by_flags.setdefault(entry["flags"], set()).add(
+                entry["python"] or _PYTHON_FLOOR
+            )
+
+    assert len(versions_by_flags) == 5, "expected the five FastAPI flavours"
+    for flags, versions in versions_by_flags.items():
+        assert versions == {_PYTHON_FLOOR, image_python}, flags
+
+
+def test_when_the_suites_matrix_is_read_then_nestjs_runs_once_and_every_suite_name_is_unique():
+    """The matrix has no axes, so a Python entry must be a separate ``include`` row.
+
+    A ``python-version`` axis with an ``exclude`` on the stack would match nothing
+    (the stack exists only inside the entries) and run every NestJS suite twice
+    under one job name.
+
+    Validates .github/workflows/test-package.yml test-variant-suites matrix.
+    """
+    entries = _suite_entries()
+    names = [e["suite"] for e in entries]
+
+    assert len(names) == len(set(names))
+    assert all(e["python"] is None for e in entries if e["stack"] == "nestjs")
+    assert "python-version" not in _suite_job().split("include:", 1)[0]

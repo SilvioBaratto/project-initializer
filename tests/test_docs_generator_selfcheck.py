@@ -17,6 +17,9 @@ guidance) are covered by their own dedicated tests; here we sweep the whole
 matrix for drift rather than re-assert every string.
 """
 
+import re
+from pathlib import Path
+
 import pytest
 
 from project_initializer.docs_generator import (
@@ -28,6 +31,9 @@ from project_initializer.docs_generator import (
 
 FRAMEWORKS = ["fastapi", "nestjs"]
 AUTHS = [None, "token", "supabase", "entra"]
+
+_PACKAGE = Path(__file__).resolve().parent.parent / "project_initializer"
+_POSTGRES_IMAGE = re.compile(r"^\s*image:\s*postgres:(?P<major>\d+)", re.MULTILINE)
 
 # Substrings that must NEVER appear in any generated doc — each is a concrete
 # regression that already happened once (pre-hexagonal layout) or would mislead.
@@ -47,6 +53,14 @@ _BANNED = [
     "six variants",
     "layered architecture",  # FastAPI is hexagonal now
 ]
+
+
+def _compose_postgres_major(framework):
+    """PostgreSQL major of the ``db`` image in the framework's compose file."""
+    compose = _PACKAGE / f"templates-api-{framework}" / "docker-compose.yml"
+    match = _POSTGRES_IMAGE.search(compose.read_text(encoding="utf-8"))
+    assert match, f"no postgres image in {compose}"
+    return match.group("major")
 
 
 def _all_docs(framework, auth):
@@ -99,20 +113,33 @@ def test_when_api_claude_generated_then_it_names_the_right_orm_layer(framework):
 
 
 def test_when_supabase_then_docker_table_omits_local_db():
-    """Supabase variants have no local db/adminer service in the generated README."""
+    """Supabase variants have no local db/adminer service in the generated README.
+
+    Validates project_initializer/docs_generator.py _docker_services_table().
+    """
     for framework in FRAMEWORKS:
         doc = generate_root_readme(framework, "supabase")
-        assert "PostgreSQL 16" not in doc
+        assert not re.search(r"PostgreSQL \d+", doc)
         assert "adminer" not in doc.lower()
 
 
 def test_when_non_supabase_then_docker_table_has_local_db():
-    """Non-supabase variants keep the local db + adminer rows."""
+    """Non-supabase variants keep the local db + adminer rows, naming the PostgreSQL major their compose file runs.
+
+    The expected major is read from the framework's compose ``db`` image, so a
+    table that names another version fails whichever side moved.
+
+    Validates project_initializer/docs_generator.py _docker_services_table().
+    """
     for framework in FRAMEWORKS:
+        row = f"| `db` | 5433:5432 | PostgreSQL {_compose_postgres_major(framework)} |"
         for auth in (None, "token", "entra"):
-            doc = generate_root_readme(framework, auth)
-            assert "PostgreSQL 16" in doc
-            assert "adminer" in doc.lower()
+            for doc in (
+                generate_root_readme(framework, auth),
+                generate_root_claude(framework, auth),
+            ):
+                assert row in doc, f"[{framework}/{auth}] services table lacks {row!r}"
+                assert "adminer" in doc.lower()
 
 
 def test_when_frontend_scope_then_root_docs_have_no_backend_commands():

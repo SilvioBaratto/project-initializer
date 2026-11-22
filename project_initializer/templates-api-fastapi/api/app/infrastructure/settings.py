@@ -125,7 +125,8 @@ class Settings(AuthSettings):
     model_config = SettingsConfigDict(
         case_sensitive=False,
         extra="ignore",
-        populate_by_name=True,
+        validate_by_name=True,
+        validate_by_alias=True,
         hide_input_in_errors=True,
     )
 

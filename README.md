@@ -1,7 +1,7 @@
 # project-initializer
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![CI](https://github.com/silviobaratto/project-initializer/actions/workflows/test-package.yml/badge.svg)](https://github.com/silviobaratto/project-initializer/actions)
 
 CLI tool to scaffold full-stack projects with **FastAPI** or **NestJS**, **Angular**, and **Docker** — with optional authentication via token, Supabase, or Microsoft Entra ID. Scaffold the full stack, or just the **backend** or **frontend** with `--scope`.
@@ -45,7 +45,7 @@ project-initializer my-app --nestjs     # NestJS backend
 
 | Feature | FastAPI | NestJS |
 |---------|---------|--------|
-| Language | Python 3.12 | TypeScript (Node 22) |
+| Language | Python 3.15 | TypeScript (Node 22) |
 | ORM | SQLAlchemy + Alembic | Prisma |
 | API style | REST with Pydantic | REST with Zod (`nestjs-zod`) |
 | Architecture | Clean / hexagonal (domain/application/infrastructure/api) | Modular (feature modules; ports and adapters for the database and token verification) |
@@ -152,7 +152,7 @@ Entra, and the docs cannot drift from the code.
 
 | Service | Port | Description | Supabase variants |
 |---------|------|-------------|-------------------|
-| `db` | 5433:5432 | PostgreSQL 16 | Omitted (Supabase hosts DB) |
+| `db` | 5433:5432 | PostgreSQL 19 (FastAPI), 16 (NestJS) | Omitted (Supabase hosts DB) |
 | `adminer` | 8080:8080 | DB management UI | Omitted |
 | `api` | 8000:8000 | Backend with hot reload | Present |
 | `frontend` | 4200:80 | Angular + nginx (proxies `/api/` to backend) | Present |
