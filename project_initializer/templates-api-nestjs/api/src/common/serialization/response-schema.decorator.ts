@@ -15,8 +15,11 @@ export interface ResponseSchemaOptions {
  * that returns anything else is a compile error (TS1241), so a handler cannot drift from the schema
  * it declares without the build noticing.
  *
- * Only the descriptor's `value` is typed, and the key and descriptor are optional, so the decorator
- * still fits Nest's `applyDecorators`, which accepts any `MethodDecorator`.
+ * Only the descriptor's `value` is typed, and the key and descriptor are optional, so the type also
+ * matches `PropertyDecorator` and `ClassDecorator`: that is how Nest's `applyDecorators` accepts it,
+ * and the decorator compiles on a property too, where no return type is checked. It is not
+ * assignable to `MethodDecorator`: a wrapper typed `(): MethodDecorator` has to return
+ * `applyDecorators(...)`, and handlers decorated with such a wrapper lose the return-type check.
  */
 export type ResponseSchemaDecorator<Body> = (
   target: object,

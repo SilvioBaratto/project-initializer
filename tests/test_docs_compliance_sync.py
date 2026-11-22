@@ -168,7 +168,9 @@ _NESTJS_ALL = [
     "a forgotten `schema` switches validation off",
     "`createSchemaValidationPipe()`",
     "finds the controller classes exported from the `*.controller.ts` files under `src/`, checks their own and inherited handlers",
+    "It also requires `HealthController` among them, so a discovery that finds nothing fails",
     "a compile error (TS1241)",
+    "only the element type is checked, so a handler may return one value while the document says array",
     "answers 404 `Route not found` with the same body, under `/api/v1` and outside it",
     "`answerUnmatchedRequests(app)`",
     "keeps its own `@HttpCode(HttpStatus.OK)`",
@@ -626,7 +628,15 @@ def test_when_the_docs_list_the_p2039_outages_then_they_are_the_classifiers(auth
     )
     documented = re.search(r"`P2039`(.*?)\)", generate_api_claude("nestjs", auth))
 
-    assert code_class is not None and code_set is not None and documented is not None
+    assert code_class is not None, (
+        "CONNECTION_EXCEPTION_SQLSTATE_CLASS is missing from database-circuit-breaker.ts"
+    )
+    assert code_set is not None, (
+        "SERVER_STOPPING_OR_STARTING_SQLSTATES is missing from database-circuit-breaker.ts"
+    )
+    assert documented is not None, (
+        "the generated api CLAUDE.md has no sentence that follows `P2039`"
+    )
     sentence = documented.group(1)
     assert re.findall(r"class `(\w+)`", sentence) == [code_class.group(1)]
     assert set(re.findall(r"`(\d\d[0-9A-Z]{3})`", sentence)) == set(

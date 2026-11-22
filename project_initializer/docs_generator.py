@@ -73,7 +73,7 @@ _NESTJS_READINESS_CHECKLIST = """\
 ### 3. DTOs, validation & serialization
 
 - ✅ zod schemas validated through Nest's native Standard Schema support: each DTO file exports `<Name>Schema` and `type <Name>Dto = z.infer<typeof <Name>Schema>`, and a handler binds the schema with `@Body({ schema })`, `@Param({ schema })` or `@Query({ schema })`
-- ✅ `StandardSchemaValidationPipe` registered as `APP_PIPE` through `createSchemaValidationPipe()` (`src/common/filters/schema-validation.exception.ts`, which specs that wire a pipe use too) — strips unknown fields from every parameter that passes `{ schema }`. It returns a parameter without one unchanged, so a forgotten `schema` switches validation off for that parameter; `src/common/validation-coverage.spec.ts` finds the controller classes exported from the `*.controller.ts` files under `src/`, checks their own and inherited handlers, and fails when a `@Body`, `@Param` or `@Query` has no schema (or when such a file exports no controller). `@CurrentUser()` and other custom decorators are skipped by design
+- ✅ `StandardSchemaValidationPipe` registered as `APP_PIPE` through `createSchemaValidationPipe()` (`src/common/filters/schema-validation.exception.ts`, which specs that wire a pipe use too) — strips unknown fields from every parameter that passes `{ schema }`. It returns a parameter without one unchanged, so a forgotten `schema` switches validation off for that parameter; `src/common/validation-coverage.spec.ts` finds the controller classes exported from the `*.controller.ts` files under `src/`, checks their own and inherited handlers, and fails when a `@Body`, `@Param` or `@Query` has no schema (or when such a file exports no controller). It also requires `HealthController` among them, so a discovery that finds nothing fails; a project that renames that controller edits the spec. `@CurrentUser()` and other custom decorators are skipped by design
 - ✅ `StandardSchemaSerializerInterceptor` registered as `APP_INTERCEPTOR`; response schemas whitelist fields so Prisma rows cannot leak secret columns; handlers declare them with `@ResponseSchema(status, schema)` (`src/common/serialization/response-schema.decorator.ts`), which also documents the response in OpenAPI and makes a handler whose return type does not match the schema a compile error (TS1241). For a list, pass the schema of one element with `{ many: true }`
 - ⚠️ Built-in transform pipes — Zod coercion covers primitive coercion; no `ParseIntPipe` needed
 - Citations: `/pipes`, `/techniques/validation`, `/techniques/serialization`
@@ -223,7 +223,10 @@ def _nestjs_jest_note(auth: str | None) -> str:
     only for the Entra variant, the one that depends on it; it is CommonJS itself,
     and it is the ``jose`` it loads that ships ESM only.
     """
-    reason = "`@nestjs/config` and `@nestjs/terminus` ship ESM only"
+    reason = (
+        "the NestJS 12 packages (`@nestjs/common`, `@nestjs/core`, `@nestjs/config`, "
+        "`@nestjs/terminus`, ...) ship ESM only"
+    )
     if auth == "entra":
         reason += " and `jwks-rsa` loads the ESM-only `jose`"
     return (
@@ -1234,7 +1237,7 @@ _NESTJS_PLATFORM_SECTION = [
     "- **Logging.** The pino request serializer keeps the request `id`, `method` and `path` without the query string; headers, route parameters and the client address are not logged. A 5xx response is a `warn` access line, because the exception filter has already logged the cause once at `error`. `x-request-id` is kept when it matches a safe pattern, otherwise a UUID is generated.",
     "- **Rate limits.** 100 requests per minute and client on every route and 5 on `POST /auth/validate`; the 429 message is `Too many requests`. The counters are in this process's memory, so each replica counts on its own.",
     "- **Database TLS.** `deriveSslOption` decides TLS from `sslmode` and the host (loopback and single-label hosts such as the compose `db` stay plaintext), and `stripSslParameters` removes `sslmode`, `sslrootcert`, `sslcert`, `sslkey` and `uselibpqcompat` from the URL that reaches the pool, because `node-postgres` would otherwise build its own `ssl` object from them and discard that decision. A private CA goes through `NODE_EXTRA_CA_CERTS`. Whether production may connect without TLS at all is a separate, earlier check (see Configuration).",
-    "- **Responses.** Every handler declares its response with `@ResponseSchema(status, schema)`, including the demo routes under `/test` (status 200), so the OpenAPI document and the serializer agree. Its type also checks the handler: a handler whose return type (awaited or not) is not the schema's input type, or not an array of it with `{ many: true }`, does not compile. The decorator does not set the HTTP status: a `POST` that answers 200 keeps its own `@HttpCode(HttpStatus.OK)`, as `POST /test/echo` does. A response that does not match its schema at run time is a generic 500, because the server, not the client, broke the contract.",
+    "- **Responses.** Every handler declares its response with `@ResponseSchema(status, schema)`, including the demo routes under `/test` (status 200), so the OpenAPI document and the serializer agree. Its type also checks the handler: a handler whose return type (awaited or not) is not the schema's input type, or not an array of it with `{ many: true }`, does not compile. When `many` comes from an options variable typed `ResponseSchemaOptions` instead of an inline literal (or `as const`), only the element type is checked, so a handler may return one value while the document says array. The decorator does not set the HTTP status: a `POST` that answers 200 keeps its own `@HttpCode(HttpStatus.OK)`, as `POST /test/echo` does. A response that does not match its schema at run time is a generic 500, because the server, not the client, broke the contract.",
 ]
 
 _NESTJS_ROLE_SOURCES = {

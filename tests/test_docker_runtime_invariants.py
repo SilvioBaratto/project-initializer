@@ -277,7 +277,9 @@ def test_when_the_nestjs_supabase_compose_is_read_then_it_has_no_local_db_and_no
     """
     services = yaml.safe_load(_text(_NESTJS_SUPABASE_COMPOSE))["services"]
 
+    assert services, "the supabase compose defines no service"
     assert "db" not in services
+    assert "adminer" not in services
     assert _floating_images(services) == {}
 
 

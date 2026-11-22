@@ -146,6 +146,7 @@ def test_when_nestjs_docs_generated_then_the_jest_flag_is_documented(auth):
         assert "`--experimental-vm-modules`" in doc
         assert "`NODE_OPTIONS=--experimental-vm-modules`" in doc
         assert "Node 24.9" in doc
+        assert "`@nestjs/common`" in doc and "`@nestjs/core`" in doc
         assert "`@nestjs/config`" in doc and "`@nestjs/terminus`" in doc
         assert ("`jwks-rsa`" in doc) == (auth == "entra")
 

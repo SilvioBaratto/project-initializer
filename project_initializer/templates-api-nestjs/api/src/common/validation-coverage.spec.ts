@@ -22,6 +22,10 @@ import { CurrentUser } from './decorators/current-user.decorator';
 
 const SOURCE_ROOT = join(__dirname, '..');
 const CONTROLLER_FILE = /\.controller\.ts$/;
+const NO_CONTROLLER_REMEDY =
+  'decorate it, or rename a file that holds only a base class or helpers so it does not end in .controller.ts';
+const HEALTH_CONTROLLER_REMEDY =
+  'the discovery missed src/modules, or the controller was renamed: update this spec';
 
 /** The request-data decorators the global pipe validates only when they pass `{ schema }`. */
 const VALIDATED_PARAMETERS: ReadonlyMap<number, string> = new Map([
@@ -153,14 +157,18 @@ describe('Validation coverage of the controllers', () => {
     const discovered = await discoverControllers();
     const filesWithoutController = [...discovered]
       .filter(([, controllers]) => controllers.length === 0)
-      .map(([file]) => file);
+      .map(([file]) => `${file} exports no @Controller() class: ${NO_CONTROLLER_REMEDY}`);
     const names = [...discovered.values()].flat().map((controller) => controller.name);
+    const missingHealthController = names.includes('HealthController')
+      ? []
+      : [`HealthController was not found: ${HEALTH_CONTROLLER_REMEDY}`];
 
+    expect(discovered.size).toBeGreaterThan(0);
     expect(filesWithoutController).toEqual([]);
-    expect(names).toContain('HealthController');
+    expect(missingHealthController).toEqual([]);
   });
 
-  it('when every controller under src is inspected, then each @Body, @Param and @Query passes a schema', async () => {
+  it('when every controller exported from a *.controller.ts file under src is inspected, then each @Body, @Param and @Query passes a schema', async () => {
     const controllers = [...(await discoverControllers()).values()].flat();
 
     expect(controllers.flatMap(parametersWithoutSchema)).toEqual([]);

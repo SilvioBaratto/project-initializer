@@ -159,9 +159,10 @@ EXPECTED_JEST_SCRIPTS = {
 def test_when_package_read_jest_runs_with_the_experimental_vm_modules_flag(path):
     """Jest needs the flag to load the ESM-only runtime packages from a CommonJS project.
 
-    ``@nestjs/config``, ``@nestjs/terminus`` and ``jwks-rsa`` (through ``jose``) ship ESM
-    only; without ``vm.SourceTextModule`` every suite fails with "Must use import to load
-    ES Module". The wrapper form keeps the scripts cross-platform (no ``NODE_OPTIONS=``).
+    The NestJS 12 packages (``@nestjs/common``, ``@nestjs/core``, ``@nestjs/config``,
+    ``@nestjs/terminus``, ...) and ``jwks-rsa`` (through ``jose``) ship ESM only; without
+    ``vm.SourceTextModule`` every suite fails with "Must use import to load ES Module". The
+    wrapper form keeps the scripts cross-platform (no ``NODE_OPTIONS=``).
 
     Validates the test scripts of project_initializer/templates-{api,supabase,entra}-nestjs/api/package.json.
     """
