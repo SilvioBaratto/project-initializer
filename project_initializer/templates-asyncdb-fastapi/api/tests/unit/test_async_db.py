@@ -10,6 +10,7 @@ Repositories and real connection failures are in
 (pytest.ini) collects the ``async def`` tests.
 """
 
+import asyncio
 import ssl
 from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import UTC, datetime, timedelta
@@ -18,6 +19,7 @@ from typing import NoReturn
 from unittest import mock
 from urllib.parse import urlencode
 
+import aiosqlite
 import asyncpg
 import pytest
 from asyncpg.exceptions import CannotConnectNowError, TooManyConnectionsError
@@ -75,6 +77,7 @@ CUSTOM_CONNECT_TIMEOUT = 9
 SECRET_VALUE = "hunter2"
 DEADLOCK_SQLSTATE = "40P01"
 UNREACHABLE_SQLITE_URL = "sqlite+aiosqlite:////nonexistent-directory/app.db"
+WORKER_STOP_TIMEOUT_SECONDS = 5
 CERTIFICATE_VALIDITY = timedelta(days=1)
 
 
@@ -213,6 +216,35 @@ async def asyncpg_engine(monkeypatch) -> AsyncIterator[AsyncEngine]:
     )
     yield engine
     await engine.dispose()
+
+
+@pytest.fixture
+async def settled_aiosqlite_stops(monkeypatch) -> AsyncIterator[None]:
+    """Let aiosqlite finish stopping its worker threads before the event loop closes.
+
+    After a failed connect aiosqlite stops the worker thread without awaiting
+    the answer, which the thread delivers later through ``call_soon_threadsafe``.
+    When the test's loop is already closed by then, the thread dies with
+    ``RuntimeError: Event loop is closed`` and pytest reports it as an unhandled
+    thread exception in whichever later test is running.
+
+    Raises:
+        TimeoutError: A worker did not answer its stop within the timeout.
+    """
+    stops: list[asyncio.Future] = []
+    stop = aiosqlite.Connection.stop
+
+    def recording_stop(connection: aiosqlite.Connection) -> asyncio.Future | None:
+        """Call the real ``stop`` and keep the future it returns."""
+        future = stop(connection)
+        if future is not None:
+            stops.append(future)
+        return future
+
+    monkeypatch.setattr(aiosqlite.Connection, "stop", recording_stop)
+    yield
+    async with asyncio.timeout(WORKER_STOP_TIMEOUT_SECONDS):
+        await asyncio.gather(*stops)
 
 
 async def trip_circuit(breaker: CircuitBreaker) -> None:
@@ -742,7 +774,7 @@ async def test_when_the_database_answers_then_the_async_probe_reports_up(
 
 @pytest.mark.unit
 async def test_when_the_database_cannot_be_opened_then_the_async_probe_reports_down(
-    monkeypatch, breaker, caplog
+    monkeypatch, breaker, caplog, settled_aiosqlite_stops
 ):
     """Validates app.infrastructure.database_async.probe_async_database()."""
     engine = create_async_engine(UNREACHABLE_SQLITE_URL)

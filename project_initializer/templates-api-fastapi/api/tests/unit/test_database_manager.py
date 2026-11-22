@@ -9,6 +9,7 @@ these tests exercise the real error translation without a PostgreSQL server.
 
 import asyncio
 import logging
+from collections.abc import Iterator
 from unittest import mock
 
 import pytest
@@ -85,6 +86,12 @@ class DriverError(Exception):
         self.pgcode = pgcode
 
 
+# Every engine any RecordingEngineFactory built in the running test; the autouse
+# fixture below disposes them, because the tests build managers inside their body
+# and have no handle to close them through.
+_built_engines: list[Engine] = []
+
+
 class RecordingEngineFactory:
     """Engine factory that remembers each engine built and each connection opened."""
 
@@ -103,7 +110,22 @@ class RecordingEngineFactory:
         )
         event.listen(engine, "connect", lambda *_: self.connects.append(True))
         self.engines.append(engine)
+        _built_engines.append(engine)
         return engine
+
+
+@pytest.fixture(autouse=True)
+def disposed_built_engines() -> Iterator[None]:
+    """Dispose the engines the test built, closing their pooled connection.
+
+    A ``StaticPool`` keeps its one SQLite connection open until the engine is
+    disposed. Left to the garbage collector, Python 3.13 and later report it as
+    ``ResourceWarning: unclosed database``, attributed to whichever unrelated
+    test the collection happens to fall in.
+    """
+    yield
+    while _built_engines:
+        _built_engines.pop().dispose()
 
 
 def make_settings(**overrides: object) -> Settings:
