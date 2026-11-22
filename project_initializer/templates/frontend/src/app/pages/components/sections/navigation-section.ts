@@ -1,6 +1,6 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideDynamicIcon } from '@lucide/angular';
 
 import type { IconName } from '../../../icons';
 import { NavbarComponent } from '../../../shared/ui/navbar/navbar';
@@ -41,7 +41,7 @@ let nextSectionId = 0;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgTemplateOutlet,
-    LucideAngularModule,
+    LucideDynamicIcon,
     ThemePreviewComponent,
     StackComponent,
     NavbarComponent,
@@ -63,7 +63,7 @@ export class NavigationSectionComponent {
 
   /** Rows of every destination preview. Plain text, not links: a preview never navigates. */
   protected readonly destinations: readonly PreviewDestination[] = [
-    { label: 'Home', icon: 'Home' },
+    { label: 'Home', icon: 'House' },
     { label: 'Dashboard', icon: 'LayoutDashboard' },
     { label: 'Settings', icon: 'Settings' },
   ];

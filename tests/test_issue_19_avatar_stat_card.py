@@ -620,12 +620,15 @@ def test_when_stat_card_read_then_delta_direction_is_not_signaled_by_color_alone
     The icons are registered lucide names typed as `IconName`, so an
     unregistered name fails the build instead of throwing at runtime; the
     direction word is read through `.cdk-visually-hidden`.
+
+    Validates project_initializer/templates/frontend/src/app/shared/ui/stat-card/stat-card.ts and stat-card.html.
     """
     src = _stat_card_file("ts")
     html = _stat_card_file("html")
     assert "IconName" in src
     assert "'ChevronUp'" in src and "'ChevronDown'" in src
-    assert "<lucide-icon" in html
+    assert "lucideIcon" in html
+    assert "stat-card-delta-icon" in html
     assert "cdk-visually-hidden" in html
     assert "data-direction" in html
 

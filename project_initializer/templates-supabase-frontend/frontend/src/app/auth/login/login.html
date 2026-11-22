@@ -120,7 +120,7 @@
           <div class="live-region" role="alert">
             @if (errorMessage()) {
               <div class="message message-error">
-                <lucide-icon class="message-icon" name="CircleAlert" [size]="20" />
+                <svg lucideIcon="CircleAlert" class="message-icon" [size]="20" />
                 <p class="message-text">{{ errorMessage() }}</p>
               </div>
             }
@@ -129,7 +129,7 @@
           <div class="live-region" role="status">
             @if (successMessage()) {
               <div class="message message-success">
-                <lucide-icon class="message-icon" name="CircleCheckBig" [size]="20" />
+                <svg lucideIcon="CircleCheckBig" class="message-icon" [size]="20" />
                 <p class="message-text">{{ successMessage() }}</p>
               </div>
             } @else if (pending() === 'google') {

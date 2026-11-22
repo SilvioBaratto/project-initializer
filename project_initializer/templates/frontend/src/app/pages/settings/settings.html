@@ -25,7 +25,7 @@
                 [value]="option.mode"
                 [attr.data-theme-option]="option.mode">
               @if (theme() !== option.mode) {
-                <lucide-icon class="theme-option-icon" [name]="option.icon" [size]="18" />
+                <svg [lucideIcon]="option.icon" class="theme-option-icon" [size]="18" />
               }
               <span>{{ option.label }}</span>
             </mat-button-toggle>

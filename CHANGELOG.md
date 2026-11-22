@@ -11,10 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **The frontend image serves from `nginx:1.30-alpine` instead of the moving `nginx:alpine` tag.** The runtime stage follows the stable nginx branch, so a rebuild no longer changes nginx branch by itself. `nginx.conf` is unchanged: the non-root user, the pid file, the healthcheck and the CSP nonce swap behave as before.
 - **The scaffolded `test-package.yml` workflow uses `actions/checkout@v7` and `actions/setup-node@v7`.** This repo's own workflow moves the same way. The Node versions the workflows install are unchanged.
+- **Icons come from `@lucide/angular` 1.77.0 instead of `lucide-angular`, which is deprecated and stops at Angular 21.** `src/app/icons.ts` registers them through `provideLucideIcons`, and templates render `<svg lucideIcon="Name">` (or `[lucideIcon]`, with `LucideDynamicIcon` imported) instead of `<lucide-icon name="...">`, so the icon is the `svg` itself and CSS selects `svg.my-icon` rather than `lucide-icon`. The `LUCIDE_ICONS` and `LucideIconConfig` providers are gone: the defaults are already 24px with stroke width 2. An unregistered name now throws `Unable to resolve icon '<name>'` when the icon renders. `IconName` drops the deprecated keys `Home`, `CheckCircle`, `Loader2`, `Sliders` and `FunctionSquare`: use `House`, `CircleCheckBig`, `LoaderCircle`, `SlidersVertical` and `SquareFunction`. The `svg` writes its whole `class` attribute, so icon classes go through `class` or `[class]` (never `[class.x]`), and `matListItemIcon` / `matListItemMeta` sit on a wrapping `span`, as the sidebar now does.
 
 ### Repo tests
 
 - `tests/test_frontend_dependency_upgrade.py` pins the nginx runtime tag of the frontend Dockerfile to a version, and `actions/checkout@v7` and `actions/setup-node@v7` on every `uses:` line of both workflow files.
+- `tests/test_frontend_dependency_upgrade.py` also checks that no frontend manifest lists `lucide-angular`, that the three manifests and the base lock pin the same exact `@lucide/angular` release, that no frontend source imports `lucide-angular`, uses `<lucide-icon>` or imports a deprecated icon class such as `LucideTrash2`, and that no `<svg lucideIcon>` carries a `[class.x]` binding, `matListItemIcon` or `matListItemMeta`.
+- `tests/test_docs_frontend_material.py`, `tests/test_issue_9_feedback_atoms.py` and `tests/test_issue_19_avatar_stat_card.py` follow the new icon element, registration and error message.
 
 ## [0.6.0] - 2026-11-21
 

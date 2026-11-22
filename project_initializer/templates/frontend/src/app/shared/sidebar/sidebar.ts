@@ -14,7 +14,7 @@ import {
 import { MatMenu, MatMenuItem, MatMenuTrigger } from '@angular/material/menu';
 import { MatTooltip } from '@angular/material/tooltip';
 import { RouterLink, RouterLinkActive } from '@angular/router';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideDynamicIcon } from '@lucide/angular';
 
 import { ThemeMode, ThemeService } from '../../services/theme';
 import { NavItem, NAV_ITEMS, RailActionsSheet, SidebarMode } from '../nav-item';
@@ -58,7 +58,7 @@ export const RAIL_ACTIONS_SHEET: RailActionsSheet = {
     MatListItemIcon,
     MatListItemMeta,
     MatListItemTitle,
-    LucideAngularModule,
+    LucideDynamicIcon,
   ],
   templateUrl: './sidebar.html',
   styleUrl: './sidebar.css',

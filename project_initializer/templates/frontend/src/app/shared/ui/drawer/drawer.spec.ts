@@ -254,7 +254,7 @@ describe('DrawerComponent — naming', () => {
     const close = await loader.getHarness(MatButtonHarness.with({ selector: '.drawer-close' }));
     expect(await close.getVariant()).toBe('icon');
     expect(await (await close.host()).getAttribute('aria-label')).toBe('Close');
-    const icon = dialogs()[0].querySelector('.drawer-close lucide-icon');
+    const icon = dialogs()[0].querySelector('.drawer-close svg.lucide-x');
     expect(icon?.getAttribute('aria-hidden')).toBe('true');
   });
 });

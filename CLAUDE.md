@@ -417,7 +417,7 @@ Which overlay owns a lock follows its `package.json`: `templates-api-nestjs` (ba
 
 ## Frontend Template (`frontend/`)
 
-Angular 21 with Angular Material 3 (`@angular/material` + `@angular/cdk` 21.2) and `lucide-angular` icons. There is no utility-class CSS framework and no PostCSS config. Key conventions:
+Angular 21 with Angular Material 3 (`@angular/material` + `@angular/cdk` 21.2) and `@lucide/angular` icons. There is no utility-class CSS framework and no PostCSS config. Key conventions:
 
 - **Standalone components only** (no NgModules, don't set `standalone: true` — it's default)
 - **Signals for state**: Use `signal()`, `computed()`, `input()`, `output()`
@@ -431,7 +431,7 @@ Angular 21 with Angular Material 3 (`@angular/material` + `@angular/cdk` 21.2) a
 - **Overlay panels**: dialogs, snackbars and menus render in the body-level `.cdk-overlay-container`, so their panel styles live in `src/styles/overlays/_<component>.scss` (`@use`d by `styles.scss`), selected by the `panelClass` passed to `MatDialog`, `MatBottomSheet` or `MatSnackBar`; `mat-menu` takes a static `class` instead (its `panelClass` input aliases `class`)
 - **Window size classes**: `WindowSizeClassService` (`src/app/services/window-size-class.ts`) on the M3 breakpoints 600 / 840 / 1200 / 1600px, with the same literals in CSS media queries. Never the CDK `Breakpoints` presets or 768px
 - **Navigation shell**: below 600px a top app bar plus a navigation bar, with a top app bar button that opens the theme and account actions (never destinations); from 600px a collapsed rail docked in `mat-sidenav`, which a toggle expands from 840px and which starts expanded from 1600px, unless the user has toggled the rail: that choice is stored in localStorage (`app-rail-expanded`, `RAIL_EXPANDED_STORAGE_KEY` in `layout.ts`) and wins at every width from 840px; never a navigation drawer
-- **Icons**: registered by name in `src/app/icons.ts` (an unregistered name throws when the icon renders); inside Material text, filled, outlined or tonal buttons add `matButtonIcon` (plus `iconPositionEnd` when trailing) and `[size]="18"`. Material's icon margins target `.mat-icon` only, so give the `lucide-icon` host `display: flex; flex-shrink: 0; margin-inline: -8px 8px` when leading (`8px -8px` when trailing, -4px instead of -8px on text buttons)
+- **Icons**: registered by PascalCase name in `src/app/icons.ts` (`ICON_PROVIDER`, built with `provideLucideIcons`) and rendered as `<svg lucideIcon="Name">` (`LucideDynamicIcon`); an unregistered name throws `Unable to resolve icon '<name>'` when the icon renders. Inside Material text, filled, outlined or tonal buttons add `matButtonIcon` (plus `iconPositionEnd` when trailing) and `[size]="18"`. Material's icon margins target `.mat-icon` only, so give the `svg` `flex-shrink: 0; margin-inline: -8px 8px` when leading (`8px -8px` when trailing, -4px instead of -8px on text buttons). The `svg` writes its whole `class` attribute, so pass classes through `class` or `[class]`, never `[class.x]`, and put `matListItemIcon` / `matListItemMeta` on a wrapping `span`
 - **Specs**: Vitest through `ng test` (zoneless, `src/test-providers.ts`); prefer Angular Material test harnesses
 
 The generated `frontend/.claude/CLAUDE.md` (`generate_frontend_claude()` in `docs_generator.py`) carries the full list; change both together. `tests/test_docs_frontend_material.py` cross-checks each convention it names against the template.

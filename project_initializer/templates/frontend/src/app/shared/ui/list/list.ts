@@ -27,7 +27,8 @@ export type ListVariant = 'default' | 'divided' | 'striped';
  * Angular Material:
  * - `[matListItemTitle]` + `[matListItemLine]` for two- and three-line items;
  * - `[matListItemIcon]` or `[matListItemAvatar]` for the leading element, such as
- *   `<lucide-icon matListItemIcon name="Mail" />`;
+ *   `<span matListItemIcon><svg lucideIcon="Mail" /></span>` (the wrapper keeps the slot's
+ *   classes, which the icon would overwrite with its own `class` attribute);
  * - `[matListItemMeta]` for trailing supporting text or an icon button.
  *
  * `mat-list` sets no ARIA role, so the list carries `role="list"` and every projected

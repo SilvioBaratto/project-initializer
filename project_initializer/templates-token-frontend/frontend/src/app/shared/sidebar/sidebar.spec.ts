@@ -10,7 +10,6 @@ import { MatMenuHarness } from '@angular/material/menu/testing';
 import { MATERIAL_ANIMATIONS } from '@angular/material/core';
 import { Router, Routes, provideRouter } from '@angular/router';
 import { vi } from 'vitest';
-import { LucideIconConfig } from 'lucide-angular';
 
 import { authGuard, guestGuard } from '../../guards/auth.guard';
 import { ICON_PROVIDER } from '../../icons';
@@ -55,7 +54,6 @@ describe('SidebarComponent (token auth)', () => {
       providers: [
         provideRouter(routes),
         ICON_PROVIDER,
-        LucideIconConfig,
         { provide: ThemeService, useValue: themeSpy },
         { provide: AuthService, useValue: authSpy },
         { provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } },
@@ -127,13 +125,19 @@ describe('SidebarComponent (token auth)', () => {
       expect(current[0].textContent).toContain(last.name);
     });
 
-    it('when the rail renders, each item carries a decorative lucide-icon and no inline svg markup', async () => {
+    it('when the rail renders, each item carries its own decorative icon and no inline svg markup', async () => {
       const el = await render();
-      const icons = el.querySelectorAll('mat-nav-list lucide-icon');
+      const icons = Array.from(el.querySelectorAll('mat-nav-list svg.lucide'));
       expect(icons.length).toBe(NAV_ITEMS.length);
-      icons.forEach((icon) => expect(icon.getAttribute('aria-hidden')).toBe('true'));
-      // Every svg in the rail is rendered by a lucide-icon host.
-      el.querySelectorAll('svg').forEach((svg) => expect(svg.closest('lucide-icon')).not.toBeNull());
+      icons.forEach((icon, index) => {
+        expect(icon.classList).toContain(`lucide-${NAV_ITEMS[index].icon}`);
+        expect(icon.getAttribute('aria-hidden')).toBe('true');
+      });
+      // Every svg in the rail is a decorative lucide icon.
+      el.querySelectorAll('svg').forEach((svg) => {
+        expect(svg.classList).toContain('lucide');
+        expect(svg.getAttribute('aria-hidden')).toBe('true');
+      });
     });
 
     it('when a destination is clicked, closeSidebar is emitted and the user stays signed in', async () => {
@@ -153,8 +157,8 @@ describe('SidebarComponent (token auth)', () => {
       // The base template shows Sign out through canSignOut; this overlay ships no template of its own.
       expect(fixture.componentInstance.canSignOut()).toBe(true);
       // LogOut's arrow points toward the inline end, so the icon is marked to mirror in RTL.
-      const signOutIcon = el.querySelector('button.sidebar-logout lucide-icon');
-      expect(signOutIcon?.classList.contains('sidebar-icon-directional')).toBe(true);
+      const signOutIcon = el.querySelector('button.sidebar-logout svg.lucide-log-out');
+      expect(signOutIcon?.closest('.sidebar-icon-directional')).not.toBeNull();
       // A bearer token names no user, so the rail shows no account name at all.
       expect(fixture.componentInstance.accountName()).toBeNull();
       expect(el.querySelector('.sidebar-account')).toBeNull();
@@ -178,7 +182,7 @@ describe('SidebarComponent (token auth)', () => {
       const el = await render('modal', [], undefined, 'Sam Rivera');
       const row = el.querySelector('.sidebar-account');
       expect(row?.textContent?.trim()).toBe('Sam Rivera');
-      expect(row?.querySelector('lucide-icon')?.getAttribute('aria-hidden')).toBe('true');
+      expect(row?.querySelector('svg.lucide-user')?.getAttribute('aria-hidden')).toBe('true');
       const list = el.querySelector('mat-action-list')!;
       expect(row!.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
@@ -236,7 +240,7 @@ describe('SidebarComponent (token auth)', () => {
       expect(links.map((a) => a.textContent?.trim())).toEqual(NAV_ITEMS.map((i) => i.name));
       for (const link of links) {
         expect(link.hasAttribute('aria-label')).toBe(false);
-        expect(link.querySelector('.rail-indicator lucide-icon')?.getAttribute('aria-hidden')).toBe('true');
+        expect(link.querySelector('.rail-indicator svg.lucide')?.getAttribute('aria-hidden')).toBe('true');
       }
     });
 
@@ -259,14 +263,15 @@ describe('SidebarComponent (token auth)', () => {
       expect(await (await theme.host()).getAttribute('aria-haspopup')).toBe('menu');
       expect(await (await logout.host()).getAttribute('aria-label')).toBe('Sign out');
 
-      // The icon hosts are grid boxes (.sidebar-icon), so the 24px svg centres in the 40px state layer.
+      // The svgs carry .sidebar-icon, which takes them off the inline baseline, so the 24px icons
+      // centre in the 40px state layer.
       for (const selector of ['.sidebar-theme-toggle', '.sidebar-logout']) {
-        const icon = fixture.nativeElement.querySelector(`button${selector} lucide-icon`);
+        const icon = fixture.nativeElement.querySelector(`button${selector} svg.lucide`);
         expect(icon?.classList.contains('sidebar-icon')).toBe(true);
         expect(icon?.getAttribute('aria-hidden')).toBe('true');
       }
       // Only the Sign out icon is directional (it mirrors in RTL).
-      const logoutIcon = fixture.nativeElement.querySelector('button.sidebar-logout lucide-icon');
+      const logoutIcon = fixture.nativeElement.querySelector('button.sidebar-logout svg.lucide-log-out');
       expect(logoutIcon?.classList.contains('sidebar-icon-directional')).toBe(true);
 
       await (await themeMenu()).clickItem({ text: 'System' });
@@ -342,7 +347,6 @@ describe('SidebarComponent (token auth, real guards)', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         ICON_PROVIDER,
-        LucideIconConfig,
         // The real AuthService and guards are under test here; the theme is not.
         { provide: ThemeService, useValue: { setTheme: vi.fn(), theme: signal<ThemeMode>('light') } },
         { provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } },

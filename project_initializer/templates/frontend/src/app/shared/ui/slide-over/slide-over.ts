@@ -33,8 +33,7 @@ export type SlideOverSide = DrawerSide;
  * The open panel renders the lucide `X` icon in its close button, so the injector needs a lucide
  * icon provider that registers `X`: `ICON_PROVIDER` from `src/app/icons.ts`, which `app.config.ts`
  * already provides. A TestBed that opens the panel must add `ICON_PROVIDER` to its providers,
- * otherwise lucide-angular throws "The "X" icon has not been provided by any available icon
- * providers."
+ * otherwise `@lucide/angular` throws "Unable to resolve icon 'X'".
  */
 @Component({
   selector: 'app-slide-over',

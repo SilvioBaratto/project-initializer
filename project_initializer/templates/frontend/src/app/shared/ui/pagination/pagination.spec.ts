@@ -262,9 +262,13 @@ describe('PaginationComponent — directional controls', () => {
 
   it('when rendered, the chevron icons are hidden from assistive technology', async () => {
     const f = await setup(2, 5);
-    const icons = Array.from((f.nativeElement as HTMLElement).querySelectorAll('lucide-icon'));
-    expect(icons.length).toBe(4);
-    icons.forEach((icon) => expect(icon.getAttribute('aria-hidden')).toBe('true'));
+    const icons = Array.from((f.nativeElement as HTMLElement).querySelectorAll('svg.lucide'));
+    const shapes = ['lucide-chevrons-left', 'lucide-chevron-left', 'lucide-chevron-right', 'lucide-chevrons-right'];
+    expect(icons.length).toBe(shapes.length);
+    icons.forEach((icon, index) => {
+      expect(icon.classList).toContain(shapes[index]);
+      expect(icon.getAttribute('aria-hidden')).toBe('true');
+    });
   });
 
   it('when prev is clicked on page 2, pageChange emits 1', async () => {

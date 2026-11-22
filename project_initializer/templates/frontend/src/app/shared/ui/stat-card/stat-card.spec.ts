@@ -113,7 +113,7 @@ describe('StatCardComponent — delta', () => {
   it('when delta is null, no delta element is rendered', async () => {
     const f = await setup({ metric: '10', label: 'Sales', delta: null });
     expect(deltaElement(f)).toBeNull();
-    expect(root(f).querySelector('lucide-icon')).toBeNull();
+    expect(root(f).querySelector('svg.lucide')).toBeNull();
   });
 
   it('when delta is an empty string, no delta element is rendered', async () => {
@@ -128,8 +128,8 @@ describe('StatCardComponent — delta', () => {
 
   // Object form with named placeholders, so the title can never drift from the row's field order.
   it.each<{ direction: DeltaDirection; delta: string; iconClass: string; word: string; role: string }>([
-    { direction: 'up', delta: '+5%', iconClass: 'lucide-ChevronUp', word: 'Up', role: 'var(--app-success)' },
-    { direction: 'down', delta: '-3%', iconClass: 'lucide-ChevronDown', word: 'Down', role: 'var(--mat-sys-error)' },
+    { direction: 'up', delta: '+5%', iconClass: 'lucide-chevron-up', word: 'Up', role: 'var(--app-success)' },
+    { direction: 'down', delta: '-3%', iconClass: 'lucide-chevron-down', word: 'Down', role: 'var(--mat-sys-error)' },
   ])(
     'when deltaDirection is $direction with delta $delta, the delta is colored $role and backed by the $iconClass icon and the hidden word $word',
     async ({ direction, delta, iconClass, word, role }) => {
@@ -140,7 +140,7 @@ describe('StatCardComponent — delta', () => {
       expect(el.getAttribute('data-direction')).toBe(direction);
       expect(colorRole(el)).toBe(role);
       // The icon shape and the hidden word back up the color.
-      expect(el.querySelector('.stat-card-delta-icon svg')?.classList).toContain(iconClass);
+      expect(el.querySelector('svg.stat-card-delta-icon')?.classList).toContain(iconClass);
       expect(readText(el.querySelector('.cdk-visually-hidden'))).toBe(word);
       expect(readText(el)).toBe(`${word} ${delta}`);
     },
@@ -152,7 +152,7 @@ describe('StatCardComponent — delta', () => {
 
     expect(el.getAttribute('data-direction')).toBe('neutral');
     expect(colorRole(el)).toBe('var(--mat-sys-on-surface-variant)');
-    expect(el.querySelector('lucide-icon')).toBeNull();
+    expect(el.querySelector('svg.lucide')).toBeNull();
     expect(el.querySelector('.cdk-visually-hidden')).toBeNull();
     expect(readText(el)).toBe('0%');
   });
@@ -173,12 +173,12 @@ describe('StatCardComponent — delta', () => {
     expect(f.componentInstance.resolvedDirection()).toBe('neutral');
     expect(deltaElement(f)!.getAttribute('data-direction')).toBe('neutral');
     expect(colorRole(deltaElement(f)!)).toBe('var(--mat-sys-on-surface-variant)');
-    expect(deltaElement(f)!.querySelector('lucide-icon')).toBeNull();
+    expect(deltaElement(f)!.querySelector('svg.lucide')).toBeNull();
   });
 
   it('when a direction icon renders, it is hidden from assistive technology', async () => {
     const f = await setup({ metric: '500', label: 'Revenue', delta: '+12%', deltaDirection: 'up' });
-    const icon = deltaElement(f)!.querySelector('lucide-icon')!;
+    const icon = deltaElement(f)!.querySelector('svg.stat-card-delta-icon')!;
     expect(icon.getAttribute('aria-hidden')).toBe('true');
   });
 
@@ -192,8 +192,8 @@ describe('StatCardComponent — delta', () => {
 
     expect(el.getAttribute('data-direction')).toBe('down');
     expect(colorRole(el)).toBe('var(--mat-sys-error)');
-    expect(el.querySelector('svg.lucide-ChevronUp')).toBeNull();
-    expect(el.querySelector('svg.lucide-ChevronDown')).not.toBeNull();
+    expect(el.querySelector('svg.lucide-chevron-up')).toBeNull();
+    expect(el.querySelector('svg.lucide-chevron-down')).not.toBeNull();
     expect(readText(el)).toBe('Down 2%');
   });
 

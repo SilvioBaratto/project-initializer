@@ -10,7 +10,6 @@ import { MatSidenavHarness } from '@angular/material/sidenav/testing';
 import { By } from '@angular/platform-browser';
 import { Router, Routes, provideRouter } from '@angular/router';
 import { vi } from 'vitest';
-import { LucideIconConfig } from 'lucide-angular';
 
 import { ICON_PROVIDER } from '../../icons';
 import { WINDOW_SIZE_QUERIES, WindowSizeClass } from '../../services/window-size-class';
@@ -105,7 +104,6 @@ describe('Responsive shell (integration)', () => {
       providers: [
         provideRouter(routes),
         ICON_PROVIDER,
-        LucideIconConfig,
         { provide: MediaMatcher, useValue: matcher },
         { provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } },
       ],

@@ -5,7 +5,7 @@
     @if (delta()) {
       <span class="stat-card-delta" [attr.data-direction]="resolvedDirection()">
         @if (deltaIcon(); as icon) {
-          <lucide-icon class="stat-card-delta-icon" [name]="icon" [size]="20" />
+          <svg [lucideIcon]="icon" class="stat-card-delta-icon" [size]="20" />
         }
         @if (deltaLabel(); as directionLabel) {
           <span class="cdk-visually-hidden">{{ directionLabel }}&ngsp;</span>

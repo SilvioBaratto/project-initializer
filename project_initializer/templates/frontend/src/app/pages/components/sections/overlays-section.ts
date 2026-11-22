@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, output } from '@angular/core';
 import { MatButton, MatIconButton } from '@angular/material/button';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideDynamicIcon } from '@lucide/angular';
 
 import { ButtonComponent } from '../../../shared/ui/button/button';
 import { StackComponent } from '../../../shared/ui/stack/stack';
@@ -41,7 +41,7 @@ import { ThemePreviewComponent } from '../theme-preview';
     TooltipDirective,
     MatButton,
     MatIconButton,
-    LucideAngularModule,
+    LucideDynamicIcon,
   ],
   templateUrl: './overlays-section.html',
   styleUrl: './overlays-section.css',

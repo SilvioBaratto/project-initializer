@@ -35,10 +35,11 @@
   gap: 8px;
 }
 
-/* Grid hosts: the 24px svg leaves no inline baseline gap. */
-.sidebar-icon,
-.rail-icon,
-.sidebar-menu-icon {
+/*
+ * The list-slot wrappers are grid boxes, so the 24px svg inside them leaves no inline baseline gap;
+ * on the svgs of the collapsed rail's icon buttons, grid computes to block, with the same effect.
+ */
+.sidebar-icon {
   display: grid;
 }
 
@@ -222,7 +223,7 @@
 /*
  * Theme menu items: the panel renders in the overlay container, but the items come from this
  * template, so this rule still reaches them. Material spaces and colors only mat-icon beside a
- * menu label, so the Lucide icon takes the same 12px gap and icon color.
+ * menu label, so the icon's svg takes the same 12px gap and icon color.
  */
 .sidebar-menu-icon {
   flex-shrink: 0;

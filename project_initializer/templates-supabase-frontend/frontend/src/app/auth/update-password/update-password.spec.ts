@@ -306,8 +306,8 @@ describe('UpdatePasswordComponent', () => {
 
   describe('with the app config', () => {
     it('renders the confirmation icon using only the providers from app.config.ts', async () => {
-      // lucide-angular throws for an icon no LUCIDE_ICONS provider registers, so this fails when
-      // the overlay's app config leaves out ICON_PROVIDER.
+      // @lucide/angular throws "Unable to resolve icon 'Check'" for an icon no provider registers,
+      // so this fails when the overlay's app config leaves out ICON_PROVIDER.
       await setup({ providers: appConfig.providers });
       updatePassword.mockResolvedValue({ success: true, message: '' });
 
@@ -315,9 +315,9 @@ describe('UpdatePasswordComponent', () => {
       await (await submitButton()).click();
       await fixture.whenStable();
 
-      const icon = host().querySelector('.update-password-success-icon lucide-icon');
+      const icon = host().querySelector('.update-password-success-icon svg.lucide-check');
       expect(icon).not.toBeNull();
-      expect(icon!.querySelector('svg')).not.toBeNull();
+      expect(icon!.children.length).toBeGreaterThan(0);
       expect(icon!.getAttribute('aria-hidden')).toBe('true');
     });
   });

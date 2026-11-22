@@ -88,7 +88,7 @@ describe('HomeComponent', () => {
     const items = host.querySelectorAll('ul > li');
     items.forEach((item) => {
       expect(item.querySelector('.cdk-visually-hidden')?.textContent?.trim()).toBe('Up');
-      const chevron = item.querySelector('lucide-icon');
+      const chevron = item.querySelector('svg.lucide-chevron-up');
       expect(chevron?.getAttribute('aria-hidden')).toBe('true');
     });
   });

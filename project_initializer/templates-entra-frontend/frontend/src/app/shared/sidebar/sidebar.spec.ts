@@ -10,7 +10,6 @@ import { Router, Routes, provideRouter } from '@angular/router';
 import { MsalService } from '@azure/msal-angular';
 import type { AccountInfo } from '@azure/msal-browser';
 import { vi } from 'vitest';
-import { LucideIconConfig } from 'lucide-angular';
 
 import { AuthService } from '../../core/services/auth.service';
 import { ICON_PROVIDER } from '../../icons';
@@ -47,7 +46,6 @@ describe('SidebarComponent (Entra)', () => {
       providers: [
         provideRouter(routes),
         ICON_PROVIDER,
-        LucideIconConfig,
         { provide: ThemeService, useValue: themeSpy },
         { provide: AuthService, useValue: authSpy },
         { provide: MsalService, useValue: { instance: { getActiveAccount: () => activeAccount } } },
@@ -128,11 +126,14 @@ describe('SidebarComponent (Entra)', () => {
       expect(current[0].textContent).toContain('Settings');
     });
 
-    it('when the rail renders, each item carries a decorative lucide-icon', async () => {
+    it('when the rail renders, each item carries its own decorative icon', async () => {
       const el = await render();
-      const icons = el.querySelectorAll('mat-nav-list lucide-icon');
+      const icons = Array.from(el.querySelectorAll('mat-nav-list svg.lucide'));
       expect(icons.length).toBe(NAV_ITEMS.length);
-      icons.forEach((icon) => expect(icon.getAttribute('aria-hidden')).toBe('true'));
+      icons.forEach((icon, index) => {
+        expect(icon.classList).toContain(`lucide-${NAV_ITEMS[index].icon}`);
+        expect(icon.getAttribute('aria-hidden')).toBe('true');
+      });
     });
 
     it('when a destination is clicked, closeSidebar is emitted and AuthService is not touched', async () => {
@@ -152,8 +153,8 @@ describe('SidebarComponent (Entra)', () => {
       expect(el.querySelector('.sidebar-account-name')?.textContent?.trim()).toBe('Ada Lovelace');
       expect(el.textContent).not.toContain('User');
       // LogOut's arrow points toward the inline end, so the icon is marked to mirror in RTL.
-      const signOutIcon = el.querySelector('button.sidebar-logout lucide-icon');
-      expect(signOutIcon?.classList.contains('sidebar-icon-directional')).toBe(true);
+      const signOutIcon = el.querySelector('button.sidebar-logout svg.lucide-log-out');
+      expect(signOutIcon?.closest('.sidebar-icon-directional')).not.toBeNull();
     });
 
     it('when Sign out is chosen, it signs out through MSAL and then closes the surface', async () => {
@@ -235,7 +236,7 @@ describe('SidebarComponent (Entra)', () => {
       expect(links.map((a) => a.textContent?.trim())).toEqual(NAV_ITEMS.map((i) => i.name));
       for (const link of links) {
         expect(link.hasAttribute('aria-label')).toBe(false);
-        expect(link.querySelector('.rail-indicator lucide-icon')?.getAttribute('aria-hidden')).toBe('true');
+        expect(link.querySelector('.rail-indicator svg.lucide')?.getAttribute('aria-hidden')).toBe('true');
       }
     });
 
@@ -256,15 +257,15 @@ describe('SidebarComponent (Entra)', () => {
       expect(await (await theme.host()).getAttribute('aria-haspopup')).toBe('menu');
       expect(await (await logout.host()).getAttribute('aria-label')).toBe('Sign out');
 
-      // The icon hosts are grid boxes (.sidebar-icon), so the 24px svg centres in the 40px state layer
-      // instead of sitting on an inline baseline.
+      // The svgs carry .sidebar-icon, which takes them off the inline baseline, so the 24px icons
+      // centre in the 40px state layer.
       for (const selector of ['.sidebar-theme-toggle', '.sidebar-logout']) {
-        const icon = fixture.nativeElement.querySelector(`button${selector} lucide-icon`);
+        const icon = fixture.nativeElement.querySelector(`button${selector} svg.lucide`);
         expect(icon?.classList.contains('sidebar-icon')).toBe(true);
         expect(icon?.getAttribute('aria-hidden')).toBe('true');
       }
       // Only the Sign out icon is directional (it mirrors in RTL).
-      const logoutIcon = fixture.nativeElement.querySelector('button.sidebar-logout lucide-icon');
+      const logoutIcon = fixture.nativeElement.querySelector('button.sidebar-logout svg.lucide-log-out');
       expect(logoutIcon?.classList.contains('sidebar-icon-directional')).toBe(true);
 
       await (await themeMenu()).clickItem({ text: 'System' });

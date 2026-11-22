@@ -49,9 +49,9 @@
   outline: none;
 }
 
-/* Lucide icons inside matIconButton: a grid host leaves no inline baseline gap, so the 24px svg centres. */
+/* Icons inside matIconButton: a block svg sits on no text baseline, so the 24px icon centres. */
 .shell-icon {
-  display: grid;
+  display: block;
 }
 
 /* ── Navigation rail ─────────────────────────────────────────────────────── */

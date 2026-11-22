@@ -75,11 +75,6 @@
   letter-spacing: var(--mat-sys-label-large-tracking);
 }
 
-/* A flex box leaves no baseline gap under the 24px svg. */
-.nav-preview-icon {
-  display: flex;
-}
-
 /* Collapsed docked rail: icon over a label-medium label, like the shell's collapsed rail. */
 .nav-preview-collapsed .nav-preview-item {
   grid-auto-flow: row;

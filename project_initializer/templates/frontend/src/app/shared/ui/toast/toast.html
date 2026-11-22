@@ -1,5 +1,5 @@
 <div matSnackBarLabel class="toast-label">
-  <lucide-icon class="toast-icon" [name]="icon" />
+  <svg [lucideIcon]="icon" class="toast-icon" />
   <span class="toast-message"><span class="cdk-visually-hidden">{{ statusLabel }}:&ngsp;</span>{{ data.message }}</span>
 </div>
 
@@ -12,7 +12,7 @@
       aria-label="Dismiss notification"
       (click)="dismiss()"
     >
-      <lucide-icon name="X" />
+      <svg lucideIcon="X" />
     </button>
   </div>
 }

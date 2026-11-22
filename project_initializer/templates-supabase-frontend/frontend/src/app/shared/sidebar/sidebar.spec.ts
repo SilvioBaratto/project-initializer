@@ -10,7 +10,6 @@ import { MATERIAL_ANIMATIONS } from '@angular/material/core';
 import { Router, Routes, provideRouter } from '@angular/router';
 import type { User } from '@supabase/supabase-js';
 import { vi } from 'vitest';
-import { LucideIconConfig } from 'lucide-angular';
 
 import { appConfig } from '../../app.config';
 import { routes as appRoutes } from '../../app.routes';
@@ -59,7 +58,6 @@ describe('SidebarComponent (supabase)', () => {
       providers: [
         provideRouter([...routes, LOGIN_ROUTE]),
         ICON_PROVIDER,
-        LucideIconConfig,
         { provide: ThemeService, useValue: themeSpy },
         { provide: AuthService, useValue: authSpy },
         { provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } },
@@ -117,13 +115,19 @@ describe('SidebarComponent (supabase)', () => {
       expect(current[0].textContent).toContain('Settings');
     });
 
-    it('when the rail renders, each item carries a decorative lucide-icon and no inline svg markup', async () => {
+    it('when the rail renders, each item carries its own decorative icon and no inline svg markup', async () => {
       const el = await render();
-      const icons = el.querySelectorAll('mat-nav-list lucide-icon');
+      const icons = Array.from(el.querySelectorAll('mat-nav-list svg.lucide'));
       expect(icons.length).toBe(NAV_ITEMS.length);
-      icons.forEach((icon) => expect(icon.getAttribute('aria-hidden')).toBe('true'));
-      // Every svg comes from a lucide-icon host; the template ships no hand-written svg.
-      el.querySelectorAll('svg').forEach((svg) => expect(svg.closest('lucide-icon')).not.toBeNull());
+      icons.forEach((icon, index) => {
+        expect(icon.classList).toContain(`lucide-${NAV_ITEMS[index].icon}`);
+        expect(icon.getAttribute('aria-hidden')).toBe('true');
+      });
+      // Every svg is a decorative lucide icon; the template ships no hand-written svg.
+      el.querySelectorAll('svg').forEach((svg) => {
+        expect(svg.classList).toContain('lucide');
+        expect(svg.getAttribute('aria-hidden')).toBe('true');
+      });
     });
 
     it('when a destination is clicked, closeSidebar is emitted', async () => {
@@ -142,8 +146,8 @@ describe('SidebarComponent (supabase)', () => {
       expect(await Promise.all(actions.map((a) => a.getTitle()))).toEqual(['Change theme', 'Sign out']);
       expect(el.querySelector('.sidebar-account')?.textContent?.trim()).toBe('ada@example.com');
       // LogOut's arrow points toward the inline end, so the icon is marked to mirror in RTL.
-      const signOutIcon = el.querySelector('button.sidebar-logout lucide-icon');
-      expect(signOutIcon?.classList.contains('sidebar-icon-directional')).toBe(true);
+      const signOutIcon = el.querySelector('button.sidebar-logout svg.lucide-log-out');
+      expect(signOutIcon?.closest('.sidebar-icon-directional')).not.toBeNull();
     });
   });
 
@@ -256,7 +260,7 @@ describe('SidebarComponent (supabase)', () => {
       // The progress indicator replaces the LogOut icon; the label does not change.
       const spinner = await loader.getHarness(MatProgressSpinnerHarness.with({ selector: '.sidebar-logout .sidebar-progress' }));
       expect(await spinner.getMode()).toBe('indeterminate');
-      expect(el.querySelector('button.sidebar-logout lucide-icon')).toBeNull();
+      expect(el.querySelector('button.sidebar-logout svg.lucide-log-out')).toBeNull();
       expect(el.querySelector('button.sidebar-logout mat-progress-spinner')?.getAttribute('aria-hidden')).toBe('true');
       const [, signOutItem] = await (await loader.getHarness(MatActionListHarness)).getItems();
       expect(await signOutItem.getTitle()).toBe('Sign out');
@@ -268,7 +272,7 @@ describe('SidebarComponent (supabase)', () => {
       await fixture.whenStable();
 
       expect(button.hasAttribute('aria-busy')).toBe(false);
-      expect(el.querySelector('button.sidebar-logout lucide-icon')).not.toBeNull();
+      expect(el.querySelector('button.sidebar-logout svg.lucide-log-out')).not.toBeNull();
     });
 
     it('when signing out in the collapsed rail, the icon button is busy and shows progress', async () => {
@@ -284,7 +288,7 @@ describe('SidebarComponent (supabase)', () => {
       expect(await signOutButton.isDisabled()).toBe(false);
       expect(await host.getAttribute('aria-label')).toBe('Sign out');
       expect(el.querySelector('button.sidebar-logout mat-progress-spinner')).not.toBeNull();
-      expect(el.querySelector('button.sidebar-logout lucide-icon')).toBeNull();
+      expect(el.querySelector('button.sidebar-logout svg.lucide-log-out')).toBeNull();
 
       signOut.resolve();
       await vi.waitFor(() => expect(fixture.componentInstance.signingOut()).toBe(false));
@@ -320,6 +324,20 @@ describe('SidebarComponent (supabase)', () => {
       await menu.open();
       expect(themeMenuItems().map((i) => i.getAttribute('aria-checked'))).toEqual(['false', 'false', 'true']);
     });
+
+    it("when the expanded rail renders, the list icons keep Material's leading and trailing slots", async () => {
+      const el = await render();
+      const button = el.querySelector<HTMLButtonElement>('button.sidebar-theme-toggle')!;
+      expect(button.querySelector('svg.lucide-sun-moon')?.closest('.mat-mdc-list-item-icon.mdc-list-item__start')).not.toBeNull();
+      expect(button.querySelector('svg.lucide-chevron-up')?.closest('.mat-mdc-list-item-meta.mdc-list-item__end')).not.toBeNull();
+      const signOut = el.querySelector('button.sidebar-logout svg.lucide-log-out');
+      expect(signOut?.closest('.mat-mdc-list-item-icon.mdc-list-item__start')).not.toBeNull();
+      const destinations = Array.from(el.querySelectorAll('mat-nav-list svg.lucide'));
+      expect(destinations.length).toBe(NAV_ITEMS.length);
+      for (const icon of destinations) {
+        expect(icon.closest('.mat-mdc-list-item-icon.mdc-list-item__start')).not.toBeNull();
+      }
+    });
   });
 
   describe('collapsed rail', () => {
@@ -334,7 +352,7 @@ describe('SidebarComponent (supabase)', () => {
       expect(links.map((a) => a.textContent?.trim())).toEqual(NAV_ITEMS.map((i) => i.name));
       for (const link of links) {
         expect(link.hasAttribute('aria-label')).toBe(false);
-        expect(link.querySelector('.rail-indicator lucide-icon')?.getAttribute('aria-hidden')).toBe('true');
+        expect(link.querySelector('.rail-indicator svg.lucide')?.getAttribute('aria-hidden')).toBe('true');
       }
     });
 
@@ -355,14 +373,15 @@ describe('SidebarComponent (supabase)', () => {
       expect(await (await theme.host()).getAttribute('aria-haspopup')).toBe('menu');
       expect(await (await signOutButton.host()).getAttribute('aria-label')).toBe('Sign out');
 
-      // The icon hosts are grid boxes (.sidebar-icon), so the 24px svg centres in the 40px state layer.
+      // The svgs carry .sidebar-icon, which takes them off the inline baseline, so the 24px icons
+      // centre in the 40px state layer.
       for (const selector of ['.sidebar-theme-toggle', '.sidebar-logout']) {
-        const icon = fixture.nativeElement.querySelector(`button${selector} lucide-icon`);
+        const icon = fixture.nativeElement.querySelector(`button${selector} svg.lucide`);
         expect(icon?.classList.contains('sidebar-icon')).toBe(true);
         expect(icon?.getAttribute('aria-hidden')).toBe('true');
       }
       // Only the Sign out icon is directional (it mirrors in RTL).
-      const logoutIcon = fixture.nativeElement.querySelector('button.sidebar-logout lucide-icon');
+      const logoutIcon = fixture.nativeElement.querySelector('button.sidebar-logout svg.lucide-log-out');
       expect(logoutIcon?.classList.contains('sidebar-icon-directional')).toBe(true);
 
       await (await themeMenu()).clickItem({ text: 'System' });
@@ -428,8 +447,8 @@ describe('SidebarComponent (supabase)', () => {
 
   describe('scaffold wiring (supabase app.config.ts and app.routes.ts)', () => {
     it('with the providers from the supabase app.config, every rail icon renders', async () => {
-      // No hand-picked ICON_PROVIDER / LucideIconConfig here: lucide-angular throws
-      // 'The "Home" icon has not been provided…' when app.config forgets the providers.
+      // No hand-picked ICON_PROVIDER here: @lucide/angular throws "Unable to resolve icon 'House'"
+      // when app.config forgets the provider.
       await TestBed.configureTestingModule({
         imports: [SidebarComponent],
         providers: [
@@ -442,9 +461,9 @@ describe('SidebarComponent (supabase)', () => {
 
       for (const mode of ['expanded', 'collapsed'] as const) {
         const el = await create(mode);
-        const icons = Array.from(el.querySelectorAll('lucide-icon'));
+        const icons = Array.from(el.querySelectorAll('svg.lucide'));
         expect(icons.length).toBeGreaterThan(0);
-        expect(icons.filter((icon) => !icon.querySelector('svg')).length).toBe(0);
+        expect(icons.filter((icon) => icon.children.length === 0).length).toBe(0);
         fixture.destroy();
       }
     });

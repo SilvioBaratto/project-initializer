@@ -12,7 +12,7 @@ import {
   output,
 } from '@angular/core';
 import { MatIconButton } from '@angular/material/button';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideDynamicIcon } from '@lucide/angular';
 
 export type AlertVariant = 'info' | 'success' | 'warning' | 'danger';
 
@@ -48,7 +48,7 @@ const VARIANTS: Record<AlertVariant, AlertVariantConfig> = {
 @Component({
   selector: 'app-alert',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule, MatIconButton],
+  imports: [LucideDynamicIcon, MatIconButton],
   templateUrl: './alert.html',
   styleUrl: './alert.css',
   host: {

@@ -9,7 +9,7 @@
       ariaCurrentWhenActive="page"
     >
       <span class="nav-bar-indicator" matRipple [matRippleTrigger]="link">
-        <lucide-icon class="nav-bar-icon" [name]="tab.icon" aria-hidden="true" />
+        <svg [lucideIcon]="tab.icon" class="nav-bar-icon" aria-hidden="true" />
       </span>
       <span class="nav-bar-label">{{ tab.name }}</span>
     </a>

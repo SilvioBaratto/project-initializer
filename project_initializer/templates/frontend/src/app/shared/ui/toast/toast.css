@@ -28,8 +28,7 @@
   letter-spacing: var(--mat-sys-body-medium-tracking);
 }
 
-lucide-icon.toast-icon {
-  display: flex;
+svg.toast-icon {
   flex-shrink: 0;
   /* 24px icon centred on the 20px first line keeps the 48px single-line snackbar. */
   margin-block: -2px;
@@ -40,19 +39,19 @@ lucide-icon.toast-icon {
  * that contrasts with inverse-surface in each scheme (tone 90 on neutral 20, tone 30 on
  * neutral 90). The icon shape and the visually hidden status label carry the meaning too.
  */
-:host(.toast-info) lucide-icon.toast-icon {
+:host(.toast-info) svg.toast-icon {
   color: var(--app-info-container);
 }
 
-:host(.toast-success) lucide-icon.toast-icon {
+:host(.toast-success) svg.toast-icon {
   color: var(--app-success-container);
 }
 
-:host(.toast-warning) lucide-icon.toast-icon {
+:host(.toast-warning) svg.toast-icon {
   color: var(--app-warning-container);
 }
 
-:host(.toast-error) lucide-icon.toast-icon {
+:host(.toast-error) svg.toast-icon {
   color: var(--mat-sys-error-container);
 }
 

@@ -281,14 +281,14 @@ describe('ToastComponent', () => {
 
   // --- variants: message, status prefix and icon ---
 
-  const variants: { variant: ToastVariant; status: string; icon: string }[] = [
-    { variant: 'info', status: 'Information', icon: 'Info' },
-    { variant: 'success', status: 'Success', icon: 'CircleCheckBig' },
-    { variant: 'warning', status: 'Warning', icon: 'TriangleAlert' },
-    { variant: 'error', status: 'Error', icon: 'CircleAlert' },
+  const variants: { variant: ToastVariant; status: string; icon: string; iconClass: string }[] = [
+    { variant: 'info', status: 'Information', icon: 'Info', iconClass: 'lucide-info' },
+    { variant: 'success', status: 'Success', icon: 'CircleCheckBig', iconClass: 'lucide-circle-check-big' },
+    { variant: 'warning', status: 'Warning', icon: 'TriangleAlert', iconClass: 'lucide-triangle-exclamation-point' },
+    { variant: 'error', status: 'Error', icon: 'CircleAlert', iconClass: 'lucide-circle-exclamation-point' },
   ];
 
-  variants.forEach(({ variant, status, icon }) => {
+  variants.forEach(({ variant, status, icon, iconClass }) => {
     it(`when variant is ${variant}, the label shows the message after a hidden "${status}" prefix and a decorative ${icon} icon`, async () => {
       t.service.show(variant, `${variant}-msg`);
       await settle(t.fixture);
@@ -298,9 +298,9 @@ describe('ToastComponent', () => {
       const label = host.querySelector('.mdc-snackbar__label')!;
       expect(label.textContent).toContain(`${variant}-msg`);
       expect(label.querySelector('.cdk-visually-hidden')?.textContent).toContain(`${status}:`);
-      const iconHost = label.querySelector('lucide-icon.toast-icon')!;
-      expect(iconHost.getAttribute('aria-hidden')).toBe('true');
-      expect(iconHost.querySelector(`svg.lucide-${icon}`)).toBeTruthy();
+      const iconElement = label.querySelector('svg.toast-icon')!;
+      expect(iconElement.getAttribute('aria-hidden')).toBe('true');
+      expect(iconElement.classList).toContain(iconClass);
     });
   });
 

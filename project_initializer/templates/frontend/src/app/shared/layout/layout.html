@@ -48,7 +48,7 @@
           [attr.aria-label]="actionsSheet.triggerLabel"
           (click)="openActionsSheet()"
         >
-          <lucide-icon class="shell-icon" [name]="actionsSheet.triggerIcon" aria-hidden="true" />
+          <svg [lucideIcon]="actionsSheet.triggerIcon" class="shell-icon" aria-hidden="true" />
         </button>
       </app-navbar>
     }

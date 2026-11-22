@@ -76,6 +76,11 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_every_published_host_port_is_parametrized",
         }
     ),
+    "test_docs_frontend_material.py": frozenset(
+        {
+            "test_when_frontend_claude_generated_then_material_convention_is_documented_and_real",
+        }
+    ),
     "test_docs_sync_async.py": frozenset(
         {
             "test_when_api_claude_md_read_async_reserved_for_real_async_io_documented",
@@ -228,6 +233,11 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_when_nestjs_overlay_files_read_client_secret_is_absent",
         }
     ),
+    "test_issue_19_avatar_stat_card.py": frozenset(
+        {
+            "test_when_stat_card_read_then_delta_direction_is_not_signaled_by_color_alone",
+        }
+    ),
     "test_issue_2_nestjs_guard_wiring.py": frozenset(
         {
             "test_when_token_app_auth_is_read_then_AccessTokenGuard_is_registered_as_APP_GUARD",
@@ -281,6 +291,11 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_when_nestjs_overlay_present_then_jwks_rsa_cache_is_enabled",
             "test_when_nestjs_overlay_present_then_jwks_rsa_rate_limit_is_enabled",
             "test_when_nestjs_overlay_present_then_rs256_algorithm_is_declared",
+        }
+    ),
+    "test_issue_9_feedback_atoms.py": frozenset(
+        {
+            "test_when_alert_source_read_then_each_variant_has_a_leading_icon",
         }
     ),
     "test_issue_9_nestjs_acceptance.py": frozenset(

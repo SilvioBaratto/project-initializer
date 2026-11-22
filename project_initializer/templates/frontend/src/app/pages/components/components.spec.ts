@@ -503,7 +503,7 @@ describe('ComponentsComponent', () => {
         expect(preview?.getAttribute('role')).toBe('list');
         expect(preview?.closest('.preview-region')).toBe(toggle.closest('.preview-region'));
         expect(preview?.querySelectorAll('li')).toHaveLength(3);
-        expect(preview?.querySelectorAll('lucide-icon[aria-hidden="true"]')).toHaveLength(3);
+        expect(preview?.querySelectorAll('svg.lucide[aria-hidden="true"]')).toHaveLength(3);
         return preview?.id;
       });
       expect(new Set(ids).size).toBe(2);

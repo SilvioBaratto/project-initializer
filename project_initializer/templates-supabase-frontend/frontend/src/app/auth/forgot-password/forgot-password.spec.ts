@@ -194,9 +194,9 @@ describe('ForgotPasswordComponent', () => {
     expect(document.activeElement).toBe(heading);
     expect(host.querySelector('.forgot-password-sent')?.textContent).toContain('user@example.com');
 
-    const mailIcon = host.querySelector('.forgot-password-sent-icon lucide-icon');
+    const mailIcon = host.querySelector('.forgot-password-sent-icon svg.lucide-mail');
+    expect(mailIcon).not.toBeNull();
     expect(mailIcon?.getAttribute('aria-hidden')).toBe('true');
-    expect(mailIcon?.querySelector('svg')).not.toBeNull();
   });
 
   it('when the service returns an error, it shows in an alert, the valid field is not marked invalid and the form stays usable', async () => {
@@ -242,16 +242,17 @@ describe('ForgotPasswordComponent', () => {
     const icon = host.querySelector('.forgot-password-back-icon');
     expect(icon?.getAttribute('aria-hidden')).toBe('true');
     expect(icon?.hasAttribute('matButtonIcon')).toBe(true);
-    expect(icon?.querySelector('svg')?.getAttribute('width')).toBe('18');
-    // lucide-angular adds `lucide-<name>` only for an icon bound by registered name, not through [img].
-    expect(icon?.querySelector('svg')?.classList).toContain('lucide-ArrowLeft');
+    expect(icon?.getAttribute('width')).toBe('18');
+    // The lucide-<name> class comes from the icon data, so it names the icon whatever bound it.
+    expect(icon?.classList).toContain('lucide-arrow-left');
   });
 });
 
 describe('ForgotPasswordComponent with the app config', () => {
   it('renders both icons using only the providers from app.config.ts', async () => {
-    // lucide-angular throws for an icon name no LUCIDE_ICONS provider registers, so this fails
-    // when the overlay's app config leaves out ICON_PROVIDER or the registry drops Mail/ArrowLeft.
+    // @lucide/angular throws "Unable to resolve icon '<name>'" for a name no provider registers, so
+    // this fails when the overlay's app config leaves out ICON_PROVIDER or the registry drops
+    // Mail/ArrowLeft.
     const forgotPassword = vi.fn(async () => ({ success: true, message: '' }));
     await TestBed.configureTestingModule({
       imports: [ForgotPasswordComponent],
@@ -263,12 +264,12 @@ describe('ForgotPasswordComponent with the app config', () => {
     await fixture.whenStable();
     const host: HTMLElement = fixture.nativeElement;
 
-    expect(host.querySelector('.forgot-password-back-icon svg')).not.toBeNull();
+    expect(host.querySelector('svg.forgot-password-back-icon.lucide-arrow-left')).not.toBeNull();
 
     await (await loader.getHarness(MatInputHarness)).setValue('user@example.com');
     await (await loader.getHarness(MatButtonHarness.with({ text: 'Send reset link' }))).click();
     await fixture.whenStable();
 
-    expect(host.querySelector('.forgot-password-sent-icon lucide-icon svg')).not.toBeNull();
+    expect(host.querySelector('.forgot-password-sent-icon svg.lucide-mail')).not.toBeNull();
   });
 });
