@@ -312,7 +312,10 @@ describe('TableComponent — stacked cards below 600px', () => {
     // only while the 600px block is the stylesheet's one grouping rule: declaredValue() skips them all,
     // so a `max-width` query or an `@supports` block could otherwise hide the cards unseen.
     const { el } = await setup();
-    expect(groupingRulePreludes()).toEqual(['@media (min-width: 600px)']);
+    expect(
+      groupingRulePreludes(),
+      'declaredValue() skips grouping rules, so list a new one here once it cannot hide .table-cards',
+    ).toEqual(['@media (min-width: 600px)']);
     expect(declaredValue(el.querySelector('table')!, 'display')).toBe('none');
     expect(declaredValue(el.querySelector('ul')!, 'display')).not.toBe('none');
   });

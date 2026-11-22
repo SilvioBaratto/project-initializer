@@ -276,7 +276,9 @@ describe('CheckboxComponent', () => {
   it('when errorText is provided, the checkbox switches to the error color tokens', async () => {
     const matCheckbox = fixture.nativeElement.querySelector('mat-checkbox') as HTMLElement;
     expect(matCheckbox.classList.contains('checkbox-invalid')).toBe(false);
-    expect(declaredValue(matCheckbox, '--mat-checkbox-selected-icon-color')).toBe('');
+    expect(
+      getComputedStyle(matCheckbox).getPropertyValue('--mat-checkbox-selected-icon-color').trim(),
+    ).toBe('');
 
     host.errorText.set('Accept the terms to continue');
     await fixture.whenStable();

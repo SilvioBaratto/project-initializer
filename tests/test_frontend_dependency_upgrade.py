@@ -54,6 +54,8 @@ _FRONTEND_LOCK = _TEMPLATES / "templates" / "frontend" / "package-lock.json"
 _BASE_INDEX_HTML = _TEMPLATES / "templates" / "frontend" / "src" / "index.html"
 _REPO_CLAUDE = _REPO / "CLAUDE.md"
 
+# The Node release line the image and both workflows build the frontend on.
+_NODE_MAJOR = "26"
 _FROM_LINE = re.compile(r"^FROM\s+(?P<image>\S+)", re.M)
 _PINNED_NGINX = re.compile(r"nginx:\d+\.(?P<minor>\d+)(\.\d+)?-alpine")
 # YAML lets a value be quoted, and a "#" that opens a line or follows whitespace starts a comment.
@@ -73,6 +75,9 @@ _ATTRIBUTE_NAME = r"""[^\s"'=<>/]+"""
 _ATTRIBUTE_VALUE = r"""\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+)"""
 _ATTRIBUTE = re.compile(rf"\s+(?P<name>{_ATTRIBUTE_NAME})(?:{_ATTRIBUTE_VALUE})?")
 _SVG_OPENING = re.compile(r"<svg\b")
+# A tag that a comment merely mentions (the icon registry's doc comment, a template example)
+# renders nothing: counting it would let the guards pass with no real icon left to scan.
+_SOURCE_COMMENT = re.compile(r"/\*.*?\*/|<!--.*?-->", re.S)
 _SVG_START_TAG = re.compile(
     rf"<svg\b(?P<attributes>(?:\s+{_ATTRIBUTE_NAME}(?:{_ATTRIBUTE_VALUE})?)*)\s*/?>"
 )
@@ -212,7 +217,7 @@ def test_when_the_frontend_dockerfile_is_read_then_the_builder_is_node_26_and_ng
     assert len(images) == 2, f"expected a builder and a runtime stage, got {images}"
 
     builder_image, runtime_image = images
-    assert builder_image == "node:26-alpine"
+    assert builder_image == f"node:{_NODE_MAJOR}-alpine"
 
     pinned = _PINNED_NGINX.fullmatch(runtime_image)
     assert pinned, f"runtime stage must pin an nginx branch, got {runtime_image}"
@@ -338,7 +343,7 @@ def test_when_a_workflow_builds_the_frontend_then_the_node_it_sets_up_is_26(
         workflow.read_text(encoding="utf-8"), "Build Angular frontend"
     )
 
-    assert version == "26", (
+    assert version == _NODE_MAJOR, (
         f"{_repo_relative(workflow)} builds the frontend on Node {version}"
     )
 
@@ -354,7 +359,7 @@ def test_when_contributing_is_read_then_it_asks_for_node_26_and_not_node_20():
     """
     contributing = (_REPO / "CONTRIBUTING.md").read_text(encoding="utf-8")
 
-    assert "- Node.js 26\n" in contributing
+    assert f"- Node.js {_NODE_MAJOR}\n" in contributing
     assert "Node.js 20" not in contributing
 
 
@@ -439,11 +444,17 @@ def _icon_tags(text: str) -> list[list[str]]:
 
 
 def _frontend_icon_tags() -> list[tuple[str, list[str]]]:
-    """List the attribute names of every icon ``svg`` in the templates and inline templates of the frontend layers."""
+    """List the attribute names of every icon ``svg`` in the templates and inline templates of the frontend layers.
+
+    Block and HTML comments are removed first, so a tag a comment mentions is neither counted
+    nor read.
+    """
     return [
         (_repo_relative(path), names)
         for path in _frontend_sources(".html", ".ts")
-        for names in _icon_tags(path.read_text(encoding="utf-8"))
+        for names in _icon_tags(
+            _SOURCE_COMMENT.sub("", path.read_text(encoding="utf-8"))
+        )
     ]
 
 
@@ -465,6 +476,21 @@ def test_when_a_binding_holds_a_greater_than_sign_then_the_icon_tag_scan_reads_t
 
 
 @pytest.mark.unit
+def test_when_a_comment_mentions_an_icon_tag_then_the_scan_does_not_count_it():
+    """A tag a comment merely mentions is neither found nor read, an unreadable one included.
+
+    Validates tests/test_frontend_dependency_upgrade.py _frontend_icon_tags().
+    """
+    source = (
+        '/** Renders <svg lucideIcon="Home" [class.x]="y"> and also <svg @broken */\n'
+        '<!-- <svg lucideIcon="Home" matListItemIcon> -->\n'
+        '<svg lucideIcon="Menu" class="menu" />'
+    )
+
+    assert _icon_tags(_SOURCE_COMMENT.sub("", source)) == [["lucideIcon", "class"]]
+
+
+@pytest.mark.unit
 def test_when_an_icon_element_is_read_then_it_carries_no_class_property_binding():
     """No ``<svg lucideIcon>`` element binds ``[class.x]``.
 
@@ -472,7 +498,7 @@ def test_when_an_icon_element_is_read_then_it_carries_no_class_property_binding(
     ``[class.x]`` binding, which bypasses that input, is wiped the next time the
     icon re-renders. A static ``class`` or a ``[class]`` binding reaches the input.
 
-    Validates project_initializer/templates/frontend/src/app, project_initializer/templates-token-frontend/frontend/src/app, project_initializer/templates-supabase-frontend/frontend/src/app and project_initializer/templates-entra-frontend/frontend/src/app.
+    Validates project_initializer/templates/frontend/src, project_initializer/templates-token-frontend/frontend/src, project_initializer/templates-supabase-frontend/frontend/src and project_initializer/templates-entra-frontend/frontend/src.
     """
     icon_tags = _frontend_icon_tags()
     assert icon_tags, (
@@ -495,7 +521,7 @@ def test_when_an_icon_element_is_read_then_it_carries_no_material_list_slot_dire
     size, spacing and color; on the ``svg`` the icon's own ``class`` attribute
     overwrites them.
 
-    Validates project_initializer/templates/frontend/src/app, project_initializer/templates-token-frontend/frontend/src/app, project_initializer/templates-supabase-frontend/frontend/src/app and project_initializer/templates-entra-frontend/frontend/src/app.
+    Validates project_initializer/templates/frontend/src, project_initializer/templates-token-frontend/frontend/src, project_initializer/templates-supabase-frontend/frontend/src and project_initializer/templates-entra-frontend/frontend/src.
     """
     icon_tags = _frontend_icon_tags()
     assert icon_tags, (
@@ -575,8 +601,9 @@ def _in_npm_range(version: str, specifier: str) -> bool:
     candidate = _version_tuple(version)
     if match["operator"] == "~":
         return candidate >= floor and candidate[:2] == floor[:2]
-    # Below 1.0.0 a caret holds the minor; from 1.0.0 on it holds the major.
-    held = 2 if floor[0] == 0 else 1
+    # A caret holds the first non-zero part: the major of ^1.2.3, the minor of ^0.2.3,
+    # the patch of ^0.0.3.
+    held = 1 if floor[0] else 2 if floor[1] else 3
     return candidate >= floor and candidate[:held] == floor[:held]
 
 
@@ -590,6 +617,31 @@ def _is_caret_range_within(
         and match["operator"] == "^"
         and floor <= _version_tuple(match["version"]) < ceiling
     )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("version", "specifier", "inside"),
+    [
+        ("1.9.0", "^1.2.3", True),
+        ("2.0.0", "^1.2.3", False),
+        ("0.2.9", "^0.2.3", True),
+        ("0.3.0", "^0.2.3", False),
+        ("0.0.3", "^0.0.3", True),
+        ("0.0.4", "^0.0.3", False),
+        ("1.2.9", "~1.2.3", True),
+        ("1.3.0", "~1.2.3", False),
+        ("1.2.2", "^1.2.3", False),
+    ],
+)
+def test_when_a_version_is_checked_against_a_range_then_a_caret_holds_the_first_non_zero_part(
+    version, specifier, inside
+):
+    """A caret holds the major from 1.0.0 on, the minor of ``^0.y.z`` and the patch of ``^0.0.z``.
+
+    Validates tests/test_frontend_dependency_upgrade.py _in_npm_range().
+    """
+    assert _in_npm_range(version, specifier) is inside
 
 
 @pytest.mark.unit

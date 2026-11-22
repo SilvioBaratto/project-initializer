@@ -222,7 +222,7 @@ describe('PaginationComponent — aria-current="page"', () => {
     expect(declaredValue(currentPageBtn(f), weightToken)).toBe(
       'var(--mat-sys-label-large-weight-prominent)',
     );
-    expect(declaredValue(el(f, 'Page 3'), weightToken)).toBe('');
+    expect(getComputedStyle(el(f, 'Page 3')).getPropertyValue(weightToken).trim()).toBe('');
   });
 
   it('when page changes, the prominent label weight follows the current page', async () => {
@@ -233,7 +233,7 @@ describe('PaginationComponent — aria-current="page"', () => {
     expect(declaredValue(el(f, 'Page 3'), weightToken)).toBe(
       'var(--mat-sys-label-large-weight-prominent)',
     );
-    expect(declaredValue(el(f, 'Page 2'), weightToken)).toBe('');
+    expect(getComputedStyle(el(f, 'Page 2')).getPropertyValue(weightToken).trim()).toBe('');
   });
 
   it('when the current page button is clicked, pageChange does not emit', async () => {
