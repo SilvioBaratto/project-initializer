@@ -45,7 +45,7 @@ project-initializer my-app --nestjs     # NestJS backend
 
 | Feature | FastAPI | NestJS |
 |---------|---------|--------|
-| Language | Python 3.12 | TypeScript (Node 22) |
+| Language | Python 3.12 | TypeScript (Node 26) |
 | ORM | SQLAlchemy + Alembic | Prisma |
 | API style | REST with Pydantic | REST with Zod (`nestjs-zod`) |
 | Architecture | Clean / hexagonal (domain/application/infrastructure/api) | Modular (feature modules; ports and adapters for the database and token verification) |

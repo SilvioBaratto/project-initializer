@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking changes for newly scaffolded projects
+
+- **The NestJS API image and the CI jobs run Node 26.** Both stages of `api/Dockerfile` are `node:26-alpine` (they were `node:22-alpine`), and every `setup-node` step of the generated `.github/workflows/test-package.yml` uses Node 26 (it was 20). Building or testing the API outside Docker needs Node 26.
+- **The generated `test`, `test:watch`, `test:cov` and `test:e2e` scripts start Jest with `node --experimental-vm-modules ./node_modules/jest/bin/jest.js`.** The packages of the Nest 12 line (`@nestjs/config`, `@nestjs/terminus`) and `jwks-rsa` 4 are ESM-only, and Jest loads them from a CommonJS project only with that flag on Node 24.9 or newer. The project stays CommonJS. A direct `npx jest` or an IDE runner needs `NODE_OPTIONS=--experimental-vm-modules`; the generated READMEs and `api/.claude/CLAUDE.md` say so.
+
+### Changed
+
+- **NestJS test and build tooling moved to the newest stable releases** in the base, supabase and entra manifests: `jest` 30.4.2 to 30.5.2, `ts-jest` 29.4.11 to 29.4.15, `eslint` 10.4.1 to 10.15.0, `supertest` 7.1.0 to 7.3.2, `@types/supertest` 6.0.2 to 7.2.1, `tsc-alias` 1.8.16 to 1.9.10 and `@types/node` 25.9.1 to 26.6.6 (it follows the Node of the image). The three `package-lock.json` were regenerated in `node:26-alpine`. `typescript` stays on 6.0.3: `typescript-eslint` accepts TypeScript below 6.1 only.
+- **The NestJS `tsconfig.json` no longer sets `baseUrl` or `ignoreDeprecations`.** TypeScript 6 deprecates `baseUrl` and 7 removes it; the `paths` targets now start with `./`, which resolves against the `tsconfig.json` directory, and `nest build` followed by `tsc-alias` still writes `dist/src/main` with every alias rewritten. The module stays `commonjs`.
+- **The repo workflow and the workflow it scaffolds use `actions/checkout@v7` and `actions/setup-node@v7`** (`.github/workflows/test-package.yml` and `project_initializer/templates/.github/workflows/test-package.yml`), with `node-version: "26"`.
+- **`CONTRIBUTING.md`, `README.md` and `CLAUDE.md` name Node 26** where they named Node 20 or 22, including the command that regenerates a NestJS lock.
+
+### Repo tests
+
+- `tests/test_docker_runtime_invariants.py` fails when a `FROM node:` line of the NestJS Dockerfile is not `node:26-alpine`, and `tests/test_ci_workflow_scope.py` fails when a `setup-node` step of either workflow does not run the Node major of that Dockerfile.
+- `tests/test_nestjs_build_config.py` pins the four Jest scripts of the three manifests, requires `@types/node` to share the Node major of the Dockerfile, and checks that the `tsconfig.json` leaves no deprecated option to silence. The `tsc-alias` pin test now covers the entra manifest too.
+- `tests/test_docs_nestjs_compliance.py` checks that every generated NestJS doc listing the test commands explains the Jest flag.
+
 ## [0.6.0] - 2026-11-21
 
 Python projects now keep their dependencies and their version in `pyproject.toml` and nowhere else. The first three changes below alter what a **newly scaffolded** FastAPI project contains; a project scaffolded earlier is not touched.

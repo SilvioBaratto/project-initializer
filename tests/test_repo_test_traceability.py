@@ -61,10 +61,12 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
     "test_ci_workflow_scope.py": frozenset(
         {
             "test_when_api_only_steps_are_gated_against_frontend_scope",
+            "test_when_the_workflows_set_up_node_then_the_version_matches_the_dockerfile",
         }
     ),
     "test_docker_runtime_invariants.py": frozenset(
         {
+            "test_when_the_nestjs_dockerfile_is_read_then_every_stage_is_node_26_alpine",
             "test_fastapi_server_does_not_write_the_unstructured_access_log",
             "test_fastapi_image_keeps_the_application_code_root_owned",
             "test_fastapi_entrypoint_waits_on_the_database_the_application_will_use",
@@ -303,6 +305,10 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_when_package_read_coverage_threshold_is_enforced",
             "test_when_package_read_jest_loads_the_test_environment_first",
             "test_when_package_read_lint_tooling_is_pinned_exactly",
+            "test_when_package_read_tsc_alias_is_pinned_exactly",
+            "test_when_package_read_jest_runs_with_the_experimental_vm_modules_flag",
+            "test_when_package_read_types_node_major_equals_the_dockerfile_node_major",
+            "test_when_tsconfig_read_no_deprecated_option_is_left_to_silence",
         }
     ),
     "test_nestjs_issue8_acceptance.py": frozenset(

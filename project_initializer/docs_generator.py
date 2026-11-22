@@ -208,8 +208,31 @@ def _docker_services_table(framework: str, auth: str | None, *, frontend: bool) 
     return "\n".join(rows)
 
 
-def _backend_dev_block(framework: str) -> list[str]:
-    """The README '### Backend' fenced command block for the framework."""
+def _nestjs_jest_note(auth: str | None) -> str:
+    """The warning every NestJS doc listing the test commands carries.
+
+    The npm scripts start Jest with ``--experimental-vm-modules``, and a direct
+    ``npx jest`` or an IDE runner skips them, so these docs are the only place a
+    scaffold user learns that the flag is needed there too. ``jwks-rsa`` is named
+    only for the Entra variant, the one that depends on it.
+    """
+    esm_only = ["`@nestjs/config`", "`@nestjs/terminus`"]
+    if auth == "entra":
+        esm_only.append("`jwks-rsa`")
+    packages = f"{', '.join(esm_only[:-1])} and {esm_only[-1]}"
+    return (
+        "Jest runs through the npm scripts, which pass `--experimental-vm-modules` "
+        f"because {packages} ship ESM only. A direct `npx jest <file>` or an IDE "
+        "runner needs `NODE_OPTIONS=--experimental-vm-modules` and Node 24.9 or newer."
+    )
+
+
+def _backend_dev_block(framework: str, auth: str | None = None) -> list[str]:
+    """The README '### Backend' fenced command block for the framework.
+
+    The NestJS block ends with the Jest note after the fence; ``auth`` picks the
+    packages that note names, and FastAPI ignores it.
+    """
     if framework == "fastapi":
         return [
             "### Backend (FastAPI)",
@@ -245,6 +268,8 @@ def _backend_dev_block(framework: str) -> list[str]:
         "npm run test:e2e                       # No Postgres needed",
         "npm run lint",
         "```",
+        "",
+        _nestjs_jest_note(auth),
     ]
 
 
@@ -472,7 +497,7 @@ def generate_root_readme(
     else:
         sections += [""] + _fastapi_root_readme_notes(auth)
     sections += ["", "## Development", ""]
-    sections += _backend_dev_block(framework)
+    sections += _backend_dev_block(framework, auth)
     if frontend:
         sections += [""] + _frontend_dev_block()
     sections += [
@@ -650,7 +675,8 @@ def generate_api_readme(
     """Build api/README.md for the framework.
 
     ``auth`` only changes the NestJS source tree, which lists the ``auth`` module in an
-    auth variant; FastAPI ignores it.
+    auth variant, and the Jest note, which names ``jwks-rsa`` for Entra; FastAPI
+    ignores it.
     """
     if framework == "fastapi":
         tree = [
@@ -720,6 +746,8 @@ def generate_api_readme(
             "npx prisma generate               # Regenerate Prisma client",
             "npx prisma studio                 # Visual DB editor",
             "```",
+            "",
+            _nestjs_jest_note(auth),
             "",
             "## Architecture",
             "",
@@ -1317,6 +1345,8 @@ def _nestjs_api_claude(auth: str | None, async_db: bool) -> str:
         "npx prisma db execute --file prisma/migrations/<dir>/down.sql  # Roll one migration back",
         "npx prisma generate           # Regenerate Prisma client",
         "```",
+        "",
+        _nestjs_jest_note(auth),
         "",
         "## Architecture Overview",
         "",

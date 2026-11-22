@@ -15,6 +15,7 @@ they only surface at container runtime:
    database the application uses, and the images ship what the entrypoints need.
 """
 
+import re
 from pathlib import Path
 
 import pytest
@@ -218,6 +219,20 @@ def test_nestjs_entrypoint_waits_on_the_database_the_application_will_use():
     assert 'nc -z -w "$DB_CONNECT_TIMEOUT_SECONDS" "$db_host" "$db_port"' in entrypoint
     assert "exit 1" in entrypoint
     assert "prisma migrate deploy" in entrypoint
+
+
+@pytest.mark.unit
+def test_when_the_nestjs_dockerfile_is_read_then_every_stage_is_node_26_alpine():
+    """The dev and production stages run the Node 26 LTS; ``builder`` inherits ``dev``.
+
+    A stage left on an older Node would build and run the API on a runtime the
+    manifests' ``@types/node`` no longer describes.
+
+    Validates project_initializer/templates-api-nestjs/api/Dockerfile.
+    """
+    images = re.findall(r"^FROM (node:\S+)", _text(_NESTJS_DOCKERFILE), re.M)
+
+    assert images == ["node:26-alpine", "node:26-alpine"]
 
 
 @pytest.mark.unit
