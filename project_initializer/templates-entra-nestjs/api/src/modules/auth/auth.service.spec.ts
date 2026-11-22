@@ -174,6 +174,18 @@ describe('AuthService.verify', () => {
       await expect(createService().verify(token)).resolves.toMatchObject({ id: USER_OBJECT_ID });
     });
 
+    it('when the configured audience is the client id itself, then a token addressed to it is accepted', async () => {
+      const sameAudienceConfig = {
+        get: (key: keyof Env) =>
+          key === 'ENTRA_API_AUDIENCE' ? TEST_ENTRA_API_CLIENT_ID : validatedEnv[key],
+      } as unknown as ConfigService<Env, true>;
+      const token = signToken({ signOptions: { audience: TEST_ENTRA_API_CLIENT_ID } });
+
+      await expect(
+        new AuthService(sameAudienceConfig, keyResolver).verify(token),
+      ).resolves.toMatchObject({ id: USER_OBJECT_ID });
+    });
+
     it('when the username claim and roles are absent, then email is undefined and roles is empty', async () => {
       const token = signToken({ claims: { preferred_username: undefined, roles: undefined } });
 

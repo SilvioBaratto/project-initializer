@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { HttpStatus, RequestMethod } from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
 import type { Params } from 'nestjs-pino';
 import type { DestinationStream } from 'pino';
 
@@ -34,12 +34,6 @@ export const REDACTED_LOG_PATHS: readonly string[] = [
   'req.headers.cookie',
   'res.headers["set-cookie"]',
 ];
-
-/**
- * Every route, in the wildcard syntax Nest 11 expects. Nest's default for the logger middleware
- * is the legacy `*`, which makes Nest log an "Unsupported route path" warning twice per start-up.
- */
-const ALL_ROUTES = [{ path: '{*splat}', method: RequestMethod.ALL }];
 
 const QUERY_SEPARATOR = '?';
 const FIRST_SERVER_ERROR_STATUS: number = HttpStatus.INTERNAL_SERVER_ERROR;
@@ -168,7 +162,8 @@ export function failedAccessFields(
  * @param options.destination - Where lines are written; standard output when omitted. Lets a
  *   test read what would be logged.
  * @returns Parameters for `LoggerModule`: requests are logged as id, method and path only, and
- *   credentials are redacted from anything else that carries headers.
+ *   credentials are redacted from anything else that carries headers. The routes are left to
+ *   `nestjs-pino`, whose default covers every path under the global prefix, its root included.
  */
 export function buildLoggerParams(options: {
   level: LogLevel;
@@ -186,6 +181,5 @@ export function buildLoggerParams(options: {
   };
   return {
     pinoHttp: options.destination ? [httpOptions, options.destination] : httpOptions,
-    forRoutes: ALL_ROUTES,
   };
 }

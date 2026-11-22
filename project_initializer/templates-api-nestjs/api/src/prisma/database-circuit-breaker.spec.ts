@@ -29,6 +29,30 @@ const rawQueryError = (cause: Record<string, unknown>): Prisma.PrismaClientKnown
     meta: { driverAdapterError: { name: 'DriverAdapterError', cause } },
   });
 
+/**
+ * Shape Prisma 7.9 and later give a model query that fails with a Postgres error the pg adapter
+ * has no kind for: the code is `P2039`, the kind is `postgres` and the SQLSTATE sits in `code`.
+ * Read from `@prisma/client-engine-runtime` and `@prisma/adapter-pg` 7.10.1.
+ */
+const unmappedDatabaseError = (sqlState: string): Prisma.PrismaClientKnownRequestError =>
+  new Prisma.PrismaClientKnownRequestError(`Database error. Code: \`${sqlState}\``, {
+    code: 'P2039',
+    clientVersion: CLIENT_VERSION,
+    meta: {
+      driverAdapterError: {
+        name: 'DriverAdapterError',
+        cause: {
+          originalCode: sqlState,
+          originalMessage: 'database error',
+          kind: 'postgres',
+          code: sqlState,
+          severity: 'FATAL',
+          message: 'database error',
+        },
+      },
+    },
+  });
+
 describe('isDatabaseUnavailableError', () => {
   it.each(['P2002', 'P2003', 'P2025'])(
     'when Prisma rejects the query with %s, then the database is considered reachable',
@@ -66,6 +90,41 @@ describe('isDatabaseUnavailableError', () => {
     },
   );
 
+  it.each(['57P01', '57P02', '57P03', '08006', '08001', '08P01'])(
+    'when a query fails with the unmapped connection error %s, then the database is considered unavailable',
+    (sqlState) => {
+      expect(isDatabaseUnavailableError(unmappedDatabaseError(sqlState))).toBe(true);
+    },
+  );
+
+  it.each(['42601', '22012', '57014'])(
+    'when a query fails with the unmapped query error %s, then the database is considered reachable',
+    (sqlState) => {
+      expect(isDatabaseUnavailableError(unmappedDatabaseError(sqlState))).toBe(false);
+    },
+  );
+
+  it.each([
+    ['carries no driver detail', undefined],
+    ['has a cause without a SQLSTATE', { driverAdapterError: { cause: { kind: 'postgres' } } }],
+    [
+      'has a non-text SQLSTATE',
+      { driverAdapterError: { cause: { kind: 'postgres', code: 8006 } } },
+    ],
+    [
+      'has a SQLSTATE of another kind',
+      { driverAdapterError: { cause: { kind: 'mysql', code: '08006' } } },
+    ],
+  ])('when an unmapped database error %s, then it counts as a rejected query', (_label, meta) => {
+    const unreadable = new Prisma.PrismaClientKnownRequestError('Database error', {
+      code: 'P2039',
+      clientVersion: CLIENT_VERSION,
+      meta,
+    });
+
+    expect(isDatabaseUnavailableError(unreadable)).toBe(false);
+  });
+
   it('when a raw query is rejected by the database itself, then it is considered reachable', () => {
     const rejected = rawQueryError({ kind: 'TableDoesNotExist', table: 'nope' });
 
@@ -75,6 +134,7 @@ describe('isDatabaseUnavailableError', () => {
   it.each([
     ['carries no driver detail', undefined],
     ['has a driver error without a cause', { driverAdapterError: { name: 'DriverAdapterError' } }],
+    ['has a cause that is not an object', { driverAdapterError: { cause: 'connection reset' } }],
     ['has a cause without a kind', { driverAdapterError: { cause: { host: 'db' } } }],
     ['has a non-text kind', { driverAdapterError: { cause: { kind: 7 } } }],
   ])('when a raw query error %s, then nothing proves the database answered', (_label, meta) => {
@@ -156,6 +216,17 @@ describe('createDatabaseCircuitBreaker', () => {
     jest.advanceTimersByTime(RESET_MS);
 
     await expect(breaker.execute(failingProbe)).rejects.toBe(rawOutage);
+
+    expect(breaker.state).toBe('open');
+  });
+
+  it('when a restarting server refuses new sessions, then the circuit opens', async () => {
+    const breaker = createDatabaseCircuitBreaker(config);
+    const startingUp = unmappedDatabaseError('57P03');
+
+    for (let attempt = 0; attempt < FAILURE_THRESHOLD; attempt += 1) {
+      await expect(breaker.execute(() => Promise.reject(startingUp))).rejects.toBe(startingUp);
+    }
 
     expect(breaker.state).toBe('open');
   });

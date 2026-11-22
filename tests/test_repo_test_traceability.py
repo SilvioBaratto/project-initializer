@@ -308,6 +308,7 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_when_package_read_tsc_alias_is_pinned_exactly",
             "test_when_package_read_jest_runs_with_the_experimental_vm_modules_flag",
             "test_when_package_read_types_node_major_equals_the_dockerfile_node_major",
+            "test_when_prisma_packages_read_then_they_are_one_exact_7x_release",
             "test_when_tsconfig_read_no_deprecated_option_is_left_to_silence",
         }
     ),

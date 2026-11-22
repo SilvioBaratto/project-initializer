@@ -170,6 +170,29 @@ def test_when_package_read_jest_runs_with_the_experimental_vm_modules_flag(path)
     assert jest_scripts == EXPECTED_JEST_SCRIPTS
 
 
+PRISMA_PACKAGES = ("prisma", "@prisma/client", "@prisma/adapter-pg")
+SUPPORTED_PRISMA_MAJOR = 7
+
+
+@pytest.mark.parametrize("path", TOOLED_PACKAGE_JSONS, ids=TOOLED_IDS)
+def test_when_prisma_packages_read_then_they_are_one_exact_7x_release(path):
+    """The CLI, the client and the pg adapter move together and stay on Prisma 7.
+
+    The generated client and the adapter must come from the CLI release that generated
+    them. Prisma 8 has no ``generate`` or ``migrate`` command, which the postinstall
+    script, the npm scripts and the entrypoint run.
+
+    Validates the Prisma dependencies of project_initializer/templates-{api,supabase,entra}-nestjs/api/package.json.
+    """
+    dependencies = _load_json(path)["dependencies"]
+    versions = {dependencies[name] for name in PRISMA_PACKAGES}
+
+    assert len(versions) == 1, f"Prisma packages diverged: {versions}"
+    (version,) = versions
+    assert not version.startswith(("^", "~")), "Prisma must be pinned exactly"
+    assert int(version.split(".")[0]) == SUPPORTED_PRISMA_MAJOR
+
+
 @pytest.mark.parametrize("path", TOOLED_PACKAGE_JSONS, ids=TOOLED_IDS)
 def test_when_package_read_types_node_major_equals_the_dockerfile_node_major(path):
     """The Node type package follows the runtime the API image runs.

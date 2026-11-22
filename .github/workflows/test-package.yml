@@ -217,8 +217,9 @@ jobs:
         working-directory: /tmp/suite-project/api
         run: pytest -q
 
-      # Jest loads the ESM-only @nestjs and jwks-rsa packages only on Node 24.9+ and with the
-      # --experimental-vm-modules flag the npm scripts pass; the generated Dockerfile runs 26.
+      # Jest loads the ESM-only @nestjs packages, and the jose that jwks-rsa loads, only on Node
+      # 24.9+ and with the --experimental-vm-modules flag the npm scripts pass; the generated
+      # Dockerfile runs 26.
       - name: Set up Node.js
         if: matrix.stack == 'nestjs'
         uses: actions/setup-node@v7

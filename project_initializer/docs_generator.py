@@ -214,15 +214,15 @@ def _nestjs_jest_note(auth: str | None) -> str:
     The npm scripts start Jest with ``--experimental-vm-modules``, and a direct
     ``npx jest`` or an IDE runner skips them, so these docs are the only place a
     scaffold user learns that the flag is needed there too. ``jwks-rsa`` is named
-    only for the Entra variant, the one that depends on it.
+    only for the Entra variant, the one that depends on it; it is CommonJS itself,
+    and it is the ``jose`` it loads that ships ESM only.
     """
-    esm_only = ["`@nestjs/config`", "`@nestjs/terminus`"]
+    reason = "`@nestjs/config` and `@nestjs/terminus` ship ESM only"
     if auth == "entra":
-        esm_only.append("`jwks-rsa`")
-    packages = f"{', '.join(esm_only[:-1])} and {esm_only[-1]}"
+        reason += " and `jwks-rsa` loads the ESM-only `jose`"
     return (
         "Jest runs through the npm scripts, which pass `--experimental-vm-modules` "
-        f"because {packages} ship ESM only. A direct `npx jest <file>` or an IDE "
+        f"because {reason}. A direct `npx jest <file>` or an IDE "
         "runner needs `NODE_OPTIONS=--experimental-vm-modules` and Node 24.9 or newer."
     )
 
@@ -1195,7 +1195,7 @@ _NESTJS_CONFIG_DETAILS = [
     "- `API_DOCS_ENABLED` publishes Swagger UI at `/docs`; unset means on everywhere except `NODE_ENV=production`.",
     "- `DB_POOL_MAX` (default 10) is the only connection pool size: the `pg` driver adapter ignores Prisma's `connection_limit` URL parameter. `DB_CONNECT_TIMEOUT_MS` and `DB_QUERY_TIMEOUT_MS` bound how long a request waits on the database.",
     "- **Database TLS.** With `NODE_ENV=production` the schema refuses a `DATABASE_URL` unless every `sslmode` parameter in it is `require`, `verify-ca` or `verify-full`, spelled exactly in lower case: `REQUIRE`, a URL without `sslmode`, and `sslmode=require&sslmode=disable` are all refused. `DB_ALLOW_INSECURE_TRANSPORT=true` (a boolean, default `false`) is the explicit opt-out for a database on the same host or on a private network that serves no TLS. The error message is fixed and names neither the URL nor the host, which would leak the password. Other `NODE_ENV` values are exempt, so the compose stack, whose generated `.env` sets `NODE_ENV=development`, is unaffected, while the production image needs the `sslmode` or the opt-out. The Supabase pooler URL of the generated `.env` carries `sslmode=require` and passes. `DIRECT_URL` is not checked: only migrations use it.",
-    "- **Log level reload.** `SIGHUP` reloads `LOG_LEVEL` without a restart (`src/config/log-level-reload.ts`, installed by `main.ts` once the server listens and removed when it closes): edit the file or export a new value, then `kill -HUP <pid>` (`docker kill --signal=HUP <container>` in Docker). The handler reads `../.env` and then `.env` with dotenv's parser, without touching `process.env`, and the first file that sets the key wins. A value you exported that differs from what the file held at start-up wins; otherwise the edited file wins, because `ConfigModule` copied the file value into `process.env` at start-up and that copy must not shadow your edit. A key set nowhere means the default level. A value that is not a level is ignored, with one warning that names only the accepted set, never the value. Both pino root loggers move together, requests already in flight keep the level they started with, and the audit logger is not touched. Nothing is installed on Windows. Two caveats: a terminal hang-up also sends `SIGHUP`, so a server started from a terminal that closes keeps running instead of exiting; and without a `.env` file, as in Docker where compose passes the variables, the environment cannot change, so a reload re-applies the start-up value.",
+    "- **Log level reload.** `SIGHUP` reloads `LOG_LEVEL` without a restart (`src/config/log-level-reload.ts`, installed by `main.ts` once the server listens and removed when it closes): edit the file or export a new value, then `kill -HUP <pid>` (`docker kill --signal=HUP <container>` in Docker). The handler reads `../.env` and then `.env` with dotenv's parser, without touching `process.env`, and the first file that sets the key wins. A value you exported that differs from what the file held at start-up wins; otherwise the edited file wins, because `ConfigModule` copied the file value into `process.env` at start-up and that copy must not shadow your edit. A key set nowhere means the default level. A value that is not a level is ignored, with one warning that names only the accepted set, never the value. The pino root logger, which every other logger descends from, moves; requests already in flight keep the level they started with, and the audit logger is not touched. Nothing is installed on Windows. Two caveats: a terminal hang-up also sends `SIGHUP`, so a server started from a terminal that closes keeps running instead of exiting; and without a `.env` file, as in Docker where compose passes the variables, the environment cannot change, so a reload re-applies the start-up value.",
     "- The generated `.env` sets `NODE_ENV=development`, which matches the compose `dev` target: it installs devDependencies and runs `npm run start:dev`, and `pino-pretty`, the development log transport, is a devDependency. The production image sets `NODE_ENV=production` itself and `.dockerignore` keeps `.env` out of it, so never hand that image the generated file.",
     "- `entrypoint.sh` reads the database host and port from `DATABASE_URL`, waits for it at most `DB_WAIT_TIMEOUT_SECONDS` (default 60) and exits with status 1 when it never answers, then runs `prisma migrate deploy`. The production image copies `prisma.config.ts` for that command, which takes its datasource URL from it.",
 ]
