@@ -13,10 +13,10 @@ asyncpg does not take libpq's query parameters, so ``to_asyncpg_url`` translates
 the ones it knows and refuses the rest at startup. A failed connect surfaces
 either as a socket error, which SQLAlchemy lets escape unwrapped, or as a server
 rejection, which SQLAlchemy has already translated into its emulated DBAPI error
-and would report as a generic ``DBAPIError``. ``_open_connection`` turns both
-into ``OperationalError`` where the connection is made, so an unreachable, full
-or starting server trips the breaker, while a timeout from unrelated code in a
-request never can.
+and would usually report as a generic ``DBAPIError``. ``_open_connection`` turns
+both into ``OperationalError`` where the connection is made, so an unreachable,
+full or starting server trips the breaker, while a timeout from unrelated code in
+a request never can.
 
 Required packages (added by the flag): ``asyncpg`` and ``sqlalchemy[asyncio]``.
 """

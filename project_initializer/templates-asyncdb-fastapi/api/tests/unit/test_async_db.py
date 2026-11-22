@@ -3,7 +3,7 @@
 They need no PostgreSQL server: URL translation is pure, the engine is built
 without connecting, and the session scope, breaker and probe run on in-memory
 ``aiosqlite``, which the unit level allows because no external service is
-involved. A server that rejects the login is played by a stand-in for
+involved. A server that rejects a new connection is played by a stand-in for
 ``asyncpg.connect``, so the real SQLAlchemy asyncpg dialect translates its error.
 Repositories and real connection failures are in
 ``tests/integration/test_async_database.py``. ``asyncio_mode = auto``
@@ -22,7 +22,11 @@ from urllib.parse import urlencode
 import aiosqlite
 import asyncpg
 import pytest
-from asyncpg.exceptions import CannotConnectNowError, TooManyConnectionsError
+from asyncpg.exceptions import (
+    CannotConnectNowError,
+    InvalidPasswordError,
+    TooManyConnectionsError,
+)
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -186,10 +190,10 @@ async def query_then_throw(error: BaseException) -> None:
     await dependency.athrow(error)
 
 
-def refuse_logins_with(
+def refuse_connections_with(
     rejection: type[asyncpg.PostgresError],
 ) -> Callable[..., Awaitable[NoReturn]]:
-    """Build an ``asyncpg.connect`` stand-in for a server that rejects every login.
+    """Build an ``asyncpg.connect`` stand-in for a server that rejects every connection.
 
     Args:
         rejection: The asyncpg error class the server's startup answer maps to.
@@ -633,11 +637,11 @@ async def test_when_outages_reach_the_threshold_then_the_next_request_is_refused
     [TooManyConnectionsError, CannotConnectNowError],
     ids=["53300-too-many-connections", "57P03-starting-up"],
 )
-async def test_when_the_server_rejects_the_login_then_unavailable_is_raised_and_the_circuit_opens(
+async def test_when_the_server_rejects_the_connection_then_unavailable_is_raised_and_the_circuit_opens(
     monkeypatch, asyncpg_engine, breaker, rejection
 ):
     """Validates app.infrastructure.database_async.build_async_engine()."""
-    monkeypatch.setattr(asyncpg, "connect", refuse_logins_with(rejection))
+    monkeypatch.setattr(asyncpg, "connect", refuse_connections_with(rejection))
 
     for _ in range(FAILURE_THRESHOLD):
         with pytest.raises(DatabaseUnavailableError) as raised:
@@ -647,6 +651,27 @@ async def test_when_the_server_rejects_the_login_then_unavailable_is_raised_and_
         assert sqlstate_of(raised.value.__cause__) == rejection.sqlstate
 
     assert breaker.state is CircuitState.OPEN
+
+
+@pytest.mark.unit
+async def test_when_the_server_rejects_the_password_then_an_operation_error_is_raised_and_the_circuit_stays_closed(
+    monkeypatch, asyncpg_engine, breaker
+):
+    """Validates app.infrastructure.database_async.build_async_engine()."""
+    monkeypatch.setattr(
+        asyncpg, "connect", refuse_connections_with(InvalidPasswordError)
+    )
+
+    for _ in range(FAILURE_THRESHOLD + 1):
+        with pytest.raises(DatabaseOperationError) as raised:
+            async with async_session_scope() as session:
+                await session.execute(select(1))
+
+    assert raised.value.log_context == {
+        "error_type": "OperationalError",
+        "sqlstate": InvalidPasswordError.sqlstate,
+    }
+    assert breaker.state is CircuitState.CLOSED
 
 
 @pytest.mark.unit
