@@ -1,4 +1,4 @@
-import { Controller, Get, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, HttpStatus, UnauthorizedException } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiForbiddenResponse,
@@ -8,15 +8,15 @@ import {
   ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { ZodResponse } from 'nestjs-zod';
 import { CurrentUser } from '../decorators/current-user.decorator';
+import { ResponseSchema } from '../serialization/response-schema.decorator';
 import {
   AUTH_PROVIDER_UNAVAILABLE_MESSAGE,
   AUTHENTICATION_REQUIRED_MESSAGE,
   INSUFFICIENT_SCOPE_MESSAGE,
 } from './auth-messages';
 import { AuthenticatedUser } from './authenticated-user';
-import { toUserInfo, UserInfoDto } from './user-info.dto';
+import { toUserInfo, UserInfoDto, UserInfoSchema } from './user-info.dto';
 
 /** Exposes the identity behind the presented token to authenticated callers. */
 @ApiTags('Auth')
@@ -34,7 +34,7 @@ export class CurrentUserController {
    *   by every auth variant.
    */
   @Get('me')
-  @ZodResponse({ status: 200, type: UserInfoDto })
+  @ResponseSchema(HttpStatus.OK, UserInfoSchema)
   @ApiOperation({ summary: 'Return the authenticated caller' })
   @ApiUnauthorizedResponse({ description: AUTHENTICATION_REQUIRED_MESSAGE })
   @ApiForbiddenResponse({ description: INSUFFICIENT_SCOPE_MESSAGE })

@@ -1,12 +1,16 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
 import { ApiBadRequestResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ZodResponse } from 'nestjs-zod';
+import { ResponseSchema } from '../../common/serialization/response-schema.decorator';
 import {
-  EchoParamDto,
-  EchoRequestDto,
-  EchoResponseDto,
+  EchoParamSchema,
+  EchoRequestSchema,
+  EchoResponseSchema,
   PING_MESSAGE,
-  PingResponseDto,
+  PingResponseSchema,
+  type EchoParamDto,
+  type EchoRequestDto,
+  type EchoResponseDto,
+  type PingResponseDto,
 } from './dto/echo.dto';
 
 const VALIDATION_FAILED_DESCRIPTION = 'The message is missing or longer than the limit';
@@ -21,7 +25,7 @@ export class TestController {
    * @returns the fixed `pong` message.
    */
   @Get('ping')
-  @ZodResponse({ status: HttpStatus.OK, type: PingResponseDto })
+  @ResponseSchema(HttpStatus.OK, PingResponseSchema)
   @ApiOperation({ summary: 'Ping endpoint' })
   ping(): PingResponseDto {
     return { message: PING_MESSAGE };
@@ -34,10 +38,10 @@ export class TestController {
    * @returns the message that was sent.
    */
   @Get('echo/:message')
-  @ZodResponse({ status: HttpStatus.OK, type: EchoResponseDto })
+  @ResponseSchema(HttpStatus.OK, EchoResponseSchema)
   @ApiOperation({ summary: 'Echo a message (GET)' })
   @ApiBadRequestResponse({ description: VALIDATION_FAILED_DESCRIPTION })
-  echoGet(@Param() params: EchoParamDto): EchoResponseDto {
+  echoGet(@Param({ schema: EchoParamSchema }) params: EchoParamDto): EchoResponseDto {
     return { message: params.message };
   }
 
@@ -50,10 +54,10 @@ export class TestController {
    */
   @Post('echo')
   @HttpCode(HttpStatus.OK)
-  @ZodResponse({ status: HttpStatus.OK, type: EchoResponseDto })
+  @ResponseSchema(HttpStatus.OK, EchoResponseSchema)
   @ApiOperation({ summary: 'Echo a message (POST)' })
   @ApiBadRequestResponse({ description: VALIDATION_FAILED_DESCRIPTION })
-  echoPost(@Body() body: EchoRequestDto): EchoResponseDto {
+  echoPost(@Body({ schema: EchoRequestSchema }) body: EchoRequestDto): EchoResponseDto {
     return { message: body.message };
   }
 }

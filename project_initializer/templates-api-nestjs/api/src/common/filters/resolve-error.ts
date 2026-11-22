@@ -2,8 +2,6 @@ import { STATUS_CODES } from 'node:http';
 import { HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@generated/prisma';
 import type { Request } from 'express';
-import { ZodValidationException } from 'nestjs-zod';
-import { z } from 'zod';
 import { CircuitOpenError } from '../resilience/circuit-breaker';
 import {
   FieldError,
@@ -11,6 +9,7 @@ import {
   ROUTE_NOT_FOUND_MESSAGE,
   SERVICE_UNAVAILABLE_MESSAGE,
 } from './error-body';
+import { type SchemaIssues, SchemaValidationException } from './schema-validation.exception';
 
 /** What a client is told about a failure: status, a message safe to show, optional field detail. */
 export interface ResolvedError {
@@ -26,12 +25,14 @@ const FIRST_CLIENT_ERROR_STATUS = 400;
 const FIRST_SERVER_ERROR_STATUS = 500;
 const UNKNOWN_CLIENT_ERROR_MESSAGE = 'Bad Request';
 
-function toFieldErrors(zodError: unknown): readonly FieldError[] | undefined {
-  if (!(zodError instanceof z.core.$ZodError)) {
-    return undefined;
-  }
-  return zodError.issues.map((issue) => ({
-    path: issue.path.map((segment) => String(segment)).join(FIELD_PATH_SEPARATOR),
+/** A Standard Schema path segment is either the key itself or an object that carries it. */
+function keyOf(segment: PropertyKey | { readonly key: PropertyKey }): string {
+  return String(typeof segment === 'object' ? segment.key : segment);
+}
+
+function toFieldErrors(issues: SchemaIssues): readonly FieldError[] {
+  return issues.map((issue) => ({
+    path: (issue.path ?? []).map(keyOf).join(FIELD_PATH_SEPARATOR),
     message: issue.message,
   }));
 }
@@ -68,15 +69,29 @@ function exposedClientErrorStatus(exception: unknown): number | undefined {
 }
 
 const resolveValidationFailure: ErrorResolver = (exception) => {
-  if (!(exception instanceof ZodValidationException)) {
+  if (!(exception instanceof SchemaValidationException)) {
     return undefined;
   }
   return {
     status: exception.getStatus(),
     message: exception.message,
-    errors: toFieldErrors(exception.getZodError()),
+    errors: toFieldErrors(exception.issues),
   };
 };
+
+const resolveRejectedRequest: ErrorResolver = (exception) => {
+  const status = exposedClientErrorStatus(exception);
+  if (status === undefined) {
+    return undefined;
+  }
+  return { status, message: STATUS_CODES[status] ?? UNKNOWN_CLIENT_ERROR_MESSAGE };
+};
+
+// NestJS 12's Express adapter wraps an Express middleware rejection in an HttpException whose
+// message is the library's own text, which can quote a request header (`unsupported charset
+// "..."`). The original error is kept as the cause, and it decides the answer.
+const resolveWrappedRejectedRequest: ErrorResolver = (exception, request) =>
+  exception instanceof HttpException ? resolveRejectedRequest(exception.cause, request) : undefined;
 
 // A thrown HttpException keeps its status and message: the code that threw it chose both for the
 // client.
@@ -99,16 +114,9 @@ const resolveUnavailableDependency: ErrorResolver = (exception) => {
     : undefined;
 };
 
-const resolveRejectedRequest: ErrorResolver = (exception) => {
-  const status = exposedClientErrorStatus(exception);
-  if (status === undefined) {
-    return undefined;
-  }
-  return { status, message: STATUS_CODES[status] ?? UNKNOWN_CLIENT_ERROR_MESSAGE };
-};
-
 const RESOLVERS: readonly ErrorResolver[] = [
   resolveValidationFailure,
+  resolveWrappedRejectedRequest,
   resolveHttpException,
   resolveUnavailableDependency,
   resolveRejectedRequest,

@@ -160,7 +160,7 @@ def test_when_env_validation_schema_is_read_then_required_secrets_are_declared()
 def test_when_user_response_schema_is_read_then_password_field_is_not_exposed():
     """
     Criterion: response schemas whitelist fields so Prisma rows cannot leak
-    sensitive columns (e.g. password) through the ZodSerializerInterceptor.
+    sensitive columns (e.g. password) through the StandardSchemaSerializerInterceptor.
     Assumption: at least one response schema or DTO file exists for the User
     entity; it must not expose a `password` field.
 

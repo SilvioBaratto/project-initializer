@@ -1,4 +1,6 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { INestApplication, UnauthorizedException } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import { openApiDocumentOf, responseSchemaOf } from '../../../test/support/openapi-document';
 import { AUTHENTICATION_REQUIRED_MESSAGE } from './auth-messages';
 import { AuthenticatedUser } from './authenticated-user';
 import { CurrentUserController } from './current-user.controller';
@@ -29,5 +31,33 @@ describe('CurrentUserController', () => {
     expect(() => controller.currentUser(undefined)).toThrow(
       new UnauthorizedException(AUTHENTICATION_REQUIRED_MESSAGE),
     );
+  });
+
+  describe('OpenAPI document', () => {
+    let app: INestApplication;
+
+    beforeAll(async () => {
+      const moduleRef = await Test.createTestingModule({
+        controllers: [CurrentUserController],
+      }).compile();
+      app = moduleRef.createNestApplication();
+      await app.init();
+    });
+
+    afterAll(async () => {
+      await app.close();
+    });
+
+    it('when GET /auth/me is documented, then its 200 body is the user info whitelist', () => {
+      expect(responseSchemaOf(openApiDocumentOf(app), '/auth/me', 'get', '200')).toMatchObject({
+        type: 'object',
+        properties: {
+          id: { type: 'string', minLength: 1 },
+          email: { nullable: true },
+          roles: { type: 'array', items: { type: 'string' } },
+        },
+        required: ['id', 'email', 'roles'],
+      });
+    });
   });
 });

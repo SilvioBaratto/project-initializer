@@ -1,12 +1,28 @@
 import type { Server } from 'node:http';
-import { INestApplication } from '@nestjs/common';
+import {
+  INestApplication,
+  StandardSchemaSerializerInterceptor,
+  StandardSchemaValidationPipe,
+} from '@nestjs/common';
 import { APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { cleanupOpenApiDoc, ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
 import request from 'supertest';
-import { MAX_ECHO_MESSAGE_LENGTH } from './dto/echo.dto';
+import {
+  documentedStatusesOf,
+  openApiDocumentOf,
+  requestBodySchemaOf,
+  responseSchemaOf,
+} from '../../../test/support/openapi-document';
+import { MAX_ECHO_MESSAGE_LENGTH, PING_MESSAGE } from './dto/echo.dto';
 import { TestController } from './test.controller';
+
+// A response schema is documented closed, because the serializer drops every unlisted field.
+const ECHO_REPLY_SCHEMA = {
+  type: 'object',
+  properties: { message: { type: 'string' } },
+  required: ['message'],
+  additionalProperties: false,
+};
 
 /** Validates src/modules/test/test.controller.ts through real routing, validation and serialization. */
 describe('TestController', () => {
@@ -18,8 +34,8 @@ describe('TestController', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [TestController],
       providers: [
-        { provide: APP_PIPE, useClass: ZodValidationPipe },
-        { provide: APP_INTERCEPTOR, useClass: ZodSerializerInterceptor },
+        { provide: APP_PIPE, useClass: StandardSchemaValidationPipe },
+        { provide: APP_INTERCEPTOR, useClass: StandardSchemaSerializerInterceptor },
       ],
     }).compile();
     app = moduleRef.createNestApplication();
@@ -75,26 +91,38 @@ describe('TestController', () => {
   });
 
   describe('OpenAPI document', () => {
-    function responseCodesOf(path: string, method: 'get' | 'post'): string[] {
-      const document = cleanupOpenApiDoc(
-        SwaggerModule.createDocument(app, new DocumentBuilder().build()),
-      );
-      return Object.keys(document.paths[path]?.[method]?.responses ?? {});
-    }
+    it('when GET /test/ping is documented, then its 200 body is the fixed pong reply', () => {
+      expect(responseSchemaOf(openApiDocumentOf(app), '/test/ping', 'get', '200')).toEqual({
+        type: 'object',
+        properties: { message: { type: 'string', enum: [PING_MESSAGE] } },
+        required: ['message'],
+        additionalProperties: false,
+      });
+    });
 
     it.each([
-      ['/test/ping', 'get'],
       ['/test/echo/{message}', 'get'],
       ['/test/echo', 'post'],
-    ] as const)(
-      'when %s %s is documented, then it declares its 200 success response',
-      (path, method) => {
-        expect(responseCodesOf(path, method)).toContain('200');
-      },
-    );
+    ] as const)('when %s %s is documented, then its 200 body is the echo reply', (path, method) => {
+      expect(responseSchemaOf(openApiDocumentOf(app), path, method, '200')).toEqual(
+        ECHO_REPLY_SCHEMA,
+      );
+    });
+
+    it('when the POST echo route is documented, then its request body comes from the request schema', () => {
+      expect(requestBodySchemaOf(openApiDocumentOf(app), '/test/echo', 'post')).toEqual({
+        type: 'object',
+        properties: {
+          message: { type: 'string', minLength: 1, maxLength: MAX_ECHO_MESSAGE_LENGTH },
+        },
+        required: ['message'],
+      });
+    });
 
     it('when the POST echo route is documented, then it does not claim a 201 because nothing is created', () => {
-      expect(responseCodesOf('/test/echo', 'post')).not.toContain('201');
+      expect(documentedStatusesOf(openApiDocumentOf(app), '/test/echo', 'post')).not.toContain(
+        '201',
+      );
     });
 
     it.each([
@@ -103,7 +131,7 @@ describe('TestController', () => {
     ] as const)(
       'when %s %s is documented, then it declares its 400 validation failure',
       (path, method) => {
-        expect(responseCodesOf(path, method)).toContain('400');
+        expect(documentedStatusesOf(openApiDocumentOf(app), path, method)).toContain('400');
       },
     );
   });

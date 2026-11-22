@@ -4,7 +4,12 @@ import { AUTH_GUARDS } from '../src/app.auth';
 import { ANONYMOUS_ACTOR_ID, AuditLogger } from '../src/common/audit/audit-logger';
 import { INSUFFICIENT_SCOPE_MESSAGE } from '../src/common/auth/auth-messages';
 import { INTERNAL_ERROR_MESSAGE, ROUTE_NOT_FOUND_MESSAGE } from '../src/common/filters/error-body';
-import { ITEM_AUDIT_ACTIONS, ITEM_NOT_FOUND_MESSAGE } from '../src/modules/items/item.constants';
+import { VALIDATION_FAILED_MESSAGE } from '../src/common/filters/schema-validation.exception';
+import {
+  ITEM_AUDIT_ACTIONS,
+  ITEM_NOT_FOUND_MESSAGE,
+  MAX_ITEM_DESCRIPTION_LENGTH,
+} from '../src/modules/items/item.constants';
 import { createE2eApp, E2eApp, httpServerOf } from './support/create-e2e-app';
 import { RolesProbeController } from './support/roles-probe.controller';
 import { TEST_BEARER_TOKEN, TEST_USER } from './support/test-doubles';
@@ -129,8 +134,44 @@ describe('API (e2e)', () => {
       expect(response.status).toBe(400);
       expect(response.body).toMatchObject({
         statusCode: 400,
-        errors: [expect.objectContaining({ path: 'name' })],
+        error: 'Bad Request',
+        message: VALIDATION_FAILED_MESSAGE,
+        errors: [{ path: 'name', message: 'Too small: expected string to have >=1 characters' }],
       });
+    });
+
+    it('when several fields of a body are invalid, then 400 lists each of them once, in order', async () => {
+      const response = await post('/api/v1/items').send({
+        name: 5,
+        description: 'd'.repeat(MAX_ITEM_DESCRIPTION_LENGTH + 1),
+      });
+
+      expect(response.status).toBe(400);
+      expect((response.body as { errors: unknown }).errors).toEqual([
+        { path: 'name', message: 'Invalid input: expected string, received number' },
+        {
+          path: 'description',
+          message: `Too big: expected string to have <=${MAX_ITEM_DESCRIPTION_LENGTH} characters`,
+        },
+      ]);
+    });
+
+    it('when a path parameter is invalid, then 400 names it like a body field', async () => {
+      const response = await get('/api/v1/items/not-a-uuid');
+
+      expect(response.status).toBe(400);
+      expect((response.body as { errors: unknown }).errors).toEqual([
+        { path: 'id', message: 'Invalid UUID' },
+      ]);
+    });
+
+    it('when the whole update body is rejected, then the field error has an empty path', async () => {
+      const response = await put(`/api/v1/items/${randomUUID()}`).send({});
+
+      expect(response.status).toBe(400);
+      expect((response.body as { errors: unknown }).errors).toEqual([
+        { path: '', message: 'At least one field must be provided' },
+      ]);
     });
 
     it('when the repository fails unexpectedly, then 500 with a generic message and no internals', async () => {

@@ -14,6 +14,7 @@ export const ROUTE_NOT_FOUND_MESSAGE = 'Route not found';
 export const SERVICE_UNAVAILABLE_MESSAGE = 'Service temporarily unavailable';
 
 const UNKNOWN_STATUS_LABEL = 'Error';
+const QUERY_OR_FRAGMENT = /[?#]/;
 
 /** One rejected field of a request, as reported to the client. */
 export interface FieldError {
@@ -48,13 +49,28 @@ export function requestIdOf(request: Request): string | undefined {
 }
 
 /**
+ * Reads the full path of a request, without the query string, which may carry credentials.
+ *
+ * It is taken from the original URL rather than `request.path`: Nest answers an unknown path under
+ * the global prefix from a router mounted at that prefix, and there Express reports `request.path`
+ * relative to the mount, without the prefix.
+ *
+ * @param request - The request being answered.
+ * @returns The path as the client sent it, e.g. `/api/v1/items/42`.
+ */
+function requestPathOf(request: Request): string {
+  const [path = ''] = request.originalUrl.split(QUERY_OR_FRAGMENT);
+  return path;
+}
+
+/**
  * Describes a request for a log line: method, path without the query string, and correlation id.
  *
  * @param request - The request being answered.
  * @returns A single line free of headers, body and query, none of which are safe to log.
  */
 export function describeRequest(request: Request): string {
-  return `${request.method} ${request.path} (requestId: ${requestIdOf(request) ?? 'none'})`;
+  return `${request.method} ${requestPathOf(request)} (requestId: ${requestIdOf(request) ?? 'none'})`;
 }
 
 /**
@@ -77,7 +93,7 @@ export function buildErrorBody(input: {
     statusCode: input.status,
     error: STATUS_CODES[input.status] ?? UNKNOWN_STATUS_LABEL,
     message: input.message,
-    path: input.request.path,
+    path: requestPathOf(input.request),
     timestamp: new Date().toISOString(),
     ...(requestId === undefined ? {} : { requestId }),
     ...(input.errors === undefined ? {} : { errors: input.errors }),

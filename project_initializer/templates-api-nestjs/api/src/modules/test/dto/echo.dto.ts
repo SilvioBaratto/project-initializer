@@ -1,4 +1,3 @@
-import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 
 /** Longest message the echo routes accept. */
@@ -22,13 +21,13 @@ export const EchoResponseSchema = z.object({ message: z.string() });
 export const PingResponseSchema = z.object({ message: z.literal(PING_MESSAGE) });
 
 /** Validated body of `POST /test/echo`. */
-export class EchoRequestDto extends createZodDto(EchoRequestSchema) {}
+export type EchoRequestDto = z.infer<typeof EchoRequestSchema>;
 
 /** Validated path parameter of `GET /test/echo/:message`. */
-export class EchoParamDto extends createZodDto(EchoParamSchema) {}
+export type EchoParamDto = z.infer<typeof EchoParamSchema>;
 
 /** Serialized reply of the echo routes. */
-export class EchoResponseDto extends createZodDto(EchoResponseSchema) {}
+export type EchoResponseDto = z.infer<typeof EchoResponseSchema>;
 
 /** Serialized reply of the ping route. */
-export class PingResponseDto extends createZodDto(PingResponseSchema) {}
+export type PingResponseDto = z.infer<typeof PingResponseSchema>;

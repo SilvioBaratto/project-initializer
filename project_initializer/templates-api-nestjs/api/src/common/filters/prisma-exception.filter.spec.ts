@@ -13,8 +13,8 @@ import { PRISMA_ERROR_MAP, PrismaClientExceptionFilter } from './prisma-exceptio
 const REQUEST_ID = 'req-456';
 const REQUEST_PATH = '/api/v1/items/42';
 
-function fakeRequest(): { method: string; path: string; id: string } {
-  return { method: 'DELETE', path: REQUEST_PATH, id: REQUEST_ID };
+function fakeRequest(): { method: string; path: string; originalUrl: string; id: string } {
+  return { method: 'DELETE', path: REQUEST_PATH, originalUrl: REQUEST_PATH, id: REQUEST_ID };
 }
 
 function prismaError(

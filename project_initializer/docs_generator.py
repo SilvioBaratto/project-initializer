@@ -39,8 +39,8 @@ _NESTJS_READINESS_CHECKLIST = """\
 3. Throttler (rate limiting), the first global guard
 4. Access-token guard (auth variants only), registered through `src/app.auth.ts`
 5. `RolesGuard` (enforces `@Roles`), the last global guard, so it sees the verified identity
-6. ZodValidationPipe (global)
-7. ZodSerializerInterceptor (global)
+6. `StandardSchemaValidationPipe` (global `APP_PIPE`, from `@nestjs/common`): validates each `@Body`, `@Param` and `@Query` that passes `{ schema }` and throws `SchemaValidationException`
+7. `StandardSchemaSerializerInterceptor` (global `APP_INTERCEPTOR`, from `@nestjs/common`): applies the schema a handler declares with `@ResponseSchema`
 8. HttpExceptionFilter + PrismaClientExceptionFilter (global), registered by `configureApp`
 
 ## Production-readiness acceptance checklist
@@ -59,24 +59,24 @@ _NESTJS_READINESS_CHECKLIST = """\
 
 ### 2. Controllers & routing
 
-- ✅ `@Controller('prefix')` + HTTP-method decorators; request-data decorators (`@Body/@Query/@Param`) over raw `@Req()`; ids and path parameters are validated by Zod param DTOs (`UuidParamDto`)
+- ✅ `@Controller('prefix')` + HTTP-method decorators; request-data decorators (`@Body/@Query/@Param`) over raw `@Req()`; ids and path parameters are validated by zod schemas bound with `@Param({ schema: UuidParamSchema })` (type `UuidParamDto`)
 - ✅ `app.setGlobalPrefix('api/v1')` in `configureApp` (`src/app.setup.ts`), called by `main.ts`; controllers declare no prefix
 - ⚠️ URI/header versioning (`VersioningType`) — static `api/v1` prefix is sufficient for a single version (non-goal)
 - Citations: `/controllers`, `/techniques/versioning`
 
 ### 3. DTOs, validation & serialization
 
-- ✅ Zod schemas via `nestjs-zod` as DTOs (not erased interfaces)
-- ✅ `ZodValidationPipe` registered as `APP_PIPE` — strips unknown fields from all incoming bodies
-- ✅ `ZodSerializerInterceptor` registered as `APP_INTERCEPTOR`; response schemas whitelist fields so Prisma rows cannot leak secret columns; handlers declare them with `@ZodResponse`
+- ✅ zod schemas validated through Nest's native Standard Schema support: each DTO file exports `<Name>Schema` and `type <Name>Dto = z.infer<typeof <Name>Schema>`, and a handler binds the schema with `@Body({ schema })`, `@Param({ schema })` or `@Query({ schema })`
+- ✅ `StandardSchemaValidationPipe` registered as `APP_PIPE` — strips unknown fields from every parameter that passes `{ schema }`. It returns a parameter without one unchanged, so a forgotten `schema` switches validation off for that parameter (a repo test fails on it); `@CurrentUser()` and other custom decorators are skipped by design
+- ✅ `StandardSchemaSerializerInterceptor` registered as `APP_INTERCEPTOR`; response schemas whitelist fields so Prisma rows cannot leak secret columns; handlers declare them with `@ResponseSchema(status, schema)` (`src/common/serialization/response-schema.decorator.ts`), which also documents the response in OpenAPI. For a list, pass the schema of one element with `{ many: true }`
 - ⚠️ Built-in transform pipes — Zod coercion covers primitive coercion; no `ParseIntPipe` needed
 - Citations: `/pipes`, `/techniques/validation`, `/techniques/serialization`
 
 ### 4. Request pipeline — pipes, guards, interceptors, filters, middleware
 
-- ✅ Global Zod pipe, the access-token guard (auth variants), `ZodSerializerInterceptor`
+- ✅ Global `StandardSchemaValidationPipe`, the access-token guard (auth variants), `StandardSchemaSerializerInterceptor`
 - ✅ `HttpExceptionFilter` + `PrismaClientExceptionFilter` registered via `useGlobalFilters()` inside `configureApp` (`src/app.setup.ts`), which both `main.ts` and the e2e harness (`test/support/create-e2e-app.ts`) call, so a test exercises the same error handling a client gets
-- ✅ Error bodies share one shape (`statusCode`, `error`, `message`, `path`, `timestamp`, `requestId`, and `errors` for validation failures); an unexpected error is answered with a fixed generic 500 and every 5xx is logged once; an oversized body is a 413, malformed JSON a 400 with a fixed message, and the health controller answers an unhealthy probe with the Terminus result
+- ✅ Error bodies share one shape (`statusCode`, `error`, `message`, `path`, `timestamp`, `requestId`, and `errors` for validation failures); an unexpected error is answered with a fixed generic 500 and every 5xx is logged once; an oversized body is a 413, malformed JSON a 400 with a fixed message, and the health controller answers an unhealthy probe with the Terminus result. A path outside `/api/v1` and `/docs` gets Express's own 404 page: since NestJS 12 the not-found handler covers the global prefix only
 - ✅ nestjs-pino request logging; `@CurrentUser()`, `@Public()` custom decorators
 - ⚠️ **Filter DI caveat:** filters registered via `useGlobalFilters()` in `configureApp` (called from `main.ts`) live outside the Nest DI container and cannot inject providers. The current filters are dependency-free (`new`-instantiated there) — **no change is required today**.
 
@@ -124,7 +124,7 @@ _NESTJS_READINESS_CHECKLIST = """\
 - ✅ Audit trail: `AuditLogger.record(action, resourceId, actorId)` (`src/common/audit`) writes one `audit.action` line through a pino child pinned to `info`, so `LOG_LEVEL` cannot silence it; the items service records `item.create`, `item.update` and `item.delete` with the caller's opaque id or `anonymous`, never an email or a username
 - ✅ Runtime log level: `SIGHUP` reloads `LOG_LEVEL` (`src/config/log-level-reload.ts`), see "Configuration"
 - ✅ Health checks: `@nestjs/terminus` liveness + readiness probes (DB with circuit state, disk, memory) — `src/modules/health/health.controller.ts`
-- ✅ OpenAPI/Swagger at `/docs` (off in production unless `API_DOCS_ENABLED=true`) with a bearer requirement in auth variants and `cleanupOpenApiDoc` — `setupOpenApi` in `src/app.setup.ts`
+- ✅ OpenAPI/Swagger at `/docs` (off in production unless `API_DOCS_ENABLED=true`) with a bearer requirement in auth variants; `@nestjs/swagger` converts the zod schemas of `@Body({ schema })` and `@ResponseSchema` itself, inline (no named components) — `setupOpenApi` in `src/app.setup.ts`
 - ✅ Graceful shutdown: `app.enableShutdownHooks()` in `configureApp` + Prisma `$disconnect` on `onModuleDestroy`; a start-up failure logs one fatal line and exits with code 1, forced after 10 seconds when closing hangs
 - Citations: `/techniques/configuration`, `/techniques/logger`, `/recipes/terminus`, `/openapi/introduction`, `/fundamentals/lifecycle-events`
 
@@ -1221,13 +1221,14 @@ _NESTJS_PLATFORM_SECTION = [
     "## Request handling and errors",
     "",
     "- **Body limit.** `configureApp` registers the JSON body parser with a 512 KiB limit (`src/config/http-limits.ts`), above Express's 100 kB default so routes can take larger documents, yet small enough that a client cannot make the process buffer megabytes per request. A larger body answers **413** with the standard reason phrase and the CORS headers, so a browser can read it. Raise the limit together with the bounds the routes validate, never alone.",
-    "- **Body-parser errors.** A body that is not valid JSON answers 400 `Malformed JSON request body`, because the parser's own text quotes the input. Any other 4xx raised by Express middleware about the request itself keeps its status under the standard reason phrase, never the library text.",
+    "- **Body-parser errors.** A body that is not valid JSON answers 400 `Malformed JSON request body`, because the parser's own text quotes the input. Any other 4xx raised by Express middleware about the request itself, such as a 415 for an unsupported charset, keeps its status under the standard reason phrase, never the library text. NestJS 12 wraps such an error in an `HttpException` that carries the library text; `resolve-error.ts` recognises it by its `cause`.",
+    "- **Validation errors.** A parameter that fails its schema answers 400 `Validation failed` with an `errors` list of `{ path, message }`, one entry per issue, the path dot-separated (empty for an issue about the whole payload). `SchemaValidationException` carries the issues from the global pipe to the filter. An issue's message is zod's own (or the one the schema sets), which names what was expected rather than echoing the value sent.",
     "- **Health probes.** `HealthCheckExceptionFilter`, applied to the health controller only, answers an unhealthy probe with the Terminus result itself (each indicator, its details and the circuit state) at 503, so an operator sees which dependency is down. It writes the one `warn` line a failed probe produces; Terminus' own logging is off.",
     "- **Prisma errors.** `P2002` answers 409, `P2003` 400 and `P2025` 404, each with a fixed message that names no column. An error that means the database cannot take the work (unreachable, timed out, no connection slot: `P2024` and `P2037`, a raw-query failure `P2010` whose driver error kind is a connection problem, and an unmapped database error `P2039` whose SQLSTATE is in class `08` or is `57P01`, `57P02` or `57P03`, which a PostgreSQL server that is shutting down or starting up returns) answers 503 like an open circuit and does not count as a query mistake. Any other code is a 500 with a fixed message, logged with its stack, except that any other `P2039` is logged with its SQLSTATE only: PostgreSQL puts the values of the failing row into the detail of such an error and the rejected input into its message, and neither may reach the log.",
     "- **Logging.** The pino request serializer keeps the request `id`, `method` and `path` without the query string; headers, route parameters and the client address are not logged. A 5xx response is a `warn` access line, because the exception filter has already logged the cause once at `error`. `x-request-id` is kept when it matches a safe pattern, otherwise a UUID is generated.",
     "- **Rate limits.** 100 requests per minute and client on every route and 5 on `POST /auth/validate`; the 429 message is `Too many requests`. The counters are in this process's memory, so each replica counts on its own.",
     "- **Database TLS.** `deriveSslOption` decides TLS from `sslmode` and the host (loopback and single-label hosts such as the compose `db` stay plaintext), and `stripSslParameters` removes `sslmode`, `sslrootcert`, `sslcert`, `sslkey` and `uselibpqcompat` from the URL that reaches the pool, because `node-postgres` would otherwise build its own `ssl` object from them and discard that decision. A private CA goes through `NODE_EXTRA_CA_CERTS`. Whether production may connect without TLS at all is a separate, earlier check (see Configuration).",
-    "- **Responses.** Every handler declares its response with `@ZodResponse`, including the demo routes under `/test` (status 200), so the OpenAPI document and the serializer agree.",
+    "- **Responses.** Every handler declares its response with `@ResponseSchema(status, schema)`, including the demo routes under `/test` (status 200), so the OpenAPI document and the serializer agree. The decorator does not set the HTTP status: a `POST` that answers 200 keeps its own `@HttpCode(HttpStatus.OK)`, as `POST /test/echo` does. A response that does not match its schema is a generic 500, because the server, not the client, broke the contract.",
 ]
 
 _NESTJS_ROLE_SOURCES = {
@@ -1372,7 +1373,7 @@ def _nestjs_api_claude(auth: str | None, async_db: bool) -> str:
         "",
         "**API Routes**: the `api/v1` prefix is applied once, by `configureApp` in `src/app.setup.ts`; controllers do not repeat it. Sample resource: `/api/v1/items` (GET, POST, GET/PUT/DELETE `:id`), backed by Postgres. Smoke routes: `GET /api/v1/test/ping`, `/api/v1/test/echo/:message`, `POST /api/v1/test/echo`.",
         "",
-        "**DTO Naming**: `Create<Entity>Dto`, `Update<Entity>Dto`, `<Entity>ResponseDto` pattern (Zod-based via nestjs-zod). Handlers declare the response schema with `@ZodResponse`.",
+        "**DTO Naming**: each DTO file exports zod schemas `Create<Entity>Schema`, `Update<Entity>Schema`, `<Entity>ResponseSchema` and their types `export type Create<Entity>Dto = z.infer<typeof Create<Entity>Schema>` (no DTO classes). Handlers bind request schemas with `@Body({ schema: Create<Entity>Schema })`, `@Param({ schema: UuidParamSchema })` or `@Query({ schema })` and declare the response with `@ResponseSchema(status, <Entity>ResponseSchema)`; Nest's `StandardSchemaValidationPipe` validates only parameters that pass a schema.",
         "",
     ]
     lines += _nestjs_config_section(auth) + [""]

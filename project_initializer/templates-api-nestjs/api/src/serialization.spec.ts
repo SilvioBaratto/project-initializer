@@ -1,11 +1,16 @@
 import 'reflect-metadata';
-import { ZodSerializerDto } from 'nestjs-zod';
-import { EchoResponseDto, PingResponseDto } from './modules/test/dto/echo.dto';
-import { ItemResponseDto, ItemResponseSchema } from './modules/items/dto/item.dto';
-import { ItemsController } from './modules/items/items.controller';
-import { TestController } from './modules/test/test.controller';
+import { Controller, Get, HttpStatus } from '@nestjs/common';
+import request from 'supertest';
+import { createE2eApp, E2eApp, httpServerOf } from '../test/support/create-e2e-app';
+import { TEST_BEARER_TOKEN } from '../test/support/test-doubles';
+import { INTERNAL_ERROR_MESSAGE } from './common/filters/error-body';
+import { ResponseSchema } from './common/serialization/response-schema.decorator';
+import { ItemResponseSchema } from './modules/items/dto/item.dto';
 
-/** Validates the response whitelist: schemas strip unknown fields and JSON handlers are serialized. */
+/**
+ * Validates the response whitelist of src/modules/items/dto/item.dto.ts and the serializer that
+ * src/app.module.ts registers for every route.
+ */
 const validItem = {
   id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
   name: 'test item',
@@ -14,21 +19,17 @@ const validItem = {
   updated_at: '2024-01-01T00:00:00.000Z',
 };
 
-/**
- * Reads the key `ZodSerializerDto` stores its DTO under by decorating a probe, so the spec follows
- * the library instead of repeating its private metadata key.
- */
-function serializerMetadataKey(): string {
-  class Probe {
-    @ZodSerializerDto(EchoResponseDto)
-    handler(): void {}
-  }
-  const [key] = Reflect.getMetadataKeys(Probe.prototype.handler) as string[];
-  return key;
-}
+const MALFORMED_ID = 'not-a-uuid';
+const LEAKED_SECRET = 'leaked-password';
 
-const serializerDtoOf = (handler: object): unknown =>
-  Reflect.getMetadata(serializerMetadataKey(), handler);
+@Controller('serialization-probe')
+class SerializationProbeController {
+  @Get('violating')
+  @ResponseSchema(HttpStatus.OK, ItemResponseSchema)
+  violating(): unknown {
+    return { ...validItem, id: MALFORMED_ID, password: LEAKED_SECRET };
+  }
+}
 
 describe('Response serialization', () => {
   it('when the item schema parses an object with an extra secret field, then the secret is stripped', () => {
@@ -39,33 +40,39 @@ describe('Response serialization', () => {
   });
 
   it('when a list is serialized, then every element is stripped of extra secret fields', () => {
-    const result = ItemResponseDto.schema.array().parse([{ ...validItem, password: 'leak' }]);
+    const result = ItemResponseSchema.array().parse([{ ...validItem, password: 'leak' }]);
 
     expect(result).toHaveLength(1);
     expect(result[0]).not.toHaveProperty('password');
   });
 
   it('when the item schema is handed an array, then it rejects it', () => {
-    // Pins why the list route must declare an array DTO instead of reusing the single-item one.
+    // Pins why a list route passes the single-item schema with `many`: the serializer applies it
+    // to each element, never to the array as a whole.
     expect(() => ItemResponseSchema.parse([validItem])).toThrow();
   });
 
-  it.each(['findOne', 'create', 'update'] as const)(
-    'when the %s handler is inspected, then its serializer DTO is the item DTO',
-    (handler) => {
-      expect(serializerDtoOf(ItemsController.prototype[handler])).toBe(ItemResponseDto);
-    },
-  );
+  describe('through the application pipeline', () => {
+    let e2e: E2eApp;
 
-  it('when the findAll handler is inspected, then its serializer DTO is the array of the item DTO', () => {
-    expect(serializerDtoOf(ItemsController.prototype.findAll)).toEqual([ItemResponseDto]);
-  });
+    beforeAll(async () => {
+      e2e = await createE2eApp({ controllers: [SerializationProbeController] });
+    });
 
-  it.each([
-    ['ping', TestController.prototype.ping, PingResponseDto],
-    ['echoGet', TestController.prototype.echoGet, EchoResponseDto],
-    ['echoPost', TestController.prototype.echoPost, EchoResponseDto],
-  ])('when the %s handler is inspected, then it has a serializer DTO', (_name, handler, dto) => {
-    expect(serializerDtoOf(handler)).toBe(dto);
+    afterAll(async () => {
+      await e2e.app.close();
+    });
+
+    it('when a handler returns data that violates its response schema, then the client gets the generic 500 without fields', async () => {
+      const response = await request(httpServerOf(e2e.app))
+        .get('/api/v1/serialization-probe/violating')
+        .set('Authorization', `Bearer ${TEST_BEARER_TOKEN}`);
+
+      expect(response.status).toBe(HttpStatus.INTERNAL_SERVER_ERROR);
+      expect(response.body).toMatchObject({ statusCode: 500, message: INTERNAL_ERROR_MESSAGE });
+      expect(response.body).not.toHaveProperty('errors');
+      expect(JSON.stringify(response.body)).not.toContain(MALFORMED_ID);
+      expect(JSON.stringify(response.body)).not.toContain(LEAKED_SECRET);
+    });
   });
 });

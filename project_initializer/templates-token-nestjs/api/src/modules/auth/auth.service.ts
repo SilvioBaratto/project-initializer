@@ -5,7 +5,7 @@ import { AccessTokenVerifier } from '../../common/auth/access-token-verifier';
 import { INVALID_CREDENTIALS_MESSAGE } from '../../common/auth/auth-messages';
 import { AuthenticatedUser } from '../../common/auth/authenticated-user';
 import { Env } from '../../config/env.validation';
-import { AuthResponseDto } from './dto/auth.dto';
+import type { AuthResponseDto } from './dto/auth.dto';
 
 /** Identity of every caller that presents the shared secret; the token cannot tell clients apart. */
 export const TOKEN_CLIENT: AuthenticatedUser = { id: 'token-client', roles: ['service'] };

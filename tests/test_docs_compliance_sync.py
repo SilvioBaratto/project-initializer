@@ -159,7 +159,15 @@ _NESTJS_ALL = [
     "`API_DOCS_ENABLED`",
     "`DB_WAIT_TIMEOUT_SECONDS`",
     "`prisma.config.ts`",
-    "`@ZodResponse`",
+    "`@ResponseSchema(status, schema)`",
+    "`StandardSchemaValidationPipe`",
+    "`StandardSchemaSerializerInterceptor`",
+    "`SchemaValidationException`",
+    "`@Body({ schema })`",
+    "a forgotten `schema` switches validation off",
+    "keeps its own `@HttpCode(HttpStatus.OK)`",
+    "a 415 for an unsupported charset",
+    "recognises it by its `cause`",
     "`Too many requests`",
     "`migration_backup.",
     "microsecond",
@@ -220,6 +228,12 @@ _NESTJS_ROLE_SOURCES = {
 _STALE_NESTJS = [
     "❌ RBAC / CASL",
     "5. ZodValidationPipe (global)",
+    "nestjs-zod",
+    "ZodValidationPipe",
+    "ZodSerializerInterceptor",
+    "@ZodResponse",
+    "createZodDto",
+    "cleanupOpenApiDoc",
 ]
 
 _NESTJS_BY_AUTH = {
@@ -474,14 +488,18 @@ def test_when_the_nestjs_root_docs_are_generated_then_tls_reload_roles_and_audit
 def test_when_the_nestjs_api_claude_is_generated_then_the_guard_order_matches_the_module(
     auth,
 ):
-    """The documented middleware stack names the roles guard as the last global guard.
+    """The documented middleware stack names the roles guard as the last global guard, ahead of
+    the native validation pipe and the serializer.
 
     Validates project_initializer/docs_generator.py generate_api_claude().
     """
     doc = generate_api_claude("nestjs", auth)
 
     assert doc.index("4. Access-token guard") < doc.index("5. `RolesGuard`")
-    assert doc.index("5. `RolesGuard`") < doc.index("6. ZodValidationPipe")
+    assert doc.index("5. `RolesGuard`") < doc.index("6. `StandardSchemaValidationPipe`")
+    assert doc.index("6. `StandardSchemaValidationPipe`") < doc.index(
+        "7. `StandardSchemaSerializerInterceptor`"
+    )
 
 
 @pytest.mark.parametrize("auth", AUTHS)

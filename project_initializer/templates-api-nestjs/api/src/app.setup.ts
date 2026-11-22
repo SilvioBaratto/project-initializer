@@ -5,7 +5,6 @@ import { ConfigService } from '@nestjs/config';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
-import { cleanupOpenApiDoc } from 'nestjs-zod';
 import { Logger } from 'nestjs-pino';
 import { z } from 'zod';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -104,7 +103,9 @@ export function isOpenApiEnabled(env: Pick<BaseEnv, 'API_DOCS_ENABLED' | 'NODE_E
 }
 
 /**
- * Publishes the OpenAPI document and its UI at {@link OPENAPI_PATH}.
+ * Publishes the OpenAPI document and its UI at {@link OPENAPI_PATH}. Request and response bodies
+ * are documented from the zod schemas that `@Body({ schema })` and `@ResponseSchema` declare,
+ * converted by the Swagger module itself.
  *
  * @param app - The configured application.
  * @param options.version - API version shown in the document.
@@ -125,7 +126,7 @@ export function setupOpenApi(
     builder.addSecurityRequirements(BEARER_SECURITY_NAME);
   }
   const document = SwaggerModule.createDocument(app, builder.build());
-  SwaggerModule.setup(OPENAPI_PATH, app, cleanupOpenApiDoc(document));
+  SwaggerModule.setup(OPENAPI_PATH, app, document);
 }
 
 /**

@@ -1,11 +1,15 @@
-import { Module } from '@nestjs/common';
+import {
+  Module,
+  StandardSchemaSerializerInterceptor,
+  StandardSchemaValidationPipe,
+} from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
-import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
 import { AUTH_GUARDS, AUTH_MODULES } from './app.auth';
 import { RolesGuard } from './common/auth/roles.guard';
+import { SchemaValidationException } from './common/filters/schema-validation.exception';
 import type { BaseEnv } from './config/env.base';
 import { validate as validateEnv } from './config/env.validation';
 import { ENV_FILE_PATHS } from './config/env-files';
@@ -23,6 +27,10 @@ import { TestModule } from './modules/test/test.module';
  * requests with bad credentials are counted and a caller cannot guess tokens at full speed.
  * `RolesGuard` is the last one, so it checks `@Roles(...)` against an identity that is already
  * verified.
+ *
+ * The validation pipe checks only the parameters that pass `{ schema }`, and it throws
+ * `SchemaValidationException` so the error filter can list each failing field. The serializer
+ * applies the schema a handler declares with `@ResponseSchema`.
  */
 @Module({
   imports: [
@@ -51,8 +59,14 @@ import { TestModule } from './modules/test/test.module';
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     ...AUTH_GUARDS,
     { provide: APP_GUARD, useClass: RolesGuard },
-    { provide: APP_PIPE, useClass: ZodValidationPipe },
-    { provide: APP_INTERCEPTOR, useClass: ZodSerializerInterceptor },
+    {
+      provide: APP_PIPE,
+      useFactory: () =>
+        new StandardSchemaValidationPipe({
+          exceptionFactory: (issues) => new SchemaValidationException(issues),
+        }),
+    },
+    { provide: APP_INTERCEPTOR, useClass: StandardSchemaSerializerInterceptor },
   ],
 })
 export class AppModule {}

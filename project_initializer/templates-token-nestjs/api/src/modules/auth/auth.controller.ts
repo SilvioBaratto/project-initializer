@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiOperation,
@@ -6,11 +6,16 @@ import {
   ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { ZodResponse } from 'nestjs-zod';
 import { Public } from '../../common/decorators/public.decorator';
+import { ResponseSchema } from '../../common/serialization/response-schema.decorator';
 import { AUTH_PROBE_RATE_LIMIT } from '../../config/rate-limit';
 import { AuthService } from './auth.service';
-import { AuthRequestDto, AuthResponseDto } from './dto/auth.dto';
+import {
+  AuthRequestSchema,
+  AuthResponseSchema,
+  type AuthRequestDto,
+  type AuthResponseDto,
+} from './dto/auth.dto';
 
 /** Token-variant endpoints under `/auth`; `GET /auth/me` lives in the shared `CurrentUserController`. */
 @ApiTags('Auth')
@@ -20,7 +25,8 @@ export class AuthController {
 
   /**
    * Public so a client can test a token before storing it. The tight rate limit is what stops this
-   * endpoint from being used to guess the shared secret.
+   * endpoint from being used to guess the shared secret. Answers 200 rather than 201 because
+   * nothing is created.
    *
    * @param authRequest - Body carrying the candidate secret.
    * @returns `authenticated: true` for the shared secret and `authenticated: false` for anything
@@ -29,11 +35,12 @@ export class AuthController {
   @Post('validate')
   @Public()
   @Throttle(AUTH_PROBE_RATE_LIMIT)
-  @ZodResponse({ status: 200, type: AuthResponseDto })
+  @HttpCode(HttpStatus.OK)
+  @ResponseSchema(HttpStatus.OK, AuthResponseSchema)
   @ApiOperation({ summary: 'Validate an authentication token' })
   @ApiBadRequestResponse({ description: 'The body is not a token request' })
   @ApiTooManyRequestsResponse({ description: 'Too many validation attempts' })
-  validate(@Body() authRequest: AuthRequestDto): AuthResponseDto {
+  validate(@Body({ schema: AuthRequestSchema }) authRequest: AuthRequestDto): AuthResponseDto {
     return this.authService.validateToken(authRequest.token);
   }
 }
