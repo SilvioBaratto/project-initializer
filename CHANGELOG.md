@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-22
+
 The CLI now needs Python 3.11. A **newly scaffolded** FastAPI project moves to Python 3.15, SQLAlchemy 2.1 and, where it has a local `db` (every variant but supabase), PostgreSQL 19, with its dependencies raised to their current releases. A **newly scaffolded** NestJS project moves to NestJS 12 with Nest's native validation in place of `nestjs-zod`, to Node 26 and, where it has a local `db`, to PostgreSQL 19. A **newly scaffolded** frontend moves to Angular and Angular Material 22.3, TypeScript 6.0, `@lucide/angular`, Vitest 5 with jsdom 31 and a Node 26 image. A project scaffolded earlier is not touched.
 
 ### Breaking changes
@@ -380,7 +382,8 @@ Every NestJS variant is now usable in Docker. Three chained bugs each hid the ne
 ### Added
 - Initial public release of the `project-initializer` CLI.
 
-[Unreleased]: https://github.com/SilvioBaratto/project-initializer/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/SilvioBaratto/project-initializer/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/SilvioBaratto/project-initializer/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/SilvioBaratto/project-initializer/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/SilvioBaratto/project-initializer/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/SilvioBaratto/project-initializer/compare/v0.4.0...v0.4.1
