@@ -67,7 +67,7 @@ _NESTJS_READINESS_CHECKLIST = """\
 ### 3. DTOs, validation & serialization
 
 - ✅ zod schemas validated through Nest's native Standard Schema support: each DTO file exports `<Name>Schema` and `type <Name>Dto = z.infer<typeof <Name>Schema>`, and a handler binds the schema with `@Body({ schema })`, `@Param({ schema })` or `@Query({ schema })`
-- ✅ `StandardSchemaValidationPipe` registered as `APP_PIPE` through `createSchemaValidationPipe()` (`src/common/filters/schema-validation.exception.ts`, which specs that wire a pipe use too) — strips unknown fields from every parameter that passes `{ schema }`. It returns a parameter without one unchanged, so a forgotten `schema` switches validation off for that parameter; `src/common/validation-coverage.spec.ts` finds every controller under `src/` and fails when a `@Body`, `@Param` or `@Query` of a handler has no schema. `@CurrentUser()` and other custom decorators are skipped by design
+- ✅ `StandardSchemaValidationPipe` registered as `APP_PIPE` through `createSchemaValidationPipe()` (`src/common/filters/schema-validation.exception.ts`, which specs that wire a pipe use too) — strips unknown fields from every parameter that passes `{ schema }`. It returns a parameter without one unchanged, so a forgotten `schema` switches validation off for that parameter; `src/common/validation-coverage.spec.ts` finds the controller classes exported from the `*.controller.ts` files under `src/`, checks their own and inherited handlers, and fails when a `@Body`, `@Param` or `@Query` has no schema (or when such a file exports no controller). `@CurrentUser()` and other custom decorators are skipped by design
 - ✅ `StandardSchemaSerializerInterceptor` registered as `APP_INTERCEPTOR`; response schemas whitelist fields so Prisma rows cannot leak secret columns; handlers declare them with `@ResponseSchema(status, schema)` (`src/common/serialization/response-schema.decorator.ts`), which also documents the response in OpenAPI and makes a handler whose return type does not match the schema a compile error (TS1241). For a list, pass the schema of one element with `{ many: true }`
 - ⚠️ Built-in transform pipes — Zod coercion covers primitive coercion; no `ParseIntPipe` needed
 - Citations: `/pipes`, `/techniques/validation`, `/techniques/serialization`
@@ -142,7 +142,7 @@ _NESTJS_READINESS_CHECKLIST = """\
 ### 9. Testing
 
 - ✅ Jest configured; `npm test` and `npm run test:e2e` scripts present; `npm run test:cov` enforces a 75% line and statement threshold
-- ✅ Service/controller unit specs next to their sources: `items.service.spec.ts`, `health.controller.spec.ts`, `src/serialization.spec.ts`; `src/common/validation-coverage.spec.ts` checks every controller for request parameters without a schema
+- ✅ Service/controller unit specs next to their sources: `items.service.spec.ts`, `health.controller.spec.ts`, `src/serialization.spec.ts`; `src/common/validation-coverage.spec.ts` checks the controllers exported from `*.controller.ts` files for request parameters without a schema
 - ✅ e2e scaffold: `test/app.e2e-spec.ts` (supertest, plus `test/auth.e2e-spec.ts` in auth variants) + `test/jest-e2e.json`, built on `test/support/create-e2e-app.ts`, which swaps Prisma and the token verifier for in-memory fakes (no Postgres needed)
 - ✅ Lint (`npm run lint`, type-checked ESLint, no warnings allowed) and Prettier (`npm run format:check`)
 - Citations: `/fundamentals/testing`

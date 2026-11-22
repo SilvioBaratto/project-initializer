@@ -1,6 +1,6 @@
 /**
- * Validates every controller under src/: each `@Body`, `@Param` and `@Query` of a route handler
- * binds a schema.
+ * Validates the controller classes exported from the `*.controller.ts` files under src/: each
+ * `@Body`, `@Param` and `@Query` of their own and inherited route handlers binds a schema.
  *
  * The global `StandardSchemaValidationPipe` validates only the parameters that pass `{ schema }`
  * and hands every other one to the handler unchanged, so a forgotten schema would switch input
@@ -36,12 +36,24 @@ interface RouteArgument {
   schema?: unknown;
 }
 
+/**
+ * Names the route handlers of a controller, its own and the ones it inherits, because Nest's scanner
+ * walks the prototype chain too: a handler declared on an undecorated base class is still a route.
+ */
 function handlerNamesOf(controller: Type<unknown>): string[] {
-  const prototype = controller.prototype as object;
-  return Object.getOwnPropertyNames(prototype).filter((name) => {
-    const member: unknown = Object.getOwnPropertyDescriptor(prototype, name)?.value;
-    return typeof member === 'function' && Reflect.hasMetadata(METHOD_METADATA, member);
-  });
+  const names = new Set<string>();
+  let prototype = controller.prototype as object | null;
+  while (prototype !== null && prototype !== Object.prototype) {
+    const current: object = prototype;
+    for (const name of Object.getOwnPropertyNames(current)) {
+      const member: unknown = Object.getOwnPropertyDescriptor(current, name)?.value;
+      if (typeof member === 'function' && Reflect.hasMetadata(METHOD_METADATA, member)) {
+        names.add(name);
+      }
+    }
+    prototype = Object.getPrototypeOf(current) as object | null;
+  }
+  return [...names];
 }
 
 /**
@@ -71,14 +83,18 @@ function isController(candidate: unknown): candidate is Type<unknown> {
   );
 }
 
-async function discoverControllers(): Promise<Type<unknown>[]> {
+/** The controller classes each `*.controller.ts` file under `src/` exports, keyed by file. */
+async function discoverControllers(): Promise<Map<string, Type<unknown>[]>> {
   const files = readdirSync(SOURCE_ROOT, { recursive: true, encoding: 'utf8' }).filter((file) =>
     CONTROLLER_FILE.test(file),
   );
-  const modules = await Promise.all(
-    files.map((file) => import(join(SOURCE_ROOT, file)) as Promise<Record<string, unknown>>),
+  const entries = await Promise.all(
+    files.map(async (file): Promise<[string, Type<unknown>[]]> => {
+      const exported = (await import(join(SOURCE_ROOT, file))) as Record<string, unknown>;
+      return [file, Object.values(exported).filter(isController)];
+    }),
   );
-  return modules.flatMap((exported) => Object.values(exported).filter(isController));
+  return new Map(entries);
 }
 
 const ProbeSchema = z.object({ name: z.string() });
@@ -105,6 +121,16 @@ class ProbeCoveredController {
   }
 }
 
+class ProbeBaseHandlers {
+  @Get('search')
+  search(@Query('term') term: string): string {
+    return term;
+  }
+}
+
+@Controller('probe')
+class ProbeInheritingController extends ProbeBaseHandlers {}
+
 describe('Validation coverage of the controllers', () => {
   it('when a handler leaves a parameter without a schema, then the check names exactly that parameter', () => {
     expect(parametersWithoutSchema(ProbeWithGapsController)).toEqual([
@@ -117,14 +143,25 @@ describe('Validation coverage of the controllers', () => {
     expect(parametersWithoutSchema(ProbeCoveredController)).toEqual([]);
   });
 
-  it('when the controllers under src are discovered, then the shared ones are among them', async () => {
-    const names = (await discoverControllers()).map((controller) => controller.name);
+  it('when a controller inherits a handler without a schema, then the check names it too', () => {
+    expect(parametersWithoutSchema(ProbeInheritingController)).toEqual([
+      'ProbeInheritingController.search: @Query at parameter 0',
+    ]);
+  });
 
-    expect(names).toEqual(expect.arrayContaining(['ItemsController', 'TestController']));
+  it('when the controller files under src are loaded, then each exports a controller and the health one is among them', async () => {
+    const discovered = await discoverControllers();
+    const filesWithoutController = [...discovered]
+      .filter(([, controllers]) => controllers.length === 0)
+      .map(([file]) => file);
+    const names = [...discovered.values()].flat().map((controller) => controller.name);
+
+    expect(filesWithoutController).toEqual([]);
+    expect(names).toContain('HealthController');
   });
 
   it('when every controller under src is inspected, then each @Body, @Param and @Query passes a schema', async () => {
-    const controllers = await discoverControllers();
+    const controllers = [...(await discoverControllers()).values()].flat();
 
     expect(controllers.flatMap(parametersWithoutSchema)).toEqual([]);
   });

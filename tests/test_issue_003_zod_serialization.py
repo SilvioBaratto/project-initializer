@@ -278,7 +278,7 @@ def test_when_app_module_is_read_then_standard_schema_validation_pipe_is_registe
     parameter that declares a schema is validated, unknown properties are stripped, and the
     error body lists the failing fields.
 
-    Validates project_initializer/templates-api-nestjs/api/src/app.module.ts and src/common/filters/schema-validation.exception.ts.
+    Validates project_initializer/templates-api-nestjs/api/src/app.module.ts and project_initializer/templates-api-nestjs/api/src/common/filters/schema-validation.exception.ts.
     """
     assert module_path.exists(), f"[{label}] app.module.ts not found: {module_path}"
     assert _has_app_pipe_standard_schema(

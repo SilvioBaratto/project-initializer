@@ -14,13 +14,14 @@ export interface ResponseSchemaOptions {
  * Decorator for a route handler whose result, awaited or not, must be a `Body`. Decorating a handler
  * that returns anything else is a compile error (TS1241), so a handler cannot drift from the schema
  * it declares without the build noticing.
+ *
+ * Only the descriptor's `value` is typed, and the key and descriptor are optional, so the decorator
+ * still fits Nest's `applyDecorators`, which accepts any `MethodDecorator`.
  */
-export type ResponseSchemaDecorator<Body> = <
-  Handler extends (...args: never[]) => Body | Promise<Body>,
->(
+export type ResponseSchemaDecorator<Body> = (
   target: object,
-  propertyKey: string | symbol,
-  descriptor: TypedPropertyDescriptor<Handler>,
+  propertyKey?: string | symbol,
+  descriptor?: Pick<TypedPropertyDescriptor<(...args: never[]) => Body | Promise<Body>>, 'value'>,
 ) => void;
 
 /**
@@ -60,7 +61,21 @@ export function ResponseSchema<Schema extends z.ZodType>(
   options?: ResponseSchemaOptions & { many?: false },
 ): ResponseSchemaDecorator<z.input<Schema>>;
 /**
- * Implementation shared by both overloads: sets the serializer schema and the OpenAPI response.
+ * Declares a body whose `many` is not known at compile time, e.g. options held in a variable of
+ * type {@link ResponseSchemaOptions}; the handler may then return one value or an array of them.
+ *
+ * @param status - Status the response is documented under.
+ * @param schema - Schema of the body, or of one element of it.
+ * @param options - See {@link ResponseSchemaOptions}.
+ * @returns A decorator for a handler that returns one `schema` value or an array of them.
+ */
+export function ResponseSchema<Schema extends z.ZodType>(
+  status: HttpStatus,
+  schema: Schema,
+  options?: ResponseSchemaOptions,
+): ResponseSchemaDecorator<z.input<Schema> | z.input<Schema>[]>;
+/**
+ * Implementation shared by the overloads: sets the serializer schema and the OpenAPI response.
  *
  * @param status - Status the response is documented under.
  * @param schema - Schema of the body, or of one element of it.

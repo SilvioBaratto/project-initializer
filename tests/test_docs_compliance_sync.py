@@ -167,7 +167,7 @@ _NESTJS_ALL = [
     "`@Body({ schema })`",
     "a forgotten `schema` switches validation off",
     "`createSchemaValidationPipe()`",
-    "`src/common/validation-coverage.spec.ts` finds every controller under `src/`",
+    "finds the controller classes exported from the `*.controller.ts` files under `src/`, checks their own and inherited handlers",
     "a compile error (TS1241)",
     "answers 404 `Route not found` with the same body, under `/api/v1` and outside it",
     "`answerUnmatchedRequests(app)`",
@@ -242,6 +242,8 @@ _STALE_NESTJS = [
     "cleanupOpenApiDoc",
     "Express's own 404 page",
     "a repo test fails on it",
+    "finds every controller under `src/`",
+    "checks every controller for request parameters",
 ]
 
 _NESTJS_BY_AUTH = {

@@ -1,23 +1,47 @@
 /** Validates src/common/serialization/response-schema.decorator.ts. */
 import 'reflect-metadata';
 import {
+  applyDecorators,
   CallHandler,
+  Get,
   HttpCode,
   HttpStatus,
   StandardSchemaSerializerInterceptor,
 } from '@nestjs/common';
-import { HTTP_CODE_METADATA } from '@nestjs/common/constants';
+import { HTTP_CODE_METADATA, METHOD_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
 import { ExecutionContextHost } from '@nestjs/core/helpers/execution-context-host';
-import { DECORATORS } from '@nestjs/swagger';
+import { ApiOperation, DECORATORS } from '@nestjs/swagger';
 import { firstValueFrom, of } from 'rxjs';
 import { z } from 'zod';
-import { ResponseSchema } from './response-schema.decorator';
+import { ResponseSchema, type ResponseSchemaOptions } from './response-schema.decorator';
 
 const WidgetSchema = z.object({ name: z.string() });
 type Widget = z.infer<typeof WidgetSchema>;
 const LIST_DESCRIPTION = 'Every widget';
 const GEAR: Widget = { name: 'gear' };
+const PAGE_OPTIONS: ResponseSchemaOptions = { description: 'A page of widgets' };
+
+/** A project's own composed decorator, the way Nest's `applyDecorators` is meant to be used. */
+function ListWidgets(): MethodDecorator {
+  return applyDecorators(
+    Get('widgets'),
+    ResponseSchema(HttpStatus.OK, WidgetSchema, { many: true }),
+    ApiOperation({ summary: LIST_DESCRIPTION }),
+  );
+}
+
+class ComposedController {
+  @ListWidgets()
+  list(): Widget[] {
+    return [GEAR];
+  }
+
+  @ResponseSchema(HttpStatus.OK, WidgetSchema, PAGE_OPTIONS)
+  page(): Widget {
+    return GEAR;
+  }
+}
 
 class WidgetController {
   @ResponseSchema(HttpStatus.OK, WidgetSchema)
@@ -110,6 +134,28 @@ describe('ResponseSchema', () => {
 
   it('when the handler returns data that violates the schema, then serialization fails', async () => {
     await expect(serialize('findOne', { name: 42 })).rejects.toThrow(Error);
+  });
+
+  it('when it is composed with applyDecorators, then the route, the array response and the serializer schema all apply', async () => {
+    const { list } = ComposedController.prototype;
+    const interceptor = new StandardSchemaSerializerInterceptor(new Reflector());
+    const context = new ExecutionContextHost([], ComposedController, list);
+    context.setType('http');
+    const next: CallHandler = { handle: () => of([{ name: 'gear', secret: 'leak' }]) };
+
+    expect(Reflect.getMetadata(METHOD_METADATA, list)).toBeDefined();
+    expect(Reflect.getMetadata(DECORATORS.API_RESPONSE, list)).toMatchObject({
+      [HttpStatus.OK]: { standardSchema: WidgetSchema, isArray: true },
+    });
+    await expect(firstValueFrom(interceptor.intercept(context, next))).resolves.toEqual([
+      { name: 'gear' },
+    ]);
+  });
+
+  it('when the options come in a variable of the exported options type, then the decorator applies them', () => {
+    expect(
+      Reflect.getMetadata(DECORATORS.API_RESPONSE, ComposedController.prototype.page),
+    ).toMatchObject({ [HttpStatus.OK]: { description: PAGE_OPTIONS.description } });
   });
 
   it('when a handler returns another type than its schema, then only the compiler objects', () => {
