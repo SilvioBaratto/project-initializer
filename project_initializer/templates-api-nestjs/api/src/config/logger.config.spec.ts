@@ -7,6 +7,7 @@ import { Test } from '@nestjs/testing';
 import type { Response } from 'express';
 import { LoggerModule } from 'nestjs-pino';
 import request from 'supertest';
+import { API_PREFIX } from '../app.setup';
 import {
   accessLogLevel,
   buildLoggerParams,
@@ -155,6 +156,10 @@ describe('buildLoggerParams', () => {
 
     expect(pinoHttp).not.toHaveProperty('transport');
   });
+
+  it('when built, then the routes are left to the nestjs-pino default', () => {
+    expect(buildLoggerParams({ level: 'info', pretty: false })).not.toHaveProperty('forRoutes');
+  });
 });
 
 @Controller('logged')
@@ -175,6 +180,7 @@ describe('what a request writes to the log', () => {
   const BEARER_SECRET = 'bearer-secret-value';
   const COOKIE_SECRET = 'cookie-secret-value';
   const QUERY_SECRET = 'query-secret-value';
+  const PREFIX_ROOT = `/${API_PREFIX}`;
   let app: INestApplication;
   let lines: Array<Record<string, unknown>>;
 
@@ -192,6 +198,8 @@ describe('what a request writes to the log', () => {
       controllers: [LoggedController],
     }).compile();
     app = moduleRef.createNestApplication();
+    // As in configureApp: the routes the logger middleware covers are derived from the prefix.
+    app.setGlobalPrefix(API_PREFIX);
     await app.init();
   });
 
@@ -217,15 +225,17 @@ describe('what a request writes to the log', () => {
   }
 
   it('when a request carries credentials and a query string, then the line holds only id, method and path', async () => {
-    const line = await accessLineOf(`/logged/ok?token=${QUERY_SECRET}`);
+    const line = await accessLineOf(`${PREFIX_ROOT}/logged/ok?token=${QUERY_SECRET}`);
 
     const requestFields = line.req as Record<string, unknown>;
     expect(Object.keys(requestFields).sort()).toEqual(['id', 'method', 'path']);
-    expect(requestFields).toMatchObject({ method: 'GET', path: '/logged/ok' });
+    expect(requestFields).toMatchObject({ method: 'GET', path: `${PREFIX_ROOT}/logged/ok` });
   });
 
   it('when a request finishes, then no secret, query or address appears anywhere in the line', async () => {
-    const serialized = JSON.stringify(await accessLineOf(`/logged/ok?token=${QUERY_SECRET}`));
+    const serialized = JSON.stringify(
+      await accessLineOf(`${PREFIX_ROOT}/logged/ok?token=${QUERY_SECRET}`),
+    );
 
     for (const secret of [BEARER_SECRET, COOKIE_SECRET, QUERY_SECRET, '198.51.100.23']) {
       expect(serialized).not.toContain(secret);
@@ -233,22 +243,28 @@ describe('what a request writes to the log', () => {
   });
 
   it('when the response sets a cookie, then the response header is redacted', async () => {
-    const line = await accessLineOf('/logged/ok');
+    const line = await accessLineOf(`${PREFIX_ROOT}/logged/ok`);
 
     expect(line.res).toHaveProperty(['headers', 'set-cookie'], '[Redacted]');
   });
 
   it('when the response is a success, then the line is at info level', async () => {
-    const line = await accessLineOf('/logged/ok');
+    const line = await accessLineOf(`${PREFIX_ROOT}/logged/ok`);
 
     expect(line.level).toBe(30);
   });
 
   it('when the response is a 5xx, then the line is a warning without a synthetic error', async () => {
-    const line = await accessLineOf('/logged/boom');
+    const line = await accessLineOf(`${PREFIX_ROOT}/logged/boom`);
 
     expect(line.level).toBe(40);
     expect(line).not.toHaveProperty('err');
     expect(line).toHaveProperty('res.statusCode', 503);
+  });
+
+  it('when a request hits the root of the global prefix, then it is logged as well', async () => {
+    const line = await accessLineOf(PREFIX_ROOT);
+
+    expect(line.req).toMatchObject({ method: 'GET', path: PREFIX_ROOT });
   });
 });

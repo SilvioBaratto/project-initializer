@@ -53,6 +53,7 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_when_pyproject_already_has_asyncpg_then_transform_returns_it_unchanged",
             "test_when_pyproject_lacks_an_array_then_transform_raises_value_error",
             "test_when_scaffolded_with_async_db_then_pyproject_declares_async_deps",
+            "test_when_async_dependencies_are_appended_then_the_sqlalchemy_extra_matches_the_base_pin",
             "test_when_scaffolded_with_async_db_then_no_requirements_txt_exists",
             "test_when_supabase_scaffolded_with_async_db_then_pyproject_gains_async_deps",
             "test_when_scaffolded_with_async_db_async_files_exist",
@@ -62,10 +63,16 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
     "test_ci_workflow_scope.py": frozenset(
         {
             "test_when_api_only_steps_are_gated_against_frontend_scope",
+            "test_when_the_workflows_set_up_node_then_the_version_matches_the_dockerfile",
+            "test_when_the_workflow_runs_the_api_suite_then_python_floor_and_image_version_are_both_tested",
+            "test_when_the_suites_matrix_is_read_then_nestjs_runs_once_and_every_suite_name_is_unique",
         }
     ),
     "test_docker_runtime_invariants.py": frozenset(
         {
+            "test_when_the_nestjs_dockerfile_is_read_then_every_stage_is_node_26_alpine",
+            "test_when_the_nestjs_compose_is_read_then_postgres_19_mounts_the_cluster_root_and_no_image_floats",
+            "test_when_the_nestjs_supabase_compose_is_read_then_it_has_no_local_db_and_no_image_floats",
             "test_fastapi_server_does_not_write_the_unstructured_access_log",
             "test_fastapi_image_keeps_the_application_code_root_owned",
             "test_fastapi_entrypoint_waits_on_the_database_the_application_will_use",
@@ -74,6 +81,14 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_nestjs_production_image_ships_the_prisma_config_the_entrypoint_needs",
             "test_no_compose_file_hardcodes_container_names",
             "test_every_published_host_port_is_parametrized",
+            "test_when_the_fastapi_compose_is_read_then_postgres_19_mounts_the_cluster_root_and_no_image_floats",
+            "test_when_the_fastapi_dockerfile_is_read_then_both_stages_share_one_python_slim_tag",
+        }
+    ),
+    "test_docs_generator_selfcheck.py": frozenset(
+        {
+            "test_when_supabase_then_docker_table_omits_local_db",
+            "test_when_non_supabase_then_docker_table_has_local_db",
         }
     ),
     "test_docs_frontend_material.py": frozenset(
@@ -129,9 +144,12 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_when_auth_overlay_app_auth_is_read_then_app_guard_is_registered",
             "test_when_base_env_validation_is_read_then_database_url_is_required",
             "test_when_overlay_is_listed_then_it_does_not_replace_the_shared_app_module",
-            "test_when_app_module_is_read_then_zod_validation_pipe_is_registered_as_app_pipe",
-            "test_when_app_module_is_read_then_zod_serializer_interceptor_is_registered_as_app_interceptor",
-            "test_when_all_controller_files_are_read_then_data_handlers_carry_zod_serializer_dto",
+            "test_when_app_module_is_read_then_standard_schema_validation_pipe_is_registered_as_app_pipe",
+            "test_when_app_module_is_read_then_standard_schema_serializer_interceptor_is_registered_as_app_interceptor",
+            "test_when_all_controller_files_are_read_then_data_handlers_carry_response_schema",
+            "test_when_a_parameter_decorator_is_scanned_then_only_those_without_a_schema_are_reported",
+            "test_when_all_controller_files_are_read_then_every_body_param_and_query_passes_a_schema",
+            "test_when_the_nestjs_layers_are_scanned_then_nothing_depends_on_nestjs_zod",
             "test_when_all_dto_files_are_read_then_no_schema_calls_passthrough",
             "test_when_serialization_spec_is_searched_then_it_exists",
             "test_when_serialization_spec_is_read_then_it_asserts_password_is_stripped",
@@ -267,6 +285,7 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_when_token_app_module_providers_are_listed_then_ThrottlerGuard_appears_before_AuthGuard",
             "test_when_supabase_app_module_providers_are_listed_then_ThrottlerGuard_appears_before_AuthGuard",
             "test_when_token_auth_guard_source_is_read_then_it_checks_Public_metadata_to_allow",
+            "test_when_token_overlay_source_is_read_then_no_response_schema_uses_passthrough",
             "test_when_supabase_auth_guard_source_is_read_then_it_checks_Public_metadata_to_allow",
             "test_when_Authorization_header_is_absent_then_token_auth_guard_rejects",
             "test_when_Authorization_header_is_absent_then_supabase_auth_guard_rejects",
@@ -342,6 +361,11 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_when_package_read_coverage_threshold_is_enforced",
             "test_when_package_read_jest_loads_the_test_environment_first",
             "test_when_package_read_lint_tooling_is_pinned_exactly",
+            "test_when_package_read_tsc_alias_is_pinned_exactly",
+            "test_when_package_read_jest_runs_with_the_experimental_vm_modules_flag",
+            "test_when_package_read_types_node_major_equals_the_dockerfile_node_major",
+            "test_when_prisma_packages_read_then_they_are_one_exact_7x_release",
+            "test_when_tsconfig_read_no_deprecated_option_is_left_to_silence",
         }
     ),
     "test_nestjs_issue8_acceptance.py": frozenset(
@@ -356,6 +380,11 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
     "test_nestjs_lockfile_sync.py": frozenset(
         {
             "test_nestjs_layer_owns_a_lock_exactly_when_it_ships_a_package_json",
+        }
+    ),
+    "test_package_data.py": frozenset(
+        {
+            "test_when_pyproject_package_data_is_read_then_runtime_data_file_is_listed",
         }
     ),
     "test_scope_scaffold.py": frozenset(

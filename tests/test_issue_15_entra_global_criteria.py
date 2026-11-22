@@ -11,13 +11,13 @@ Criteria covered (oracle: all UNIT-verifiable):
 """
 
 import re
+import tomllib
 from pathlib import Path
 
 from tests.fastapi_entra_sources import (
     auth_failure_statuses_are_wired,
     entra_verifier_text,
 )
-from tests.toml_support import tomllib
 
 ROOT = Path(__file__).resolve().parent.parent
 PKG = ROOT / "project_initializer"

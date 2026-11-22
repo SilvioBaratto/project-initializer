@@ -12,10 +12,10 @@ async CRUD contract is verified by the repo suite too.
 import shutil
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 from project_initializer.file_transforms import append_async_dependencies
-from tests.toml_support import tomllib
 
 _ROOT = Path(__file__).resolve().parent.parent
 _TEMPLATES = _ROOT / "project_initializer"

@@ -3,7 +3,7 @@ import { Logger, ServiceUnavailableException } from '@nestjs/common';
 import { createFakeResponse, httpHostOf } from '../../../test/support/filter-test-doubles';
 import { HealthCheckExceptionFilter } from './health-check-exception.filter';
 
-const REQUEST = { method: 'GET', path: '/api/v1/health/readiness', id: 'req-9' };
+const REQUEST = { method: 'GET', baseUrl: '', path: '/api/v1/health/readiness', id: 'req-9' };
 const REQUEST_SUMMARY = 'GET /api/v1/health/readiness (requestId: req-9)';
 
 describe('HealthCheckExceptionFilter', () => {

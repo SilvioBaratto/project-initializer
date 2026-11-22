@@ -5,13 +5,12 @@ in pyproject.toml and MANIFEST.in.
 Tests authored directly from acceptance criteria only; no implementation source was read.
 """
 
+import tomllib
 from pathlib import Path
 
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
-
-from tests.toml_support import tomllib
 
 _ROOT = Path(__file__).parent.parent
 _PKG = _ROOT / "project_initializer"

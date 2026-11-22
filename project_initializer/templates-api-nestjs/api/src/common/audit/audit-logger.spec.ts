@@ -1,8 +1,6 @@
 import { Writable } from 'node:stream';
-import { Test } from '@nestjs/testing';
+import { Test, type TestingModule } from '@nestjs/testing';
 import { LoggerModule, PinoLogger } from 'nestjs-pino';
-import { __resetOutOfContextForTests } from 'nestjs-pino/PinoLogger';
-import type { Logger } from 'pino';
 import { buildLoggerParams, type LogLevel } from '../../config/logger.config';
 import { ANONYMOUS_ACTOR_ID, AUDIT_EVENT, AuditLogger, auditActorIdOf } from './audit-logger';
 
@@ -25,32 +23,41 @@ class CapturedLines extends Writable {
   }
 }
 
-/** Boots the real pino wiring of the application at the given level, writing to `sink`. */
-async function bootLogging(
-  level: LogLevel,
-  sink: CapturedLines,
-): Promise<{ audit: AuditLogger; appLogger: Logger }> {
-  const moduleRef = await Test.createTestingModule({
-    imports: [LoggerModule.forRoot(buildLoggerParams({ level, pretty: false, destination: sink }))],
-    providers: [AuditLogger],
-  }).compile();
-  await moduleRef.init();
-  const pinoLogger = await moduleRef.resolve(PinoLogger);
-  return { audit: moduleRef.get(AuditLogger), appLogger: pinoLogger.logger };
-}
-
 /** Validates src/common/audit/audit-logger.ts AuditLogger and auditActorIdOf. */
 describe('AuditLogger', () => {
-  let sink: CapturedLines;
+  // nestjs-pino builds one root logger per process, on the first boot of LoggerModule, and keeps
+  // its destination and level from then on, so a second boot with other options would change
+  // nothing. The real wiring is therefore booted once, and each test sets the level where
+  // LOG_LEVEL and a runtime reload set it: on the root every application logger descends from.
+  const sink = new CapturedLines();
+  let moduleRef: TestingModule;
+  let audit: AuditLogger;
+  let appLogger: PinoLogger;
 
-  beforeEach(() => {
-    __resetOutOfContextForTests();
-    sink = new CapturedLines();
+  beforeAll(async () => {
+    moduleRef = await Test.createTestingModule({
+      imports: [
+        LoggerModule.forRoot(
+          buildLoggerParams({ level: 'info', pretty: false, destination: sink }),
+        ),
+      ],
+      providers: [AuditLogger],
+    }).compile();
+    await moduleRef.init();
+    audit = moduleRef.get(AuditLogger);
+    appLogger = await moduleRef.resolve(PinoLogger);
   });
 
-  it('when an action is recorded, then one structured line carries the event, action, resource and actor', async () => {
-    const { audit } = await bootLogging('info', sink);
+  afterAll(async () => {
+    await moduleRef.close();
+  });
 
+  beforeEach(() => {
+    sink.lines.length = 0;
+    PinoLogger.root.level = 'info';
+  });
+
+  it('when an action is recorded, then one structured line carries the event, action, resource and actor', () => {
     audit.record('item.create', 'item-1', 'user-1');
 
     expect(sink.lines).toHaveLength(1);
@@ -65,8 +72,8 @@ describe('AuditLogger', () => {
 
   it.each<LogLevel>(['warn', 'error', 'fatal', 'silent'])(
     'when LOG_LEVEL is %s, then the audit record is still written',
-    async (level) => {
-      const { audit } = await bootLogging(level, sink);
+    (level) => {
+      PinoLogger.root.level = level;
 
       audit.record('item.delete', 'item-2', 'user-2');
 
@@ -75,8 +82,8 @@ describe('AuditLogger', () => {
     },
   );
 
-  it('when the application logs at the same level, then ordinary info lines are filtered but the audit line is not', async () => {
-    const { audit, appLogger } = await bootLogging('warn', sink);
+  it('when the application logs at the same level, then ordinary info lines are filtered but the audit line is not', () => {
+    PinoLogger.root.level = 'warn';
 
     appLogger.info('ordinary');
     appLogger.warn('visible');
@@ -85,18 +92,16 @@ describe('AuditLogger', () => {
     expect(sink.lines.map((line) => line.level)).toEqual([PINO_WARN, PINO_INFO]);
   });
 
-  it('when the level of the application loggers changes at runtime, then the audit record is still written', async () => {
-    const { audit, appLogger } = await bootLogging('info', sink);
-
-    appLogger.level = 'fatal';
+  it('when the level of the application loggers changes at runtime, then the audit record is still written', () => {
     audit.record('item.create', 'item-4', 'user-4');
 
-    expect(sink.lines).toHaveLength(1);
+    PinoLogger.root.level = 'fatal';
+    audit.record('item.update', 'item-6', 'user-6');
+
+    expect(sink.lines.map((line) => line.resourceId)).toEqual(['item-4', 'item-6']);
   });
 
-  it('when an action is recorded, then the line holds only the audit fields and pino metadata', async () => {
-    const { audit } = await bootLogging('info', sink);
-
+  it('when an action is recorded, then the line holds only the audit fields and pino metadata', () => {
     audit.record('item.create', 'item-5', 'user-5');
 
     expect(Object.keys(sink.lines[0] ?? {}).sort()).toEqual(

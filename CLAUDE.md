@@ -233,7 +233,7 @@ This means contributors can press F5 and get a running API immediately.
 | | `app/application/commands/`, `dto/` | Commands in, DTOs out; entities never leave the layer |
 | **infrastructure** | `app/infrastructure/settings.py` | `Settings`: Literal-validated, `DEBUG` off by default and refused outside development |
 | | `app/infrastructure/auth_settings.py` | The auth-settings seam: empty in the base, replaced by each auth overlay |
-| | `app/infrastructure/database.py`, `circuit_breaker.py`, `errors.py`, `health.py` | Sync pooled engine behind a circuit breaker that counts connectivity failures only; driver errors translated to domain errors (deadlocks to `ConflictError`); readiness probe; the shutdown-hook and readiness-probe registries that optional components such as the async overlay use |
+| | `app/infrastructure/database.py`, `circuit_breaker.py`, `errors.py`, `health.py` | Sync pooled engine behind a circuit breaker that counts connectivity failures only (`with_psycopg2_driver` binds a driverless `postgresql://` URL to psycopg2, because SQLAlchemy 2.1 would pick psycopg 3); driver errors translated to domain errors (deadlocks to `ConflictError`); readiness probe; the shutdown-hook and readiness-probe registries that optional components such as the async overlay use |
 | | `app/infrastructure/orm/`, `repositories/`, `unit_of_work.py` | SQLAlchemy records (mixins in `orm/base.py` supply string UUID keys and timestamps), port adapters, commit/rollback |
 | | `app/infrastructure/structured_logging.py`, `request_context.py` | JSON logs that carry the request id |
 | | `app/infrastructure/log_level.py` | `reload_log_level_on_sighup`: SIGHUP re-reads `LOG_LEVEL`; on a reload the `.env` file wins over the process environment |
@@ -270,7 +270,7 @@ alembic revision --autogenerate --rev-id 0003_add_widget -m "add widget"  # Crea
 
 `pytest.ini` of the template enforces the coverage gate (`--cov-fail-under=75`, branch coverage). `tests/test_asyncdb_overlay.py` runs a single scaffolded test file in a subprocess, so it passes `--no-cov`.
 
-To verify a FastAPI change, scaffold all five variants (none, token, supabase, entra, `--async-db`) and run `pip install ".[dev]" && pytest -q` in each `api/`. CI does the same in `test-variant-suites`.
+To verify a FastAPI change, scaffold all five variants (none, token, supabase, entra, `--async-db`) and run `pip install ".[dev]" && pytest -q` in each `api/`. CI does the same in `test-variant-suites`, on Python 3.12 (the `requires-python` floor) and on 3.15 (the interpreter the API image runs).
 
 ### The auth seam: overlays replace by path, never copy a base file
 
@@ -286,7 +286,7 @@ Everything an overlay must keep stable is a contract in the base: routes import 
 
 ### Alembic migrations — own the schema, and mind the overlay
 
-Alembic is the only thing that creates tables: `entrypoint.sh` runs `alembic upgrade head`, and the runtime `create_all` was removed on purpose. So a model change must ship its migration in the same edit; `tests/integration/test_migrations.py` (in the scaffold) compares the migrated schema with the ORM and fails otherwise.
+Alembic is the only thing that creates tables: `entrypoint.sh` runs `alembic upgrade head`, and the runtime `create_all` was removed on purpose. So a model change must ship its migration in the same edit; `tests/integration/test_migrations.py` (in the scaffold) compares the migrated schema with the ORM and fails otherwise. `alembic/env.py` passes both migration URLs (online and offline) through `with_psycopg2_driver` from `app/infrastructure/database.py`, so a driverless `postgresql://` URL runs on psycopg2 there as it does in the application.
 
 Which layer owns a migration follows its ORM model: the base carries `0001_create_items_table.py` and `0002_create_users_table.py` (`users`, used by the token variant, and present in none and entra), and `templates-supabase-fastapi` carries a `0002_create_users_table.py` that creates `profiles`. **The supabase migration reuses the base migration's file name on purpose** (revision `0002_create_profiles`): layers overwrite by path, so the identical name makes it *replace* the base file, whereas a different name would leave both and a supabase scaffold would create a stray `users` table next to `profiles`.
 
@@ -407,10 +407,10 @@ The templates ship no requirement IDs. The generated docs describe the `[REQ-<AR
 
 ### package-lock.json — regenerate on linux
 
-The API Dockerfile runs `npm ci`, which hard-fails on **any** drift between `package.json` and its lock, so a stale lock means the image never builds. After changing a NestJS dependency, regenerate the lock **inside the build's own platform** — a lock resolved on macOS/arm64 pins different native/optional packages (`@emnapi/*`, …) and `npm ci` then rejects it on `node:22-alpine`:
+The API Dockerfile runs `npm ci`, which hard-fails on **any** drift between `package.json` and its lock, so a stale lock means the image never builds. After changing a NestJS dependency, regenerate the lock **inside the build's own platform** — a lock resolved on macOS/arm64 pins different native/optional packages (`@emnapi/*`, …) and `npm ci` then rejects it on `node:26-alpine`:
 
 ```bash
-docker run --rm -v "$PWD:/w" -w /w node:22-alpine npm install --package-lock-only --ignore-scripts
+docker run --rm -v "$PWD:/w" -w /w node:26-alpine npm install --package-lock-only --ignore-scripts
 ```
 
 Which overlay owns a lock follows its `package.json`: `templates-api-nestjs` (base) and the overlays that ship their own `package.json` (`templates-supabase-nestjs`, `templates-entra-nestjs`) each carry one. `templates-token-nestjs` ships no `package.json`, so it must **not** carry a lock — it inherits the base pair. `tests/test_nestjs_lockfile_sync.py` checks the **layered** result for every auth mode, which is the only place the drift is visible, and pins which layers own a lock. A change to a dependency shared by all variants (anything in the base `package.json`) has to be made in the base, supabase and entra manifests, and in all three locks.
@@ -449,7 +449,7 @@ Non-supabase variants:
 
 | Service | Host port | Description |
 |---------|-----------|-------------|
-| `db` | `${DB_HOST_PORT:-5433}`:5432 | PostgreSQL 16 |
+| `db` | `${DB_HOST_PORT:-5433}`:5432 | PostgreSQL 19 |
 | `adminer` | `${ADMINER_HOST_PORT:-8080}`:8080 | Database management UI |
 | `api` | `${API_HOST_PORT:-8000}`:8000 | Backend with hot reload |
 | `frontend` | `${FRONTEND_HOST_PORT:-4200}`:80 | Angular + nginx (proxies `/api/` to backend) |

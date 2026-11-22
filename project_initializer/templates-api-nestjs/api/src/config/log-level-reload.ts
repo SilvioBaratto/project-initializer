@@ -138,15 +138,14 @@ export interface LogLevelReporter {
 /**
  * Builds the sink that moves a set of pino loggers to a new level together.
  *
- * `nestjs-pino` keeps two independent root loggers: one inside the HTTP middleware, which every
- * request logger descends from, and one for lines written outside a request. Setting only one
- * would change the level for requests or for everything else, never both. Loggers already created
- * for in-flight requests keep the level they were created with; the next request picks up the
- * new one. A child logger created with an explicit level, such as the audit logger's, is not
- * touched.
+ * `nestjs-pino` has one root logger, `PinoLogger.root`, that every other logger descends from:
+ * request loggers are its children and lines written outside a request go to it directly, so the
+ * application passes the root alone. Loggers already created for in-flight requests keep the
+ * level they were created with; the next request picks up the new one. A child logger created
+ * with an explicit level, such as the audit logger's, is not touched.
  *
  * @param loggers - Returns the loggers to keep in step, evaluated at every reload because the
- *   middleware logger only exists once the application is configured. The first one is the
+ *   root logger only exists once the logging module has been built. The first one is the
  *   reference for the current level.
  * @param reporter - Receives the result lines.
  * @returns The sink to pass to {@link installLogLevelReload}.

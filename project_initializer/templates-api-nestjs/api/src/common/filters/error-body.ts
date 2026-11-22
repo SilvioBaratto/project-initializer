@@ -48,13 +48,29 @@ export function requestIdOf(request: Request): string | undefined {
 }
 
 /**
+ * Reads the full path of a request, without the query string, which may carry credentials.
+ *
+ * `request.path` alone is not enough: Nest answers an unknown path under the global prefix from a
+ * router mounted at that prefix, and there Express reports the path relative to the mount, so the
+ * mount point (`baseUrl`) is put back in front. Both come from Express's parse of the request
+ * target, never from the raw target, which in absolute form (`GET http://user:pass@host/...`)
+ * carries a scheme, a host and possibly credentials.
+ *
+ * @param request - The request being answered.
+ * @returns The path, e.g. `/api/v1/items/42`.
+ */
+export function requestPathOf(request: Request): string {
+  return `${request.baseUrl}${request.path}`;
+}
+
+/**
  * Describes a request for a log line: method, path without the query string, and correlation id.
  *
  * @param request - The request being answered.
  * @returns A single line free of headers, body and query, none of which are safe to log.
  */
 export function describeRequest(request: Request): string {
-  return `${request.method} ${request.path} (requestId: ${requestIdOf(request) ?? 'none'})`;
+  return `${request.method} ${requestPathOf(request)} (requestId: ${requestIdOf(request) ?? 'none'})`;
 }
 
 /**
@@ -77,7 +93,7 @@ export function buildErrorBody(input: {
     statusCode: input.status,
     error: STATUS_CODES[input.status] ?? UNKNOWN_STATUS_LABEL,
     message: input.message,
-    path: input.request.path,
+    path: requestPathOf(input.request),
     timestamp: new Date().toISOString(),
     ...(requestId === undefined ? {} : { requestId }),
     ...(input.errors === undefined ? {} : { errors: input.errors }),

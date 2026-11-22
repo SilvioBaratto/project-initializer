@@ -109,10 +109,10 @@ def test_when_response_schema_files_are_read_then_password_is_not_a_whitelisted_
     """
     Criterion: Zod response schemas explicitly whitelist safe fields; `password`
     must not appear in any response schema definition.
-    Assumption: NestJS/nestjs-zod convention — response schemas live in *.dto.ts
-    files under src/ (the template uses CreateZodDto/createZodDto pattern). Files
-    whose names contain 'response' OR end in '.dto.ts' are considered response-schema
-    candidates.
+    Assumption: the template's DTO convention — response schemas live in *.dto.ts
+    files under src/, each exporting a zod `<Name>Schema` and its inferred `<Name>Dto`
+    type. Files whose names contain 'response' OR end in '.dto.ts' are considered
+    response-schema candidates.
 
     Validates project_initializer/templates-api-nestjs/api/src/**/*.dto.ts and **/*response*.ts.
     """

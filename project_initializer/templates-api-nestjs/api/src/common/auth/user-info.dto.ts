@@ -1,4 +1,3 @@
-import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import type { AuthenticatedUser } from './authenticated-user';
 import { emailAddressSchema } from './optional-email';
@@ -13,8 +12,8 @@ export const UserInfoSchema = z.object({
   roles: z.array(z.string()),
 });
 
-/** Response DTO of `GET /auth/me`, derived from {@link UserInfoSchema}. */
-export class UserInfoDto extends createZodDto(UserInfoSchema) {}
+/** Response body of `GET /auth/me`, derived from {@link UserInfoSchema}. */
+export type UserInfoDto = z.infer<typeof UserInfoSchema>;
 
 /**
  * Maps the internal identity to its response shape.

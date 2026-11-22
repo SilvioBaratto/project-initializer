@@ -474,7 +474,7 @@ def test_when_avatar_template_read_then_photo_uses_fill_mode_without_bound_dimen
 # literal (which would ignore the bound input) for any realistic alt value.
 
 _ALT_TEXTS = st.text(
-    alphabet=st.characters(blacklist_categories=("Cs",)),
+    alphabet=st.characters(exclude_categories=("Cs",)),
     min_size=1,
     max_size=80,
 )
@@ -530,7 +530,7 @@ def test_when_alt_text_is_any_nonempty_string_then_template_does_not_hardcode_it
 # constructed from a name, for any single-word or multi-word name string.
 
 _NAME_TEXTS = st.text(
-    alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Zs")),
+    alphabet=st.characters(categories=("Lu", "Ll", "Zs")),
     min_size=1,
     max_size=40,
 )

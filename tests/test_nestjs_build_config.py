@@ -8,9 +8,12 @@ format and coverage-gate tooling. Reads the real template files so the fixtures 
 """
 
 import json
+import re
 from pathlib import Path
 
 import pytest
+
+from tests.nestjs_runtime import nestjs_dockerfile_node_majors
 
 TEMPLATES = Path(__file__).resolve().parent.parent / "project_initializer"
 BASE_PKG = TEMPLATES / "templates-api-nestjs" / "api" / "package.json"
@@ -19,10 +22,12 @@ ENTRA_PKG = TEMPLATES / "templates-entra-nestjs" / "api" / "package.json"
 BASE_TSCONFIG = TEMPLATES / "templates-api-nestjs" / "api" / "tsconfig.json"
 
 PACKAGE_JSONS = [BASE_PKG, SUPABASE_PKG]
+TOOLED_PACKAGE_JSONS = [BASE_PKG, SUPABASE_PKG, ENTRA_PKG]
+TOOLED_IDS = ["base", "supabase", "entra"]
 
 EXPECTED_POSTINSTALL = "npx prisma generate || true"
 EXPECTED_BUILD = "nest build && tsc-alias -p tsconfig.json"
-EXPECTED_TSC_ALIAS = "1.8.16"
+EXPECTED_TSC_ALIAS = "1.9.10"
 
 
 def _load_json(path: Path) -> dict:
@@ -39,8 +44,12 @@ def test_when_package_read_build_runs_tsc_alias(path):
     assert _load_json(path)["scripts"]["build"] == EXPECTED_BUILD
 
 
-@pytest.mark.parametrize("path", PACKAGE_JSONS, ids=["base", "supabase"])
+@pytest.mark.parametrize("path", TOOLED_PACKAGE_JSONS, ids=TOOLED_IDS)
 def test_when_package_read_tsc_alias_is_pinned_exactly(path):
+    """tsc-alias rewrites the build's path aliases, so all three manifests pin the same release.
+
+    Validates the devDependencies of project_initializer/templates-{api,supabase,entra}-nestjs/api/package.json.
+    """
     assert _load_json(path)["devDependencies"]["tsc-alias"] == EXPECTED_TSC_ALIAS
 
 
@@ -63,14 +72,26 @@ def test_when_both_packages_compared_only_supabase_js_differs():
     assert base == supa, "packages diverged beyond allowed differences"
 
 
-def test_when_tsconfig_read_baseurl_deprecation_is_silenced():
-    # TypeScript 6.x hard-errors (TS5101) on the deprecated `baseUrl` that the
-    # `@generated/*` path aliases rely on; the override keeps `nest build` green.
-    assert _load_json(BASE_TSCONFIG)["compilerOptions"]["ignoreDeprecations"] == "6.0"
+def test_when_tsconfig_read_no_deprecated_option_is_left_to_silence():
+    """The path aliases resolve without ``baseUrl``, so nothing needs ``ignoreDeprecations``.
+
+    TypeScript 6 deprecates ``baseUrl`` (TS5101) and removes it in 7. ``paths`` targets
+    prefixed with ``./`` resolve against the tsconfig directory instead, and tsc-alias
+    rewrites them the same way, so the override that kept ``nest build`` green is gone.
+
+    Validates project_initializer/templates-api-nestjs/api/tsconfig.json.
+    """
+    options = _load_json(BASE_TSCONFIG)["compilerOptions"]
+
+    assert "baseUrl" not in options
+    assert "ignoreDeprecations" not in options
+    assert all(
+        target.startswith("./")
+        for targets in options["paths"].values()
+        for target in targets
+    )
 
 
-TOOLED_PACKAGE_JSONS = [BASE_PKG, SUPABASE_PKG, ENTRA_PKG]
-TOOLED_IDS = ["base", "supabase", "entra"]
 MIN_LINE_COVERAGE = 75
 
 
@@ -123,3 +144,66 @@ def test_when_package_read_lint_tooling_is_pinned_exactly(path):
     ):
         assert name in dev, f"{name} missing from devDependencies"
         assert not dev[name].startswith(("^", "~")), f"{name} must be pinned exactly"
+
+
+JEST_COMMAND = "node --experimental-vm-modules ./node_modules/jest/bin/jest.js"
+EXPECTED_JEST_SCRIPTS = {
+    "test": JEST_COMMAND,
+    "test:watch": f"{JEST_COMMAND} --watch",
+    "test:cov": f"{JEST_COMMAND} --coverage",
+    "test:e2e": f"{JEST_COMMAND} --config ./test/jest-e2e.json",
+}
+
+
+@pytest.mark.parametrize("path", TOOLED_PACKAGE_JSONS, ids=TOOLED_IDS)
+def test_when_package_read_jest_runs_with_the_experimental_vm_modules_flag(path):
+    """Jest needs the flag to load the ESM-only runtime packages from a CommonJS project.
+
+    The NestJS 12 packages (``@nestjs/common``, ``@nestjs/core``, ``@nestjs/config``,
+    ``@nestjs/terminus``, ...) and ``jwks-rsa`` (through ``jose``) ship ESM only; without
+    ``vm.SourceTextModule`` every suite fails with "Must use import to load ES Module". The
+    wrapper form keeps the scripts cross-platform (no ``NODE_OPTIONS=``).
+
+    Validates the test scripts of project_initializer/templates-{api,supabase,entra}-nestjs/api/package.json.
+    """
+    scripts = _load_json(path)["scripts"]
+    jest_scripts = {name: scripts[name] for name in EXPECTED_JEST_SCRIPTS}
+
+    assert jest_scripts == EXPECTED_JEST_SCRIPTS
+
+
+PRISMA_PACKAGES = ("prisma", "@prisma/client", "@prisma/adapter-pg")
+SUPPORTED_PRISMA_MAJOR = 7
+
+
+@pytest.mark.parametrize("path", TOOLED_PACKAGE_JSONS, ids=TOOLED_IDS)
+def test_when_prisma_packages_read_then_they_are_one_exact_7x_release(path):
+    """The CLI, the client and the pg adapter move together and stay on Prisma 7.
+
+    The generated client and the adapter must come from the CLI release that generated
+    them. Prisma 8 has no ``generate`` or ``migrate`` command, which the postinstall
+    script, the npm scripts and the entrypoint run.
+
+    Validates the Prisma dependencies of project_initializer/templates-{api,supabase,entra}-nestjs/api/package.json.
+    """
+    dependencies = _load_json(path)["dependencies"]
+    versions = {dependencies[name] for name in PRISMA_PACKAGES}
+
+    assert len(versions) == 1, f"Prisma packages diverged: {versions}"
+    (version,) = versions
+    exact = re.fullmatch(r"(\d+)\.\d+\.\d+", version)
+    assert exact, f"Prisma must be pinned to one exact version, not {version!r}"
+    assert int(exact.group(1)) == SUPPORTED_PRISMA_MAJOR, (
+        f"Prisma must stay on major {SUPPORTED_PRISMA_MAJOR}, not {version!r}"
+    )
+
+
+@pytest.mark.parametrize("path", TOOLED_PACKAGE_JSONS, ids=TOOLED_IDS)
+def test_when_package_read_types_node_major_equals_the_dockerfile_node_major(path):
+    """The Node type package follows the runtime the API image runs.
+
+    Validates the @types/node devDependency of project_initializer/templates-{api,supabase,entra}-nestjs/api/package.json against project_initializer/templates-api-nestjs/api/Dockerfile.
+    """
+    types_major = int(_load_json(path)["devDependencies"]["@types/node"].split(".")[0])
+
+    assert nestjs_dockerfile_node_majors() == {types_major}

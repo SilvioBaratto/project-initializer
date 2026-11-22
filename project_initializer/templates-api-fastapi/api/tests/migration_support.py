@@ -8,6 +8,7 @@ module imports the fixtures it uses, which is what makes pytest see them.
 import ast
 import io
 from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
@@ -66,12 +67,36 @@ def migrate(
         action(alembic_config(connection), revision)
 
 
-def offline_script(revision_range: str, *, downgrade: bool = False) -> str:
+@contextmanager
+def migrations_reading(database_url: str) -> Iterator[None]:
+    """Make ``env.py`` read ``database_url`` while the block runs.
+
+    The database named in a developer's ``.env`` must not change what a test
+    asserts, so ``DIRECT_DATABASE_URL`` is cleared as well.
+
+    Args:
+        database_url: URL that ``settings.migration_database_url`` returns.
+    """
+    with (
+        patch.object(settings, "database_migration_url", None),
+        patch.object(settings, "database_url", database_url),
+    ):
+        yield
+
+
+def offline_script(
+    revision_range: str,
+    *,
+    downgrade: bool = False,
+    database_url: str = DEFAULT_DATABASE_URL,
+) -> str:
     """Render the SQL of an offline (``--sql``) run for a revision range.
 
     Args:
         revision_range: Target revision, or ``<from>:<to>`` for a downgrade.
         downgrade: Render a downgrade instead of an upgrade.
+        database_url: PostgreSQL URL that ``env.py`` reads; the settings
+            default unless a test needs another one.
 
     Returns:
         The script text, always in the PostgreSQL dialect: the database named in
@@ -80,10 +105,7 @@ def offline_script(revision_range: str, *, downgrade: bool = False) -> str:
     config = alembic_config()
     config.output_buffer = io.StringIO()
     action = command.downgrade if downgrade else command.upgrade
-    with (
-        patch.object(settings, "database_migration_url", None),
-        patch.object(settings, "database_url", DEFAULT_DATABASE_URL),
-    ):
+    with migrations_reading(database_url):
         action(config, revision_range, sql=True)
     return config.output_buffer.getvalue()
 

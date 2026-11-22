@@ -50,7 +50,9 @@ function contextFor(
   const request = {
     headers,
     method: 'GET',
+    baseUrl: '',
     path: '/api/v1/items',
+    originalUrl: '/api/v1/items',
     ...requestFields,
   } as unknown as AuthenticatedRequest;
   const context = new ExecutionContextHost([request], controller, controller.prototype.handle);
@@ -202,6 +204,18 @@ describe('AccessTokenGuard', () => {
 
       expect(warn).toHaveBeenCalledTimes(1);
       expect(warn.mock.calls[0][0]).toMatchObject({ status: 401 });
+    });
+
+    it('then the audited path is the parsed path, never an absolute-form target or its query', async () => {
+      const { context } = contextFor({}, ProtectedController, {
+        id: 'req-1',
+        originalUrl: 'http://user:hunter2@host/api/v1/items?token=secret',
+      });
+
+      await guard.canActivate(context).catch(() => undefined);
+
+      expect(warn.mock.calls[0][0]).toMatchObject({ path: '/api/v1/items' });
+      expect(JSON.stringify(warn.mock.calls)).not.toMatch(/hunter2|secret/);
     });
 
     it('then a numeric request id is logged as text', async () => {

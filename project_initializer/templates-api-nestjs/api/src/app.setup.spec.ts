@@ -10,7 +10,6 @@ import { Test } from '@nestjs/testing';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { Prisma } from '@generated/prisma';
 import type { Request } from 'express';
-import { createZodDto, ZodValidationPipe } from 'nestjs-zod';
 import { Logger, LoggerModule } from 'nestjs-pino';
 import request from 'supertest';
 import { z } from 'zod';
@@ -20,6 +19,7 @@ import {
   CORS_EXPOSED_HEADERS,
   CORS_MAX_AGE_SECONDS,
   CORS_METHODS,
+  answerUnmatchedRequests,
   configureApp,
   isOpenApiEnabled,
   readPackageVersion,
@@ -27,6 +27,7 @@ import {
 } from './app.setup';
 import { INTERNAL_ERROR_MESSAGE, ROUTE_NOT_FOUND_MESSAGE } from './common/filters/error-body';
 import { MALFORMED_JSON_MESSAGE } from './common/filters/malformed-json.middleware';
+import { createSchemaValidationPipe } from './common/filters/schema-validation.exception';
 import { validate } from './config/env.validation';
 import { MAX_REQUEST_BODY_BYTES } from './config/http-limits';
 import { buildLoggerParams } from './config/logger.config';
@@ -40,7 +41,8 @@ const ALLOWED_ORIGIN = 'http://localhost:4200';
 const FOREIGN_ORIGIN = 'http://untrusted.example.com';
 const PROBE_BASE = `/${API_PREFIX}/probe`;
 
-class ProbeBodyDto extends createZodDto(z.object({ name: z.string().min(1) })) {}
+const ProbeBodySchema = z.object({ name: z.string().min(1) });
+type ProbeBody = z.infer<typeof ProbeBodySchema>;
 
 @Controller('probe')
 class ProbeController {
@@ -64,7 +66,7 @@ class ProbeController {
   }
 
   @Post('named')
-  named(@Body() body: ProbeBodyDto): ProbeBodyDto {
+  named(@Body({ schema: ProbeBodySchema }) body: ProbeBody): ProbeBody {
     return body;
   }
 
@@ -98,7 +100,7 @@ async function createProbeApp(options: ProbeAppOptions = {}): Promise<INestAppli
     ],
     controllers: [ProbeController],
     providers: [
-      { provide: APP_PIPE, useClass: ZodValidationPipe },
+      { provide: APP_PIPE, useFactory: createSchemaValidationPipe },
       ...(options.rateLimited ? [{ provide: APP_GUARD, useClass: ThrottlerGuard }] : []),
     ],
   }).compile();
@@ -216,7 +218,7 @@ describe('configureApp', () => {
       expect(response.status).toBe(400);
       expect(response.body).toMatchObject({
         message: 'Validation failed',
-        errors: [{ path: 'name' }],
+        errors: [{ path: 'name', message: 'Too small: expected string to have >=1 characters' }],
       });
     });
 
@@ -268,6 +270,23 @@ describe('configureApp', () => {
         path: `${PROBE_BASE}/named`,
       });
       expect(response.headers['access-control-allow-origin']).toBe(ALLOWED_ORIGIN);
+      expect(JSON.stringify(response.body)).not.toContain('request entity too large');
+    });
+
+    it('when the body declares a charset the parser refuses, then the answer is a generic 415 that does not echo the header', async () => {
+      const response = await request(httpServerOf(app))
+        .post(`${PROBE_BASE}/named`)
+        .set('Content-Type', 'application/json; charset=iso-8859-1')
+        .send('{"name":"x"}');
+
+      expect(response.status).toBe(415);
+      expect(response.body).toMatchObject({
+        statusCode: 415,
+        error: 'Unsupported Media Type',
+        message: 'Unsupported Media Type',
+        path: `${PROBE_BASE}/named`,
+      });
+      expect(JSON.stringify(response.body)).not.toMatch(/iso-8859-1|charset/i);
     });
 
     it('when the body is malformed JSON, then the answer is a 400 that does not echo the parser text', async () => {
@@ -422,6 +441,23 @@ describe('setupOpenApi', () => {
     const document = await documentFor(false);
 
     expect(document).not.toHaveProperty('security');
+  });
+
+  it('when the docs are published, then the UI still answers next to the JSON 404 for unknown root paths', async () => {
+    const app = await createProbeApp();
+    configureApp(app);
+    setupOpenApi(app, { version: '9.8.7', bearerAuthRequired: false });
+    await app.init();
+    answerUnmatchedRequests(app);
+
+    const ui = await request(httpServerOf(app)).get('/docs');
+    const unknown = await request(httpServerOf(app)).get('/docs-missing');
+    await app.close();
+
+    expect(ui.status).toBe(200);
+    expect(ui.headers['content-type']).toMatch(/^text\/html/);
+    expect(unknown.status).toBe(404);
+    expect(unknown.body).toMatchObject({ message: ROUTE_NOT_FOUND_MESSAGE, path: '/docs-missing' });
   });
 });
 

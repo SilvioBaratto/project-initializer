@@ -1,4 +1,3 @@
-import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import type { Item } from '../item.entity';
 import { MAX_ITEM_DESCRIPTION_LENGTH, MAX_ITEM_NAME_LENGTH } from '../item.constants';
@@ -31,11 +30,11 @@ export const ItemResponseSchema = z.object({
 });
 
 /** Validated body of `POST /items`. */
-export class CreateItemDto extends createZodDto(CreateItemSchema) {}
+export type CreateItemDto = z.infer<typeof CreateItemSchema>;
 /** Validated body of `PUT /items/:id`. */
-export class UpdateItemDto extends createZodDto(UpdateItemSchema) {}
+export type UpdateItemDto = z.infer<typeof UpdateItemSchema>;
 /** Serialized item returned by every item route. */
-export class ItemResponseDto extends createZodDto(ItemResponseSchema) {}
+export type ItemResponseDto = z.infer<typeof ItemResponseSchema>;
 
 /**
  * Maps a stored item to its wire representation.

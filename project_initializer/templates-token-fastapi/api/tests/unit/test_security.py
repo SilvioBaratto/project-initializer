@@ -56,6 +56,31 @@ MALFORMED_HASHES = [
     pytest.param("$2b$04$" + "/" * 53, id="salt-with-an-invalid-last-character"),
     pytest.param("$1$" + "a" * 57, id="other-scheme"),
 ]
+# Written by bcrypt 4.0.1 at cost 12, the release the template pinned before 5.x.
+# They are literals on purpose: a hash built by the installed bcrypt could never
+# show that the password of an existing account stops verifying after an upgrade.
+HASHES_MADE_BY_BCRYPT_4 = [
+    pytest.param(
+        "Correct-Horse-9",
+        "$2b$12$78PmStIqytU3pb0kr.fk8ej5V6TDJYopQiHMdacl3DlSlK1obYwMe",
+        id="2b-ascii",
+    ),
+    pytest.param(
+        "Correct-Horse-9",
+        "$2a$12$pkH8WMm0GJU9CD9bNqp.FOVdG06CRsZ/XkkgvTUFfx5zvo6psIt52",
+        id="2a-ascii",
+    ),
+    pytest.param(
+        "pässwörd-日本語-9",
+        "$2b$12$EURZiZ14JGyQjXmkYGZhueeL2tis.1h/cmCyZkl96wt/CPeW9AwxK",
+        id="utf-8",
+    ),
+    pytest.param(
+        "x" * PASSWORD_MAX_BYTES,
+        "$2b$12$8YemQ23zAC2zMGLHrVj1QuVNyfAokwqltYkMPtxxvfHPYIwO.x6Gi",
+        id="maximum-bytes",
+    ),
+]
 MALFORMED_TOKENS = [
     pytest.param("", id="empty"),
     pytest.param("not-a-jwt", id="no-segments"),
@@ -213,6 +238,21 @@ def test_when_a_hash_uses_another_accepted_scheme_then_verify_matches(hasher, sc
     password_hash = hasher.hash("scheme-password").replace("$2b$", f"${scheme}$", 1)
 
     assert hasher.verify("scheme-password", password_hash) is True
+
+
+@pytest.mark.parametrize(("password", "password_hash"), HASHES_MADE_BY_BCRYPT_4)
+def test_when_a_hash_made_by_bcrypt_4_is_verified_then_it_is_accepted(
+    hasher, password, password_hash
+):
+    """when a hash written under the bcrypt 4 pin is verified, it is accepted.
+
+    Accounts registered before the move to bcrypt 5 keep their stored hashes; a
+    wrong password must still be refused against them.
+
+    Validates app.infrastructure.security.BcryptPasswordHasher.verify().
+    """
+    assert hasher.verify(password, password_hash) is True
+    assert hasher.verify("wrong", password_hash) is False
 
 
 def test_when_the_hash_ends_with_a_newline_then_verify_returns_false(hasher):

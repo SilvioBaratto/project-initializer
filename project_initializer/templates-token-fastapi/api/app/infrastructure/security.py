@@ -1,9 +1,10 @@
 """Adapters of the credential ports: bcrypt password hashing and JWT access tokens.
 
-``bcrypt`` is called directly, without a wrapper library. Its 4.x releases
-silently ignore everything past the 72nd byte of a password and its 5.x
-releases raise instead, so both adapters enforce the limit themselves and behave
-the same on either.
+``bcrypt`` is called directly, without a wrapper library. It raises
+``ValueError`` for a malformed hash and, since 5.0, for a password over 72 bytes
+(4.x ignored everything past the 72nd byte). The hasher checks both before calling
+it, so ``verify`` never raises and never truncates, and ``hash`` refuses a password
+that bcrypt could not hash in full.
 """
 
 import re
@@ -21,11 +22,11 @@ from app.domain.exceptions import AuthenticationError
 from app.infrastructure.auth_settings import AuthSettings, JwtAlgorithm
 
 BCRYPT_COST_FACTOR = 12
-# Anything that is not a canonical bcrypt hash must not reach ``checkpw``: a
-# truncated hash makes bcrypt 4.0.1 panic with an exception that is not an
-# ``Exception`` subclass, which would take the worker down, and a cost outside
-# 4..31 or a salt whose last character carries bits the 16-byte salt does not
-# have (only ``.``, ``O``, ``e`` and ``u`` are legal there) raises ValueError.
+# Anything that is not a canonical bcrypt hash must not reach ``checkpw``: it
+# raises ``ValueError("Invalid salt")`` for a truncated hash, a cost outside
+# 4..31 and a salt whose last character carries bits the 16-byte salt does not
+# have (only ``.``, ``O``, ``e`` and ``u`` are legal there). Left uncaught that
+# turns a login into a 500 and skips the timing comparison.
 BCRYPT_HASH_PATTERN = re.compile(
     rb"\$2[aby]\$(0[4-9]|[12][0-9]|3[01])\$[./A-Za-z0-9]{21}[.Oeu][./A-Za-z0-9]{31}"
 )

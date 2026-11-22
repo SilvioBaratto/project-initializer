@@ -60,9 +60,11 @@ class SupabaseAuthApi(Protocol):
             AuthApiError: Supabase answered with an error status. 401 and 403
                 mean the token is refused, and 429 and 5xx mean no verdict.
             AuthRetryableError: A gateway or timeout status that is worth
-                retrying.
+                retrying, or a failure in transport: the real client reports
+                it with status 0 and the httpx error as ``__cause__``.
             AuthUnknownError: The answer could not be read.
-            httpx.HTTPError: The request failed in transport.
+            httpx.HTTPError: A failure in transport that an implementation
+                raises as is; the real client does not.
             pydantic.ValidationError: A 200 answer was not a user document.
         """
         ...
@@ -186,7 +188,9 @@ class SupabaseTokenVerifier:
         ) as error:
             # A 200 whose body is not a user fails validation inside the client.
             # Its message quotes the offending document, which can hold an email,
-            # so only the class name travels on.
+            # so only the class name travels on. The real client wraps a transport
+            # failure in AuthRetryableError; httpx.HTTPError stays for the other
+            # SupabaseAuthApi implementations, which may raise it directly.
             raise _unavailable(error) from error
         if response is None:
             raise _rejected(RejectionReason.NO_USER)

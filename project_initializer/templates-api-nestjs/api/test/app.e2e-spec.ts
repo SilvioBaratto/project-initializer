@@ -4,10 +4,19 @@ import { AUTH_GUARDS } from '../src/app.auth';
 import { ANONYMOUS_ACTOR_ID, AuditLogger } from '../src/common/audit/audit-logger';
 import { INSUFFICIENT_SCOPE_MESSAGE } from '../src/common/auth/auth-messages';
 import { INTERNAL_ERROR_MESSAGE, ROUTE_NOT_FOUND_MESSAGE } from '../src/common/filters/error-body';
-import { ITEM_AUDIT_ACTIONS, ITEM_NOT_FOUND_MESSAGE } from '../src/modules/items/item.constants';
+import { VALIDATION_FAILED_MESSAGE } from '../src/common/filters/schema-validation.exception';
+import {
+  ITEM_AUDIT_ACTIONS,
+  ITEM_NOT_FOUND_MESSAGE,
+  MAX_ITEM_DESCRIPTION_LENGTH,
+} from '../src/modules/items/item.constants';
 import { createE2eApp, E2eApp, httpServerOf } from './support/create-e2e-app';
+import { sendRawRequest } from './support/raw-request';
 import { RolesProbeController } from './support/roles-probe.controller';
 import { TEST_BEARER_TOKEN, TEST_USER } from './support/test-doubles';
+
+/** Every field the shared error body may carry; a 404 carries no `errors`. */
+const ERROR_BODY_KEYS = ['statusCode', 'error', 'message', 'path', 'timestamp', 'requestId'];
 
 /**
  * Validates the HTTP surface that every auth variant shares: routing, validation, error bodies and
@@ -123,14 +132,90 @@ describe('API (e2e)', () => {
       expect(JSON.stringify(response.body)).not.toContain('secret');
     });
 
+    it.each([
+      ['get', '/nope?token=secret', '/nope'],
+      ['get', '/', '/'],
+      ['post', '/nope', '/nope'],
+      ['delete', '/nope', '/nope'],
+      ['get', '/docs-x', '/docs-x'],
+      ['get', '/api/v1x/foo', '/api/v1x/foo'],
+      ['get', '/api/v1/missing', '/api/v1/missing'],
+      ['post', '/api/v1/missing?token=secret', '/api/v1/missing'],
+    ] as const)(
+      'when %s %s matches no route, then it answers the JSON 404 body whether or not the path is under the prefix',
+      async (method, url, path) => {
+        const response = await request(httpServerOf(e2e.app))[method](url);
+        const body = response.body as Record<string, unknown>;
+
+        expect(response.status).toBe(404);
+        expect(response.headers['content-type']).toMatch(/^application\/json/);
+        expect(body).toMatchObject({
+          statusCode: 404,
+          error: 'Not Found',
+          message: ROUTE_NOT_FOUND_MESSAGE,
+          path,
+        });
+        expect(typeof body.timestamp).toBe('string');
+        expect(ERROR_BODY_KEYS).toEqual(expect.arrayContaining(Object.keys(body)));
+        expect(response.text).not.toContain('secret');
+      },
+    );
+
+    it('when an absolute-form request target carries credentials, then the 404 body names only the path', async () => {
+      const raw = await sendRawRequest(
+        e2e.app,
+        'GET http://user:hunter2@localhost/api/v1/missing?token=secret HTTP/1.1',
+      );
+
+      expect(raw).toMatch(/^HTTP\/1\.1 404 /);
+      expect(raw).toContain('"path":"/api/v1/missing"');
+      expect(raw).not.toMatch(/hunter2|secret/);
+    });
+
     it('when an item body is invalid, then 400 names the rejected field', async () => {
       const response = await post('/api/v1/items').send({ name: '   ' });
 
       expect(response.status).toBe(400);
       expect(response.body).toMatchObject({
         statusCode: 400,
-        errors: [expect.objectContaining({ path: 'name' })],
+        error: 'Bad Request',
+        message: VALIDATION_FAILED_MESSAGE,
+        errors: [{ path: 'name', message: 'Too small: expected string to have >=1 characters' }],
       });
+    });
+
+    it('when several fields of a body are invalid, then 400 lists each of them once, in order', async () => {
+      const response = await post('/api/v1/items').send({
+        name: 5,
+        description: 'd'.repeat(MAX_ITEM_DESCRIPTION_LENGTH + 1),
+      });
+
+      expect(response.status).toBe(400);
+      expect((response.body as { errors: unknown }).errors).toEqual([
+        { path: 'name', message: 'Invalid input: expected string, received number' },
+        {
+          path: 'description',
+          message: `Too big: expected string to have <=${MAX_ITEM_DESCRIPTION_LENGTH} characters`,
+        },
+      ]);
+    });
+
+    it('when a path parameter is invalid, then 400 names it like a body field', async () => {
+      const response = await get('/api/v1/items/not-a-uuid');
+
+      expect(response.status).toBe(400);
+      expect((response.body as { errors: unknown }).errors).toEqual([
+        { path: 'id', message: 'Invalid UUID' },
+      ]);
+    });
+
+    it('when the whole update body is rejected, then the field error has an empty path', async () => {
+      const response = await put(`/api/v1/items/${randomUUID()}`).send({});
+
+      expect(response.status).toBe(400);
+      expect((response.body as { errors: unknown }).errors).toEqual([
+        { path: '', message: 'At least one field must be provided' },
+      ]);
     });
 
     it('when the repository fails unexpectedly, then 500 with a generic message and no internals', async () => {

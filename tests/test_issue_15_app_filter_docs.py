@@ -150,7 +150,7 @@ def test_when_response_schema_exists_then_password_field_is_absent():
     """
     A response Zod schema must not expose a password field.
     Whitelisting via an explicit z.object({...}) ensures Prisma rows cannot leak the
-    password column through the ZodSerializerInterceptor.
+    password column through the StandardSchemaSerializerInterceptor.
 
     The template ships ItemResponseSchema in items/dto/item.dto.ts as the canonical
     proof (verified by serialization.spec.ts). Auth overlays may add user schemas.

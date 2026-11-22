@@ -2,6 +2,7 @@
 import {
   BadRequestException,
   ForbiddenException,
+  HttpException,
   HttpStatus,
   InternalServerErrorException,
   Logger,
@@ -9,7 +10,6 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { Prisma } from '@generated/prisma';
-import { ZodValidationException } from 'nestjs-zod';
 import { z } from 'zod';
 import {
   createFakeResponse,
@@ -23,6 +23,7 @@ import {
   SERVICE_UNAVAILABLE_MESSAGE,
 } from './error-body';
 import { HttpExceptionFilter } from './http-exception.filter';
+import { type SchemaIssues, SchemaValidationException } from './schema-validation.exception';
 
 const REQUEST_ID = 'req-123';
 const REQUEST_PATH = '/api/v1/items';
@@ -30,26 +31,31 @@ const REQUEST_SUMMARY = `POST ${REQUEST_PATH} (requestId: ${REQUEST_ID})`;
 
 function fakeRequest(id: unknown = REQUEST_ID): {
   method: string;
+  baseUrl: string;
   path: string;
   originalUrl: string;
   id: unknown;
 } {
-  return { method: 'POST', path: REQUEST_PATH, originalUrl: REQUEST_PATH, id };
+  return { method: 'POST', baseUrl: '', path: REQUEST_PATH, originalUrl: REQUEST_PATH, id };
 }
 
-function zodFailure(): z.ZodError {
-  const result = z.object({ user: z.object({ name: z.string().min(1) }) }).safeParse({
-    user: { name: '' },
-  });
-  if (result.success) {
+async function schemaIssues(): Promise<SchemaIssues> {
+  const schema = z.object({ user: z.object({ name: z.string().min(1) }) });
+  const result = await schema['~standard'].validate({ user: { name: '' } });
+  if (result.issues === undefined) {
     throw new Error('the fixture must fail validation');
   }
-  return result.error;
+  return result.issues;
 }
 
 /** Shape of the errors body-parser raises, which Express hands to the error handlers. */
 function middlewareError(statusCode: number, message: string, expose = true): Error {
   return Object.assign(new Error(message), { statusCode, status: statusCode, expose });
+}
+
+/** What the Express adapter makes of a middleware error before the filters see it. */
+function adapterMappedError(statusCode: number, message: string): HttpException {
+  return new HttpException(message, statusCode, { cause: middlewareError(statusCode, message) });
 }
 
 describe('HttpExceptionFilter', () => {
@@ -136,22 +142,49 @@ describe('HttpExceptionFilter', () => {
 
       expect(body.message).toBe('Cannot GET the moon');
     });
+
+    it('then the body names the full path even when the handler sits under the prefix mount', () => {
+      const originalUrl = '/api/v1/nope?token=secret';
+      // Express reports the path relative to the router the not-found handler is mounted on.
+      const request = { method: 'GET', path: '/nope', baseUrl: '/api/v1', originalUrl, id: 'r' };
+
+      const body = sentErrorBody(
+        handle(new NotFoundException(`Cannot GET ${originalUrl}`), request),
+      );
+
+      expect(body.path).toBe('/api/v1/nope');
+      expect(JSON.stringify(body)).not.toContain('secret');
+    });
   });
 
   describe('when request validation fails', () => {
-    it('then it answers 400 with one entry per failing field and nothing else', () => {
-      const response = handle(new ZodValidationException(zodFailure()));
+    it('then it answers 400 with one entry per failing field and nothing else', async () => {
+      const response = handle(new SchemaValidationException(await schemaIssues()));
       const body = sentErrorBody(response);
 
       expect(response.status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
       expect(body.message).toBe('Validation failed');
-      expect(body.errors).toHaveLength(1);
-      expect(body.errors?.[0]?.path).toBe('user.name');
-      expect(body.errors?.[0]?.message).toContain('>=1');
+      expect(body.errors).toEqual([
+        { path: 'user.name', message: 'Too small: expected string to have >=1 characters' },
+      ]);
     });
 
-    it('then it answers 400 without field detail when the error is not a Zod error', () => {
-      const body = sentErrorBody(handle(new ZodValidationException(new Error('not a zod error'))));
+    it('then a path segment given as an object contributes its key', () => {
+      const issues = [{ message: 'Required', path: [{ key: 'user' }, { key: 0 }, 'name'] }];
+
+      const body = sentErrorBody(handle(new SchemaValidationException(issues)));
+
+      expect(body.errors).toEqual([{ path: 'user.0.name', message: 'Required' }]);
+    });
+
+    it('then an issue about the whole payload has an empty path', () => {
+      const body = sentErrorBody(handle(new SchemaValidationException([{ message: 'Required' }])));
+
+      expect(body.errors).toEqual([{ path: '', message: 'Required' }]);
+    });
+
+    it('then a 400 that is not a validation failure carries no field detail', () => {
+      const body = sentErrorBody(handle(new BadRequestException('Validation failed')));
 
       expect(body.statusCode).toBe(HttpStatus.BAD_REQUEST);
       expect(body).not.toHaveProperty('errors');
@@ -189,6 +222,32 @@ describe('HttpExceptionFilter', () => {
       expect(body.message).toBe(phrase);
       expect(JSON.stringify(body)).not.toContain(text);
       expect(errorLog).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [HttpStatus.PAYLOAD_TOO_LARGE, 'request entity too large', 'Payload Too Large'],
+      [
+        HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+        'unsupported charset "ISO-8859-1"',
+        'Unsupported Media Type',
+      ],
+    ])(
+      'then a %i the adapter wrapped in an HttpException still answers the fixed reason phrase',
+      (status, text, phrase) => {
+        const response = handle(adapterMappedError(status, text));
+        const body = sentErrorBody(response);
+
+        expect(response.status).toHaveBeenCalledWith(status);
+        expect(body.message).toBe(phrase);
+        expect(JSON.stringify(body)).not.toContain(text);
+        expect(errorLog).not.toHaveBeenCalled();
+      },
+    );
+
+    it('then an HttpException whose cause is not a middleware rejection keeps its own message', () => {
+      const exception = new BadRequestException('Name is taken', { cause: new Error('detail') });
+
+      expect(sentErrorBody(handle(exception)).message).toBe('Name is taken');
     });
 
     it.each([
@@ -264,7 +323,7 @@ describe('HttpExceptionFilter', () => {
 
   describe('when the request has no usable id', () => {
     it('then a request without an id property is answered without one', () => {
-      const request = { method: 'GET', path: REQUEST_PATH, originalUrl: REQUEST_PATH };
+      const request = { method: 'GET', baseUrl: '', path: REQUEST_PATH, originalUrl: REQUEST_PATH };
 
       expect(sentErrorBody(handle(new Error('boom'), request))).not.toHaveProperty('requestId');
     });

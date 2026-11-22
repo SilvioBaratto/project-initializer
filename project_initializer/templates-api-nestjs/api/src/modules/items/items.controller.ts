@@ -16,13 +16,21 @@ import {
   ApiServiceUnavailableResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { ZodResponse } from 'nestjs-zod';
 import { auditActorIdOf } from '../../common/audit/audit-logger';
 import type { AuthenticatedUser } from '../../common/auth/authenticated-user';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { UuidParamDto } from '../../common/dto/uuid-param.dto';
+import { UuidParamSchema, type UuidParamDto } from '../../common/dto/uuid-param.dto';
 import { SERVICE_UNAVAILABLE_MESSAGE } from '../../common/filters/error-body';
-import { CreateItemDto, ItemResponseDto, UpdateItemDto, toItemResponse } from './dto/item.dto';
+import { ResponseSchema } from '../../common/serialization/response-schema.decorator';
+import {
+  CreateItemSchema,
+  ItemResponseSchema,
+  UpdateItemSchema,
+  toItemResponse,
+  type CreateItemDto,
+  type ItemResponseDto,
+  type UpdateItemDto,
+} from './dto/item.dto';
 import { ITEM_NOT_FOUND_MESSAGE } from './item.constants';
 import { ItemsService } from './items.service';
 
@@ -39,7 +47,7 @@ export class ItemsController {
    * @throws ServiceUnavailableException (503) when the database circuit is open.
    */
   @Get()
-  @ZodResponse({ type: [ItemResponseDto] })
+  @ResponseSchema(HttpStatus.OK, ItemResponseSchema, { many: true })
   @ApiOperation({ summary: 'List the most recent items, newest first' })
   async findAll(): Promise<ItemResponseDto[]> {
     const items = await this.itemsService.findAll();
@@ -53,10 +61,10 @@ export class ItemsController {
    * @throws ServiceUnavailableException (503) when the database circuit is open.
    */
   @Post()
-  @ZodResponse({ status: HttpStatus.CREATED, type: ItemResponseDto })
+  @ResponseSchema(HttpStatus.CREATED, ItemResponseSchema)
   @ApiOperation({ summary: 'Create an item' })
   async create(
-    @Body() body: CreateItemDto,
+    @Body({ schema: CreateItemSchema }) body: CreateItemDto,
     @CurrentUser() user?: AuthenticatedUser,
   ): Promise<ItemResponseDto> {
     return toItemResponse(await this.itemsService.create(body, auditActorIdOf(user)));
@@ -70,10 +78,12 @@ export class ItemsController {
    * @throws ServiceUnavailableException (503) when the database circuit is open.
    */
   @Get(':id')
-  @ZodResponse({ type: ItemResponseDto })
+  @ResponseSchema(HttpStatus.OK, ItemResponseSchema)
   @ApiOperation({ summary: 'Get an item by id' })
   @ApiNotFoundResponse({ description: ITEM_NOT_FOUND_MESSAGE })
-  async findOne(@Param() params: UuidParamDto): Promise<ItemResponseDto> {
+  async findOne(
+    @Param({ schema: UuidParamSchema }) params: UuidParamDto,
+  ): Promise<ItemResponseDto> {
     return toItemResponse(await this.itemsService.findOne(params.id));
   }
 
@@ -85,12 +95,12 @@ export class ItemsController {
    * @throws ServiceUnavailableException (503) when the database circuit is open.
    */
   @Put(':id')
-  @ZodResponse({ type: ItemResponseDto })
+  @ResponseSchema(HttpStatus.OK, ItemResponseSchema)
   @ApiOperation({ summary: 'Update the given fields of an item' })
   @ApiNotFoundResponse({ description: ITEM_NOT_FOUND_MESSAGE })
   async update(
-    @Param() params: UuidParamDto,
-    @Body() body: UpdateItemDto,
+    @Param({ schema: UuidParamSchema }) params: UuidParamDto,
+    @Body({ schema: UpdateItemSchema }) body: UpdateItemDto,
     @CurrentUser() user?: AuthenticatedUser,
   ): Promise<ItemResponseDto> {
     return toItemResponse(await this.itemsService.update(params.id, body, auditActorIdOf(user)));
@@ -108,7 +118,10 @@ export class ItemsController {
   @ApiOperation({ summary: 'Delete an item' })
   @ApiNoContentResponse({ description: 'Item deleted' })
   @ApiNotFoundResponse({ description: ITEM_NOT_FOUND_MESSAGE })
-  remove(@Param() params: UuidParamDto, @CurrentUser() user?: AuthenticatedUser): Promise<void> {
+  remove(
+    @Param({ schema: UuidParamSchema }) params: UuidParamDto,
+    @CurrentUser() user?: AuthenticatedUser,
+  ): Promise<void> {
     return this.itemsService.remove(params.id, auditActorIdOf(user));
   }
 }
