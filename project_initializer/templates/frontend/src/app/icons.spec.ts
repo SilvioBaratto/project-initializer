@@ -8,7 +8,6 @@ import { ICON_PROVIDER, IconName } from './icons';
 // cannot drift from the registry it checks.
 const ICON_NAMES: Record<IconName, true> = {
   ArrowLeft: true,
-  Bell: true,
   Check: true,
   ChevronDown: true,
   ChevronLeft: true,
@@ -18,35 +17,20 @@ const ICON_NAMES: Record<IconName, true> = {
   ChevronUp: true,
   CircleAlert: true,
   CircleCheckBig: true,
-  CircleX: true,
   Copy: true,
-  EllipsisVertical: true,
-  Eye: true,
-  EyeOff: true,
   House: true,
-  Inbox: true,
   Info: true,
   LayoutDashboard: true,
-  LoaderCircle: true,
-  Lock: true,
   LogOut: true,
   Mail: true,
   Menu: true,
-  Minus: true,
   Monitor: true,
   Moon: true,
   PanelLeftClose: true,
-  PanelLeftOpen: true,
-  Pencil: true,
-  Plus: true,
-  Search: true,
   Settings: true,
   Settings2: true,
-  SlidersVertical: true,
-  SquareFunction: true,
   Sun: true,
   SunMoon: true,
-  Trash2: true,
   TriangleAlert: true,
   User: true,
   X: true,
@@ -99,7 +83,6 @@ describe('ICON_PROVIDER', () => {
       expect(registry['house']?.name).toBe('house');
       expect(registry['circle-exclamation-point']?.name).toBe('circle-exclamation-point');
       expect(registry['triangle-exclamation-point']?.name).toBe('triangle-exclamation-point');
-      expect(registry['trash']?.name).toBe('trash');
     });
 
     it('maps each renamed PascalCase key to the icon of its current class', () => {
@@ -107,7 +90,6 @@ describe('ICON_PROVIDER', () => {
 
       expect(registry['CircleAlert']?.name).toBe('circle-exclamation-point');
       expect(registry['TriangleAlert']?.name).toBe('triangle-exclamation-point');
-      expect(registry['Trash2']?.name).toBe('trash');
     });
 
     it('resolves the older names that Lucide keeps as aliases', () => {

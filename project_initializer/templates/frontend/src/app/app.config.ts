@@ -5,7 +5,7 @@ import {
   provideBrowserGlobalErrorListeners,
 } from '@angular/core';
 import { provideRouter, withComponentInputBinding, withViewTransitions } from '@angular/router';
-import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 
 import { routes } from './app.routes';
 import { ICON_PROVIDER } from './icons';
@@ -16,7 +16,7 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes, withComponentInputBinding(), withViewTransitions()),
-    provideHttpClient(withFetch(), withInterceptors([errorInterceptor])),
+    provideHttpClient(withInterceptors([errorInterceptor])),
     ICON_PROVIDER,
     // Apply the stored light/dark choice before the first view renders, so every
     // routed view honours it, not only those inside the shell.

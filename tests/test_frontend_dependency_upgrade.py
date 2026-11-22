@@ -1,9 +1,12 @@
-"""Pins what the frontend dependency upgrade moved: the runtime image, the CI actions and the icon library.
+"""Pins what the frontend dependency upgrade moved: the runtime image, the CI actions, the icon library and Angular.
 
 A moving nginx tag would let the runtime stage change nginx branch between two
 builds, and an action left on an old major keeps a job on a runtime that GitHub
 has retired. ``lucide-angular`` is deprecated and caps its Angular peers at 21,
 so the frontends render their icons through ``@lucide/angular`` instead.
+Angular, Angular Material and the CDK are on 22 and TypeScript on 6.0, the only
+minor the Angular 22 compiler accepts; the APIs Angular 22 deprecates, and the
+opt-out from its OnPush default, stay out of the templates.
 """
 
 import json
@@ -12,6 +15,11 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+
+from project_initializer.docs_generator import (
+    generate_frontend_claude,
+    generate_root_claude,
+)
 
 _REPO = Path(__file__).resolve().parent.parent
 _TEMPLATES = _REPO / "project_initializer"
@@ -38,7 +46,10 @@ _FRONTEND_MANIFESTS = tuple(
     for layer in _FRONTEND_LAYERS
     if (layer / "package.json").is_file()
 )
+_BASE_MANIFEST = _TEMPLATES / "templates" / "frontend" / "package.json"
 _FRONTEND_LOCK = _TEMPLATES / "templates" / "frontend" / "package-lock.json"
+_BASE_INDEX_HTML = _TEMPLATES / "templates" / "frontend" / "src" / "index.html"
+_REPO_CLAUDE = _REPO / "CLAUDE.md"
 
 _FROM_LINE = re.compile(r"^FROM\s+(?P<image>\S+)", re.M)
 _PINNED_NGINX = re.compile(r"nginx:\d+\.\d+(\.\d+)?-alpine")
@@ -60,6 +71,49 @@ _ICON_INPUTS = {"lucideIcon", "[lucideIcon]"}
 _DEPRECATED_ICON_CLASSES = re.compile(
     r"\bLucide(?:CircleAlert|TriangleAlert|Trash2|Home|CheckCircle|Loader2|Sliders|FunctionSquare)\b"
 )
+
+# Each group is published together and peers on its own members at the exact same
+# release (compiler-cli on compiler, Material on CDK), so a group never splits.
+_ANGULAR_RELEASE_GROUPS = {
+    "framework": (
+        "@angular/common",
+        "@angular/compiler",
+        "@angular/compiler-cli",
+        "@angular/core",
+        "@angular/forms",
+        "@angular/platform-browser",
+        "@angular/router",
+    ),
+    "cli": ("@angular/build", "@angular/cli"),
+    "components": ("@angular/cdk", "@angular/material"),
+}
+_ANGULAR_PACKAGES = tuple(
+    name for group in _ANGULAR_RELEASE_GROUPS.values() for name in group
+)
+# 22.3.0 is the first Material release whose checkbox and radio DOM agrees with
+# its own test harness selectors.
+_ANGULAR_FLOOR = (22, 3, 0)
+_ANGULAR_MAJOR = 22
+_TYPESCRIPT_PIN = re.compile(r"6\.0\.\d+")
+_EXACT_PINNED = (*_ANGULAR_PACKAGES, "typescript", "tslib", "rxjs")
+_PEER_COMPARATOR = re.compile(r"(?P<operator>>=|<)(?P<version>\d+(?:\.\d+)*)")
+_WITH_FETCH = re.compile(r"\bwithFetch\b")
+# Default is the deprecated alias of Eager; both opt a component out of OnPush.
+_CHANGE_DETECTION_OPT_OUT = re.compile(r"ChangeDetectionStrategy\.(?:Eager|Default)\b")
+# Angular 22.3 removed both checks; ng update still writes a "suppress" entry for each.
+_REMOVED_DIAGNOSTICS = ("nullishCoalescingNotNullable", "optionalChainNotNullable")
+_BASE_APP, _TOKEN_APP, _SUPABASE_APP, _ENTRA_APP = (
+    layer / "src" / "app" for layer in _FRONTEND_LAYERS
+)
+_ROOT_SERVICES = (
+    _BASE_APP / "services" / "theme.ts",
+    _BASE_APP / "services" / "window-size-class.ts",
+    _BASE_APP / "shared" / "ui" / "toast" / "toast.service.ts",
+    _TOKEN_APP / "services" / "auth.ts",
+    _SUPABASE_APP / "services" / "auth.ts",
+    _ENTRA_APP / "core" / "services" / "auth.service.ts",
+)
+_PROVIDED_IN_ROOT = re.compile(r"providedIn\s*:\s*['\"]root['\"]")
 
 
 def _repo_relative(path: Path) -> str:
@@ -279,3 +333,317 @@ def test_when_the_frontend_sources_are_read_then_no_file_imports_a_deprecated_ic
         for match in _DEPRECATED_ICON_CLASSES.findall(path.read_text(encoding="utf-8"))
     ]
     assert offenders == []
+
+
+def _manifest_dependencies(manifest: Path) -> dict[str, str]:
+    """Return every runtime and dev dependency ``manifest`` declares, by package name."""
+    package = json.loads(manifest.read_text(encoding="utf-8"))
+    return {**package.get("dependencies", {}), **package.get("devDependencies", {})}
+
+
+def _lock_packages() -> dict[str, dict]:
+    """Return the ``packages`` map of the base lock, keyed by install path (``""`` is the root)."""
+    return json.loads(_FRONTEND_LOCK.read_text(encoding="utf-8"))["packages"]
+
+
+def _version_tuple(version: str) -> tuple[int, ...]:
+    """Turn a dotted version into a tuple padded to three numbers, so ``6.0`` compares as ``6.0.0``."""
+    numbers = tuple(int(part) for part in version.split("."))
+    return numbers + (0,) * (3 - len(numbers))
+
+
+def _satisfies(version: str, peer_range: str) -> bool:
+    """Tell whether ``version`` meets a peer range written only with ``>=`` and ``<`` comparators.
+
+    Raises:
+        ValueError: when the range holds any other syntax, so a reworded range is
+            flagged instead of being half read.
+    """
+    comparators = list(_PEER_COMPARATOR.finditer(peer_range))
+    if "".join(match.group(0) for match in comparators) != peer_range.replace(" ", ""):
+        raise ValueError(f"unsupported peer range {peer_range!r}")
+    candidate = _version_tuple(version)
+    return all(
+        candidate >= _version_tuple(match["version"])
+        if match["operator"] == ">="
+        else candidate < _version_tuple(match["version"])
+        for match in comparators
+    )
+
+
+@pytest.mark.unit
+def test_when_the_frontend_manifests_are_read_then_every_angular_package_is_an_exact_22_pin():
+    """Every ``@angular/*`` package of each manifest is pinned to an Angular 22 release, 22.3.0 or later.
+
+    A range left on 21 would let npm put an Angular 21 package next to Angular 22
+    ones, and a range of any kind lets the layers drift from the release the
+    templates were verified with.
+
+    Validates project_initializer/templates/frontend/package.json, project_initializer/templates-supabase-frontend/frontend/package.json and project_initializer/templates-entra-frontend/frontend/package.json.
+    """
+    assert len(_FRONTEND_MANIFESTS) == 3, [
+        _repo_relative(m) for m in _FRONTEND_MANIFESTS
+    ]
+    offenders = []
+    for manifest in _FRONTEND_MANIFESTS:
+        declared = _manifest_dependencies(manifest)
+        missing = [name for name in _ANGULAR_PACKAGES if name not in declared]
+        assert missing == [], f"{_repo_relative(manifest)} lacks {missing}"
+        for name, pin in declared.items():
+            if not name.startswith("@angular/"):
+                continue
+            # A range is not a version, so it is rejected before it is compared.
+            if not _EXACT_VERSION.fullmatch(pin) or not (
+                _ANGULAR_FLOOR <= _version_tuple(pin) < (_ANGULAR_MAJOR + 1, 0, 0)
+            ):
+                offenders.append(f"{_repo_relative(manifest)}: {name}@{pin}")
+    assert offenders == []
+
+
+@pytest.mark.unit
+def test_when_the_frontend_manifests_are_read_then_a_package_they_share_has_the_same_pin_in_each():
+    """A dependency that more than one frontend manifest declares carries the same pin in all of them.
+
+    The supabase and entra overlays replace the base manifest whole, so a version
+    bumped in one copy only would scaffold a different Angular, Material, CDK or
+    TypeScript for one auth mode.
+
+    Validates project_initializer/templates/frontend/package.json, project_initializer/templates-supabase-frontend/frontend/package.json and project_initializer/templates-entra-frontend/frontend/package.json.
+    """
+    pins: dict[str, dict[str, str]] = {}
+    for manifest in _FRONTEND_MANIFESTS:
+        for name, pin in _manifest_dependencies(manifest).items():
+            pins.setdefault(name, {})[_repo_relative(manifest)] = pin
+    shared = {name: found for name, found in pins.items() if len(found) > 1}
+
+    assert sorted(set(_EXACT_PINNED) - set(shared)) == []
+    diverging = {
+        name: found for name, found in shared.items() if len(set(found.values())) > 1
+    }
+    assert diverging == {}
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("group", sorted(_ANGULAR_RELEASE_GROUPS))
+def test_when_a_frontend_manifest_is_read_then_each_angular_release_group_shares_one_version(
+    group: str,
+):
+    """The packages Angular publishes together carry one version in each manifest.
+
+    ``@angular/compiler-cli`` peers on ``@angular/compiler`` and ``@angular/material``
+    on ``@angular/cdk`` at exactly their own release, so a split group breaks the
+    install or the build.
+
+    Validates project_initializer/templates/frontend/package.json, project_initializer/templates-supabase-frontend/frontend/package.json and project_initializer/templates-entra-frontend/frontend/package.json.
+    """
+    for manifest in _FRONTEND_MANIFESTS:
+        declared = _manifest_dependencies(manifest)
+        versions = {name: declared.get(name) for name in _ANGULAR_RELEASE_GROUPS[group]}
+        assert len(set(versions.values())) == 1, (
+            f"{_repo_relative(manifest)}: {versions}"
+        )
+
+
+@pytest.mark.unit
+def test_when_typescript_is_read_then_it_is_an_exact_6_0_pin_inside_the_angular_compiler_peer_range():
+    """Each manifest pins TypeScript 6.0.x, and the lock resolves it inside the Angular compiler's and builder's peer range.
+
+    The Angular 22 compiler and builder peer on ``typescript >=6.0 <6.1``:
+    TypeScript 7 is the registry's latest release, but the compiler rejects it.
+
+    Validates project_initializer/templates/frontend/package.json, project_initializer/templates-supabase-frontend/frontend/package.json, project_initializer/templates-entra-frontend/frontend/package.json and project_initializer/templates/frontend/package-lock.json.
+    """
+    pins = {
+        _repo_relative(m): _manifest_dependencies(m).get("typescript")
+        for m in _FRONTEND_MANIFESTS
+    }
+    assert all(pin and _TYPESCRIPT_PIN.fullmatch(pin) for pin in pins.values()), pins
+
+    packages = _lock_packages()
+    resolved = packages["node_modules/typescript"]["version"]
+    for dependent in ("@angular/compiler-cli", "@angular/build"):
+        peer_range = packages[f"node_modules/{dependent}"]["peerDependencies"][
+            "typescript"
+        ]
+        assert _satisfies(resolved, peer_range), (
+            f"typescript {resolved} is outside the {dependent} peer range {peer_range!r}"
+        )
+
+
+@pytest.mark.unit
+def test_when_the_base_lock_is_read_then_it_resolves_every_exact_pin_of_the_base_manifest():
+    """The base lock declares and resolves Angular, TypeScript, tslib and rxjs at the base manifest's exact pins.
+
+    ``npm ci`` in the image build refuses a lock that disagrees with the manifest,
+    and only an exact pin makes the lock's release the declared one.
+
+    Validates project_initializer/templates/frontend/package.json and project_initializer/templates/frontend/package-lock.json.
+    """
+    declared = _manifest_dependencies(_BASE_MANIFEST)
+    packages = _lock_packages()
+    root = {
+        **packages[""].get("dependencies", {}),
+        **packages[""].get("devDependencies", {}),
+    }
+    mismatches = []
+    for name in _EXACT_PINNED:
+        pin = declared[name]
+        resolved = packages.get(f"node_modules/{name}", {}).get("version")
+        if not _EXACT_VERSION.fullmatch(pin):
+            mismatches.append(f"{name}: {pin!r} is not an exact version")
+        elif root.get(name) != pin or resolved != pin:
+            mismatches.append(
+                f"{name}: manifest {pin}, lock root {root.get(name)}, resolved {resolved}"
+            )
+    assert mismatches == []
+
+
+@pytest.mark.unit
+def test_when_the_frontend_sources_are_read_then_no_file_calls_the_deprecated_with_fetch():
+    """No frontend source or spec passes ``withFetch()`` to ``provideHttpClient``.
+
+    Angular 22 makes ``FetchBackend`` the default ``HttpBackend`` and deprecates
+    ``withFetch()``, so the call adds a deprecation without changing the backend.
+
+    Validates project_initializer/templates/frontend/src, project_initializer/templates-token-frontend/frontend/src, project_initializer/templates-supabase-frontend/frontend/src and project_initializer/templates-entra-frontend/frontend/src.
+    """
+    offenders = [
+        _repo_relative(path)
+        for path in _frontend_sources(".ts")
+        if _WITH_FETCH.search(path.read_text(encoding="utf-8"))
+    ]
+    assert offenders == []
+
+
+@pytest.mark.unit
+def test_when_the_frontend_sources_are_read_then_no_component_opts_out_of_on_push():
+    """No component, test host included, sets ``ChangeDetectionStrategy.Eager`` or ``Default``.
+
+    Angular 22 makes OnPush the default and ``ng update`` writes ``Eager`` into
+    every component that sets nothing. The templates keep what a host renders in
+    signals, which re-render under OnPush, instead of opting out.
+
+    Validates project_initializer/templates/frontend/src, project_initializer/templates-token-frontend/frontend/src, project_initializer/templates-supabase-frontend/frontend/src and project_initializer/templates-entra-frontend/frontend/src.
+    """
+    offenders = [
+        f"{_repo_relative(path)}: {match}"
+        for path in _frontend_sources(".ts")
+        for match in _CHANGE_DETECTION_OPT_OUT.findall(path.read_text(encoding="utf-8"))
+    ]
+    assert offenders == []
+
+
+@pytest.mark.unit
+def test_when_the_frontend_tsconfigs_are_read_then_no_removed_extended_diagnostic_is_configured():
+    """No tsconfig of a frontend layer configures ``nullishCoalescingNotNullable`` or ``optionalChainNotNullable``.
+
+    Angular 22.3 removed both checks and accepts their names only as no-ops, so
+    the ``suppress`` entries ``ng update`` adds for them would be dead settings.
+
+    Validates project_initializer/templates/frontend/tsconfig.json, project_initializer/templates/frontend/tsconfig.app.json and project_initializer/templates/frontend/tsconfig.spec.json.
+    """
+    tsconfigs = sorted(
+        path for layer in _FRONTEND_LAYERS for path in layer.glob("tsconfig*.json")
+    )
+    assert tsconfigs, "no frontend tsconfig found"
+    offenders = [
+        f"{_repo_relative(path)}: {name}"
+        for path in tsconfigs
+        for name in _REMOVED_DIAGNOSTICS
+        if name in path.read_text(encoding="utf-8")
+    ]
+    assert offenders == []
+
+
+@pytest.mark.unit
+def test_when_a_root_service_is_read_then_it_uses_the_service_decorator_and_nothing_is_provided_in_root():
+    """The six singleton services are declared with ``@Service()`` and no frontend file keeps ``providedIn: 'root'``.
+
+    Angular 22 documents ``@Service()`` as the shorthand for
+    ``@Injectable({providedIn: 'root'})``, and the generated frontend CLAUDE.md
+    prescribes it, so a leftover ``providedIn: 'root'`` would contradict the docs.
+
+    Validates project_initializer/templates/frontend/src/app/services/theme.ts, project_initializer/templates/frontend/src/app/services/window-size-class.ts, project_initializer/templates/frontend/src/app/shared/ui/toast/toast.service.ts, project_initializer/templates-token-frontend/frontend/src/app/services/auth.ts, project_initializer/templates-supabase-frontend/frontend/src/app/services/auth.ts and project_initializer/templates-entra-frontend/frontend/src/app/core/services/auth.service.ts.
+    """
+    undecorated = [
+        _repo_relative(path)
+        for path in _ROOT_SERVICES
+        if "@Service()" not in path.read_text(encoding="utf-8")
+    ]
+    assert undecorated == []
+    provided_in_root = [
+        _repo_relative(path)
+        for path in _frontend_sources(".ts")
+        if _PROVIDED_IN_ROOT.search(path.read_text(encoding="utf-8"))
+    ]
+    assert provided_in_root == []
+    assert "Prefer the `@Service` decorator" in generate_frontend_claude()
+
+
+@pytest.mark.unit
+def test_when_the_docs_name_the_angular_release_then_it_is_the_one_the_manifests_pin():
+    """The generated root and frontend CLAUDE.md and the repo CLAUDE.md name the pinned Angular major and Material + CDK minor.
+
+    Validates project_initializer/docs_generator.py generate_root_claude(), project_initializer/docs_generator.py generate_frontend_claude() and CLAUDE.md.
+    """
+    declared = _manifest_dependencies(_BASE_MANIFEST)
+    angular_major = declared["@angular/core"].split(".")[0]
+    material_minor = ".".join(declared["@angular/material"].split(".")[:2])
+
+    root_docs = {
+        "fullstack": generate_root_claude("fastapi", None),
+        "frontend only": generate_root_claude("fastapi", None, api=False),
+    }
+    for scope, doc in root_docs.items():
+        assert f"Angular {angular_major} with Angular Material 3" in doc, scope
+    assert f"Angular Material + CDK {material_minor}" in generate_frontend_claude()
+    assert (
+        f"Angular {angular_major} with Angular Material 3 "
+        f"(`@angular/material` + `@angular/cdk` {material_minor})"
+    ) in _REPO_CLAUDE.read_text(encoding="utf-8")
+
+
+@pytest.mark.unit
+def test_when_the_csp_nonce_is_described_then_the_stylesheet_and_modulepreload_links_are_named():
+    """The generated frontend CLAUDE.md and the nonce comment in ``index.html`` list the link tags the build stamps.
+
+    Since ``@angular/build`` 22.2.3 the production build copies the nonce onto
+    ``<link rel="stylesheet">`` and ``<link rel="modulepreload">`` as well, so a
+    reader writing another server must know those tags carry it too.
+
+    Validates project_initializer/docs_generator.py generate_frontend_claude() and project_initializer/templates/frontend/src/index.html.
+    """
+    documents = {
+        "frontend CLAUDE.md": generate_frontend_claude(),
+        "index.html": _BASE_INDEX_HTML.read_text(encoding="utf-8"),
+    }
+    for name, text in documents.items():
+        assert '<link rel="stylesheet">' in text, name
+        assert '<link rel="modulepreload">' in text, name
+
+
+@pytest.mark.unit
+def test_when_a_frontend_manifest_is_read_then_allow_scripts_names_every_locked_package_with_an_install_script():
+    """Each manifest's ``allowScripts`` lists, by name only, exactly the packages the base lock marks with an install script.
+
+    npm 11.20 warns on every install about install scripts that ``allowScripts``
+    does not cover, and npm 12 blocks them. A ``name@version`` key would stop
+    covering the package at the next lock regeneration, and a package the lock
+    adds or drops must change the list with it.
+
+    Validates project_initializer/templates/frontend/package.json, project_initializer/templates-supabase-frontend/frontend/package.json, project_initializer/templates-entra-frontend/frontend/package.json and project_initializer/templates/frontend/package-lock.json.
+    """
+    with_install_script = {
+        path.rpartition("node_modules/")[2]
+        for path, entry in _lock_packages().items()
+        if entry.get("hasInstallScript")
+    }
+    assert with_install_script, "the base lock marks no package with an install script"
+
+    for manifest in _FRONTEND_MANIFESTS:
+        allowed = json.loads(manifest.read_text(encoding="utf-8")).get("allowScripts")
+        assert isinstance(allowed, dict), (
+            f"{_repo_relative(manifest)} has no allowScripts"
+        )
+        assert set(allowed) == with_install_script, _repo_relative(manifest)
+        assert set(allowed.values()) == {True}, _repo_relative(manifest)

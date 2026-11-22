@@ -5,7 +5,7 @@ import {
   inject,
 } from '@angular/core';
 import { provideRouter, withComponentInputBinding, withViewTransitions } from '@angular/router';
-import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import {
   IPublicClientApplication,
   PublicClientApplication,
@@ -54,7 +54,7 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes, withComponentInputBinding(), withViewTransitions()),
-    provideHttpClient(withFetch(), withInterceptors([errorInterceptor, authInterceptor])),
+    provideHttpClient(withInterceptors([errorInterceptor, authInterceptor])),
     ICON_PROVIDER,
     // Apply the stored light/dark choice before the first view renders, so views
     // outside the shell (sign-in) honour it too.

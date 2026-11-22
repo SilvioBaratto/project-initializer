@@ -309,10 +309,21 @@ def test_when_nestjs_auth_service_is_read_then_jwks_rsa_rate_limit_is_true():
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def test_when_auth_service_template_is_read_then_provided_in_root_is_declared():
+def test_when_auth_service_template_is_read_then_it_is_a_root_singleton():
+    """AuthService is provided in the root injector, so every consumer shares one MSAL session.
+
+    ``@Service()`` is Angular 22's shorthand for ``@Injectable({ providedIn: 'root' })``;
+    either spelling meets the criterion, ``autoProvided: false`` does not.
+
+    Validates project_initializer/templates-entra-frontend/frontend/src/app/core/services/auth.service.ts.
+    """
     content = _read(FE_AUTH_SERVICE)
-    assert "providedIn: 'root'" in content, (
-        "AuthService must declare providedIn: 'root' for singleton access"
+    root_provided = (
+        re.search(r"@Service\(\s*\)", content) or "providedIn: 'root'" in content
+    )
+    assert root_provided and "autoProvided" not in content, (
+        "AuthService must be declared with @Service() (or providedIn: 'root') "
+        "for singleton access"
     )
 
 

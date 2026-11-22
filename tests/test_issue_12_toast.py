@@ -102,15 +102,24 @@ class TestToastServiceExists:
             "ToastService has not been created yet."
         )
 
-    def test_when_toast_service_parsed_then_provided_in_root_is_declared(self, ui_root):
-        """@Injectable({ providedIn: 'root' }) must appear so one instance is shared
-        across all consumers without explicit provider registration."""
+    def test_when_toast_service_parsed_then_it_is_a_root_singleton(self, ui_root):
+        """ToastService is provided in the root injector, so one instance is shared
+        across all consumers without explicit provider registration.
+
+        ``@Service()`` is Angular 22's shorthand for ``@Injectable({ providedIn: 'root' })``;
+        either spelling meets the criterion, ``autoProvided: false`` does not.
+
+        Validates project_initializer/templates/frontend/src/app/shared/ui/toast/toast.service.ts.
+        """
         candidates = list(ui_root.rglob("toast.service.ts"))
         assert candidates, "toast.service.ts not found"
         code = _read(candidates[0])
-        assert re.search(r"providedIn\s*:\s*['\"]root['\"]", code), (
-            "ToastService must be decorated with @Injectable({ providedIn: 'root' }) "
-            "so it is a singleton across the application."
+        root_provided = re.search(r"@Service\(\s*\)", code) or re.search(
+            r"providedIn\s*:\s*['\"]root['\"]", code
+        )
+        assert root_provided and "autoProvided" not in code, (
+            "ToastService must be declared with @Service() (or "
+            "@Injectable({ providedIn: 'root' })) so it is a singleton across the application."
         )
 
     def test_when_toast_service_parsed_then_show_method_is_declared(self, ui_root):

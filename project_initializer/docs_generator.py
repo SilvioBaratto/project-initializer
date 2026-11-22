@@ -580,7 +580,7 @@ def generate_root_claude(
                 "",
                 "## Frontend Template (`frontend/`)",
                 "",
-                "Angular 21 with Angular Material 3 (`mat.theme()` and `--mat-sys-*` tokens). See `frontend/.claude/CLAUDE.md` for conventions.",
+                "Angular 22 with Angular Material 3 (`mat.theme()` and `--mat-sys-*` tokens). See `frontend/.claude/CLAUDE.md` for conventions.",
                 "",
             ]
         )
@@ -614,7 +614,7 @@ def generate_root_claude(
             "",
             "## Frontend Template (`frontend/`)",
             "",
-            "Angular 21 with Angular Material 3 (standalone components, signals, native control flow, OnPush, `inject()`, `--mat-sys-*` tokens). See `frontend/.claude/CLAUDE.md` for the full conventions.",
+            "Angular 22 with Angular Material 3 (standalone components, signals, native control flow, OnPush, `inject()`, `--mat-sys-*` tokens). See `frontend/.claude/CLAUDE.md` for the full conventions.",
         ]
     sections += [
         "",
@@ -1461,12 +1461,12 @@ def generate_frontend_claude() -> str:
             "## Services",
             "",
             "- Design services around a single responsibility",
-            "- Use `providedIn: 'root'` for singleton services",
+            "- Prefer the `@Service` decorator over `@Injectable({providedIn: 'root'})` for singleton services",
             "- Use the `inject()` function instead of constructor injection",
             "",
             "## Styling with Angular Material 3",
             "",
-            "- The UI is built with Angular Material 3 (Angular Material + CDK 21.2). Use the matching Material component first; build only the gaps (such as the navigation bar and rail) on `--mat-sys-*` tokens",
+            "- The UI is built with Angular Material 3 (Angular Material + CDK 22.3). Use the matching Material component first; build only the gaps (such as the navigation bar and rail) on `--mat-sys-*` tokens",
             "- There is no utility-class CSS framework and there are no global utility classes: style with Material components plus each component's own CSS. A component at a screen edge pads itself by `env(safe-area-inset-*)`, which works because `src/index.html` sets `viewport-fit=cover`",
             "- `src/styles.scss` owns the theme: `mat.theme()` on `html` emits every color, typography, shape and elevation value as a `--mat-sys-*` token (density 0). Don't add a second theme or per-component palettes",
             "- Component CSS uses tokens only: colors from `--mat-sys-*` roles (content on a container uses its `on-` role; `--mat-sys-outline` is for borders, never text), type as `font: var(--mat-sys-<role>)` plus `letter-spacing: var(--mat-sys-<role>-tracking)`, shape from `--mat-sys-corner-*`, elevation from `--mat-sys-level0` to `--mat-sys-level5`",
@@ -1527,7 +1527,7 @@ def generate_frontend_claude() -> str:
             "",
             "- Never use `bypassSecurityTrust*` APIs or bind untrusted data to `[innerHTML]`; "
             "Angular's built-in sanitization is the only safe path",
-            '- `src/index.html` puts `ngCspNonce="CSP_NONCE"` on `<app-root>`. `nginx.conf` replaces `CSP_NONCE` with `$request_id`, a fresh random value on every request, through `sub_filter`, and allows that nonce in the `script-src` and `style-src` of its `Content-Security-Policy`; any other server for `index.html` must do the same. The build copies the nonce onto inline `<script>` and `<style>` tags (including the critical-CSS loader), and Angular adds it to every component style it injects',
+            '- `src/index.html` puts `ngCspNonce="CSP_NONCE"` on `<app-root>`. `nginx.conf` replaces `CSP_NONCE` with `$request_id`, a fresh random value on every request, through `sub_filter`, and allows that nonce in the `script-src` and `style-src` of its `Content-Security-Policy`; any other server for `index.html` must do the same. The build copies the nonce onto `<script>` and `<style>` tags (including the critical-CSS loader) and onto `<link rel="stylesheet">` and `<link rel="modulepreload">` tags, and Angular adds it to every component style it injects',
             '- That policy blocks a static `style="…"` attribute in a template, because Angular writes it with `setAttribute`: bind `[style.<property>]` or use the component\'s CSS instead',
             "",
         ]

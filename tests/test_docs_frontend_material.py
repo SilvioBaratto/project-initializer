@@ -133,7 +133,7 @@ _CONVENTIONS = [
     ("`LucideDynamicIcon`", "src/app/shared/sidebar/sidebar.ts", "LucideDynamicIcon"),
     ("`matButtonIcon`", None, None),
     ('`[size]="18"`', None, None),
-    # Material's button icon margins target .mat-icon only (button.mjs, 21.2).
+    # Material's button icon margins target .mat-icon only (button.mjs, 22.3).
     ("`margin-inline: -8px 8px`", None, None),
     # @lucide/angular 1.77 throws, rather than logs, for an unregistered name.
     ("Unable to resolve icon", None, None),

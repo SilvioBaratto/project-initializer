@@ -2,12 +2,12 @@
 Tests for issue #1: the frontend template's styling dependencies.
 
 History: issue #1 bumped Tailwind to v4.3. The Material 3 migration then removed
-Tailwind in favour of Angular Material 3 (Angular Material + CDK 21.2), so the
-file keeps its name for the issue history and now pins the new dependency truth:
+Tailwind in favour of Angular Material 3 (Angular Material + CDK 21.2, now 22.3),
+so the file keeps its name for the issue history and now pins the dependency truth:
   - package.json (the base template, and the supabase / entra overlays that ship
     their own) declares no tailwindcss / @tailwindcss/postcss and depends on
-    @angular/material and @angular/cdk ^21.2, both on the same range
-  - package-lock.json resolves @angular/material to 21.2.x, resolves
+    @angular/material and @angular/cdk pinned to the same exact 22.3.x release
+  - package-lock.json resolves @angular/material to 22.3.x, resolves
     @angular/cdk to the exact release Material peers on, and contains no Tailwind
     package
   - no PostCSS config (.postcssrc.json / postcss.config.*) and no
@@ -40,7 +40,7 @@ PACKAGE_JSONS = {
 
 TAILWIND_PACKAGES = ("tailwindcss", "@tailwindcss/postcss")
 MATERIAL_PACKAGES = ("@angular/material", "@angular/cdk")
-_MATERIAL_RANGE = re.compile(r"^\^21\.2\.\d+$")
+_MATERIAL_PIN = re.compile(r"^22\.3\.\d+$")
 
 _DEPENDENCY_SECTIONS = (
     "dependencies",
@@ -82,7 +82,7 @@ def _resolved_version(lock: dict, package_name: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# package.json: no Tailwind, Angular Material + CDK ^21.2
+# package.json: no Tailwind, Angular Material + CDK 22.3
 # ---------------------------------------------------------------------------
 
 
@@ -96,16 +96,19 @@ def test_when_package_json_read_then_no_tailwind_dependency_is_declared(variant)
 
 @pytest.mark.parametrize("variant", sorted(PACKAGE_JSONS))
 @pytest.mark.parametrize("package_name", MATERIAL_PACKAGES)
-def test_when_package_json_read_then_material_package_is_a_21_2_runtime_dependency(
+def test_when_package_json_read_then_material_package_is_a_22_3_runtime_dependency(
     variant, package_name
 ):
-    """@angular/material and @angular/cdk are runtime dependencies on a ^21.2.x range."""
+    """@angular/material and @angular/cdk are runtime dependencies pinned to an exact 22.3.x release.
+
+    Validates project_initializer/templates/frontend/package.json, project_initializer/templates-supabase-frontend/frontend/package.json and project_initializer/templates-entra-frontend/frontend/package.json.
+    """
     dependencies = _load_json(PACKAGE_JSONS[variant]).get("dependencies", {})
     assert package_name in dependencies, (
         f"[{variant}] {package_name} must be listed under dependencies"
     )
-    assert _MATERIAL_RANGE.match(dependencies[package_name]), (
-        f"[{variant}] expected {package_name} on ^21.2.x, "
+    assert _MATERIAL_PIN.match(dependencies[package_name]), (
+        f"[{variant}] expected {package_name} pinned to 22.3.x, "
         f"got {dependencies[package_name]!r}"
     )
 
@@ -134,15 +137,18 @@ def test_when_overlays_listed_then_every_frontend_package_json_is_covered():
 
 
 # ---------------------------------------------------------------------------
-# package-lock.json: Material 21.2.x resolved, no Tailwind
+# package-lock.json: Material 22.3.x resolved, no Tailwind
 # ---------------------------------------------------------------------------
 
 
-def test_when_package_lock_read_then_angular_material_resolves_to_21_2():
-    """Resolved '@angular/material' version in package-lock.json must start with '21.2.'."""
+def test_when_package_lock_read_then_angular_material_resolves_to_22_3():
+    """Resolved '@angular/material' version in package-lock.json must start with '22.3.'.
+
+    Validates project_initializer/templates/frontend/package-lock.json.
+    """
     version = _resolved_version(_load_package_lock(), "@angular/material")
-    assert version.startswith("21.2."), (
-        f"expected @angular/material to resolve to 21.2.x, got {version!r}"
+    assert version.startswith("22.3."), (
+        f"expected @angular/material to resolve to 22.3.x, got {version!r}"
     )
 
 

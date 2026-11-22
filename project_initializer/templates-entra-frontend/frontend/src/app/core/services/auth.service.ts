@@ -1,4 +1,4 @@
-import { Injectable, signal, inject } from '@angular/core';
+import { Service, signal, inject } from '@angular/core';
 import { MsalService } from '@azure/msal-angular';
 import {
   AccountInfo,
@@ -7,9 +7,7 @@ import {
 } from '@azure/msal-browser';
 import { environment } from '../../../environments/environment';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class AuthService {
   private readonly msalService = inject(MsalService);
   // Init promise is owned here; provideAppInitializer calls runInitSequence() to resolve it.

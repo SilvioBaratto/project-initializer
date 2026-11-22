@@ -3,7 +3,6 @@ import {
   HttpClient,
   HttpErrorResponse,
   provideHttpClient,
-  withFetch,
   withInterceptors,
 } from '@angular/common/http';
 import {
@@ -21,7 +20,7 @@ describe('errorInterceptor', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [
-        provideHttpClient(withFetch(), withInterceptors([errorInterceptor])),
+        provideHttpClient(withInterceptors([errorInterceptor])),
         provideHttpClientTesting(),
       ],
     });

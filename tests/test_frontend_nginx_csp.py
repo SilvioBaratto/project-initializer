@@ -1,8 +1,9 @@
 """Content-Security-Policy of the scaffolded frontend's nginx.conf.
 
 ``src/index.html`` puts a ``CSP_NONCE`` placeholder on ``<app-root>``, and the production build
-copies it onto every inline ``<script>`` and ``<style>`` (the theme script, the critical CSS and
-its loader, the main bundle tag). nginx must swap the placeholder for a fresh per-request nonce and
+copies it onto every ``<script>`` and ``<style>`` (the theme script, the critical CSS and its
+loader, the main bundle tag) and onto the ``<link rel="stylesheet">`` and
+``<link rel="modulepreload">`` tags. nginx must swap the placeholder for a fresh per-request nonce and
 allow that nonce in ``script-src`` and ``style-src``; otherwise the policy blocks Angular's inline
 styles and scripts and the container serves an unstyled app.
 

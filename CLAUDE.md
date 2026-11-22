@@ -417,13 +417,13 @@ Which overlay owns a lock follows its `package.json`: `templates-api-nestjs` (ba
 
 ## Frontend Template (`frontend/`)
 
-Angular 21 with Angular Material 3 (`@angular/material` + `@angular/cdk` 21.2) and `@lucide/angular` icons. There is no utility-class CSS framework and no PostCSS config. Key conventions:
+Angular 22 with Angular Material 3 (`@angular/material` + `@angular/cdk` 22.3), TypeScript 6.0 and `@lucide/angular` icons. There is no utility-class CSS framework and no PostCSS config. Key conventions:
 
 - **Standalone components only** (no NgModules, don't set `standalone: true` — it's default)
 - **Signals for state**: Use `signal()`, `computed()`, `input()`, `output()`
 - **Native control flow**: Use `@if`, `@for`, `@switch` instead of `*ngIf`, `*ngFor`
 - **OnPush change detection**: Set `changeDetection: ChangeDetectionStrategy.OnPush`
-- **Inject function**: Use `inject()` instead of constructor injection
+- **Inject function**: Use `inject()` instead of constructor injection; singleton services are declared with `@Service()`, Angular 22's shorthand for `@Injectable({ providedIn: 'root' })`
 - **Three files per component**: `<name>.ts` + `<name>.html` + `<name>.css`, wired with `templateUrl` / `styleUrl`; no inline templates or styles
 - **Theme and tokens**: `src/styles.scss` applies `mat.theme()` on `html` with `color-scheme: light dark` (violet primary, green tertiary, density 0). Component CSS uses only `--mat-sys-*` tokens plus the `--app-{success,warning,info}*` status roles defined there: no color literals, no `!important`, no `::ng-deep`. Tune a Material component through its token custom properties (`--mat-button-*`, `--mat-list-*`, …)
 - **Light and dark**: `ThemeService` puts exactly one of `.light` / `.dark` on `<html>`; those classes only set `color-scheme`. Before Angular boots, a script in `src/index.html` pins a stored choice (`app-theme`) as an inline `color-scheme`, which `ThemeService` removes when it applies the class

@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { Service, signal } from '@angular/core';
 import {
   createClient,
   isAuthError,
@@ -91,9 +91,7 @@ export function authFailureMessage(error: unknown, action: AuthAction): string {
   return failure === 'unexpected' ? UNEXPECTED_FAILURE_MESSAGES[action] : AUTH_FAILURE_MESSAGES[failure];
 }
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class AuthService {
   private readonly supabase: SupabaseClient;
   private initPromise: Promise<void>;

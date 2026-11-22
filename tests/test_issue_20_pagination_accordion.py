@@ -440,8 +440,10 @@ class TestAccordionComponentFiles:
     ) -> None:
         """
         M3 hover is inherited by list-like rows (interaction/states.md:172-176). Material
-        21.2 paints hover only on collapsed headers, so the unit draws a token-only
+        22.3 paints hover only on collapsed headers, so the unit draws a token-only
         ::after layer on every header (::before is the focus ring), expanded included.
+
+        Validates project_initializer/templates/frontend/src/app/shared/ui/accordion/accordion-item.css.
         """
         css = _read_accordion_sources(scaffolded, "accordion-item.css")
         block = _css_block(css, ".mat-expansion-panel-header:not([aria-disabled='true']):hover::after")

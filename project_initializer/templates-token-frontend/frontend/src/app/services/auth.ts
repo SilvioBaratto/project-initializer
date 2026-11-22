@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Service, inject, signal } from '@angular/core';
 import { HttpClient, HttpErrorResponse, HttpHeaders, HttpStatusCode } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
 import { tap, map, catchError } from 'rxjs/operators';
@@ -58,9 +58,7 @@ function failedSignIn(failure: SignInFailure): AuthResponse {
   return { authenticated: false, message: SIGN_IN_FAILURE_MESSAGES[failure], failure };
 }
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly AUTH_ENDPOINT = `${environment.apiUrl}auth/validate`;

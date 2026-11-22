@@ -27,6 +27,14 @@ const OVERLAY_BACKDROP_CLASS = 'cdk-overlay-backdrop';
 /** Escape presses a focus trap already turned into `close`, so an enclosing trap leaves them alone. */
 const escapeHandledByTrap = new WeakSet<Event>();
 
+/**
+ * Active traps in activation order. Only the last one moves focus once rendered: when an outer and
+ * an inner trap activate in the same render, everything around the inner trap is inert, so the
+ * outer trap's first focusable element is the inner trap's start anchor, which wraps focus to the
+ * inner trap's last element (opening an autocomplete there) before the inner trap focuses its first.
+ */
+const activeTraps: FocusTrapDirective[] = [];
+
 /** A background sibling's own attribute values, kept so deactivation puts back exactly what was there. */
 interface SavedBackgroundState {
   readonly inert: string | null;
@@ -41,6 +49,7 @@ interface SavedBackgroundState {
  *   Traps stack through the CDK `FocusTrapManager`: only the innermost active trap wraps.
  * - Focus that leaves the host by pointer or script is pulled back by the CDK inert strategy.
  * - Once rendered, focus moves to the `[cdkFocusInitial]` element, or else the first tabbable child.
+ *   When nested traps activate in the same render, only the innermost moves focus.
  *   With nothing tabbable inside, the host itself takes focus (with `tabindex="-1"` if it has none),
  *   and Tab keeps it there.
  * - Everything outside the host gets `inert` and `aria-hidden="true"`: the siblings of the host and
@@ -109,11 +118,13 @@ export class FocusTrapDirective implements OnDestroy {
     // create() attaches the anchors and registers this trap as the innermost active one.
     const trap = this.focusTrapFactory.create(this.host);
     this.focusTrap = trap;
+    activeTraps.push(this);
     this.watchAnchors();
     // Content under @if inside the host may render later in this pass, so wait for the render.
     afterNextRender(
       () => {
-        if (this.focusTrap === trap && !trap.focusInitialElement()) this.focusHost();
+        if (this.focusTrap !== trap || activeTraps.at(-1) !== this) return;
+        if (!trap.focusInitialElement()) this.focusHost();
       },
       { injector: this.injector },
     );
@@ -123,6 +134,7 @@ export class FocusTrapDirective implements OnDestroy {
     const trap = this.focusTrap;
     if (!trap) return;
     this.focusTrap = null;
+    activeTraps.splice(activeTraps.indexOf(this), 1);
     // Disabling first also cancels the CDK inert strategy's pending refocus, then destroy removes the anchors.
     trap.enabled = false;
     this.anchors.forEach((anchor) => anchor.removeEventListener('focus', this.onAnchorFocus));

@@ -502,7 +502,7 @@ describe('TableComponent — horizontal-scroll region', () => {
 });
 
 // ===========================================================================
-// Criterion — Signal inputs (Angular 21)
+// Criterion — Signal inputs
 // ===========================================================================
 
 describe('TableComponent — signal inputs', () => {

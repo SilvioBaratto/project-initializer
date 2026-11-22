@@ -174,7 +174,7 @@ class ComboboxHostComponent {
       <button type="button">Outer</button>
       <section>
         <div appFocusTrap [active]="true" (close)="onInnerClose()">
-          <button type="button">Inner</button>
+          <button id="nested-inner" type="button">Inner</button>
           <mat-form-field>
             <mat-label>City</mat-label>
             <input id="nested-city" matInput [matAutocomplete]="nestedCities" />
@@ -786,6 +786,21 @@ describe('FocusTrapDirective', () => {
       expect(document.activeElement).toBe(byId('outer-btn'));
       const outer = byId('outer');
       expect(outer.nextElementSibling?.getAttribute('tabindex')).toBe('0');
+    });
+
+    it('when an outer and an inner trap activate in the same render, focus goes straight to the first inner element', async () => {
+      const focusedIds: string[] = [];
+      const recordFocus = (event: FocusEvent) => focusedIds.push((event.target as HTMLElement).id);
+      document.addEventListener('focusin', recordFocus);
+      try {
+        await settle(mount(NestedComboboxHostComponent));
+      } finally {
+        document.removeEventListener('focusin', recordFocus);
+      }
+
+      expect(document.activeElement).toBe(byId('nested-inner'));
+      // Focus that passes through the autocomplete input opens its panel.
+      expect(focusedIds).not.toContain('nested-city');
     });
 
     it('when Escape is pressed on a collapsed autocomplete in the inner trap, only the inner close output fires', async () => {
