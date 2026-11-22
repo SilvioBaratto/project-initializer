@@ -90,12 +90,6 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_when_non_supabase_then_docker_table_has_local_db",
         }
     ),
-    "test_docs_generator_selfcheck.py": frozenset(
-        {
-            "test_when_supabase_then_docker_table_omits_local_db",
-            "test_when_non_supabase_then_docker_table_has_local_db",
-        }
-    ),
     "test_docs_sync_async.py": frozenset(
         {
             "test_when_api_claude_md_read_async_reserved_for_real_async_io_documented",
