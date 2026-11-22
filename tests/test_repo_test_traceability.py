@@ -282,6 +282,12 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_when_nestjs_base_scaffolded_logger_config_has_a_companion_spec",
         }
     ),
+    "test_entra_frontend_overlay.py": frozenset(
+        {
+            "test_when_entra_frontend_package_json_is_read_then_msal_angular_v6_is_listed",
+            "test_when_entra_frontend_package_json_is_read_then_msal_browser_v5_is_listed",
+        }
+    ),
     "test_issue_7_entra_auth_service.py": frozenset(
         {
             "test_when_fastapi_pyproject_is_read_then_pyjwt_crypto_is_declared",
