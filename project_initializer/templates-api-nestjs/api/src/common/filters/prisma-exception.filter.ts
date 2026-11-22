@@ -37,10 +37,10 @@ function findMapping(code: string): PrismaErrorMapping | undefined {
  *
  * Codes in {@link PRISMA_ERROR_MAP} are caller mistakes and log one warning line carrying only
  * the code. Errors that mean the database cannot take the work (unreachable, timed out, out of
- * connections, as {@link isDatabaseUnavailableError} defines) answer 503, exactly as a call
- * rejected by the open circuit does, so a client sees one answer for one outage; they log one
- * warning line. Any other code is an unexpected database failure: it answers 500 with a fixed
- * message and logs the error with its stack.
+ * connections, refusing sessions while it restarts, as {@link isDatabaseUnavailableError}
+ * defines) answer 503, exactly as a call rejected by the open circuit does, so a client sees one
+ * answer for one outage; they log one warning line. Any other code is an unexpected database
+ * failure: it answers 500 with a fixed message and logs the error with its stack.
  */
 @Catch(Prisma.PrismaClientKnownRequestError)
 export class PrismaClientExceptionFilter implements ExceptionFilter<Prisma.PrismaClientKnownRequestError> {

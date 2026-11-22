@@ -116,6 +116,10 @@ describe('PrismaClientExceptionFilter', () => {
     const rawQueryOutage = prismaError('P2010', {
       driverAdapterError: { cause: { kind: 'DatabaseNotReachable', host: 'db', port: 5432 } },
     });
+    const unmappedDatabaseError = (sqlState: string): Prisma.PrismaClientKnownRequestError =>
+      prismaError('P2039', {
+        driverAdapterError: { cause: { kind: 'postgres', code: sqlState, severity: 'FATAL' } },
+      });
 
     it.each([
       ['unreachable', prismaError('P1001')],
@@ -124,6 +128,7 @@ describe('PrismaClientExceptionFilter', () => {
       ['pool timeout', prismaError('P2024')],
       ['out of connection slots', prismaError('P2037')],
       ['unreachable on a raw query', rawQueryOutage],
+      ['refused by a server that is starting or stopping', unmappedDatabaseError('57P03')],
     ])('then %s answers 503 like an open circuit, with one warning line', (_label, exception) => {
       const response = handle(exception);
 
@@ -145,6 +150,14 @@ describe('PrismaClientExceptionFilter', () => {
 
       expect(response.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
       expect(errorLog).toHaveBeenCalledTimes(1);
+    });
+
+    it('then an unmapped database error about the query is still an unexpected 500', () => {
+      const response = handle(unmappedDatabaseError('42601'));
+
+      expect(response.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
+      expect(errorLog).toHaveBeenCalledTimes(1);
+      expect(warnLog).not.toHaveBeenCalled();
     });
   });
 

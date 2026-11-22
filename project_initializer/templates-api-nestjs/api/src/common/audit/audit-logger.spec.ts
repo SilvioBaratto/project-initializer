@@ -96,9 +96,9 @@ describe('AuditLogger', () => {
     audit.record('item.create', 'item-4', 'user-4');
 
     PinoLogger.root.level = 'fatal';
-    audit.record('item.create', 'item-4', 'user-4');
+    audit.record('item.update', 'item-6', 'user-6');
 
-    expect(sink.lines).toHaveLength(2);
+    expect(sink.lines.map((line) => line.resourceId)).toEqual(['item-4', 'item-6']);
   });
 
   it('when an action is recorded, then the line holds only the audit fields and pino metadata', () => {
