@@ -1522,6 +1522,7 @@ def generate_frontend_claude() -> str:
             "- Query Material components through their test harnesses (`@angular/material/<component>/testing` with `TestbedHarnessEnvironment`) rather than internal class names",
             "- Dialogs, snackbars and menus render in `document.body`'s `.cdk-overlay-container`, not inside the fixture",
             "- jsdom has no `window.matchMedia`: define it with `Object.defineProperty` (see `theme.spec.ts`) or provide a fake `MediaMatcher` (see `window-size-class.spec.ts`)",
+            "- jsdom evaluates stylesheet `@media` queries against a fixed 1024x768 window, which assigning `window.innerWidth` does not change, and substitutes `var()` in `getComputedStyle()`, where no global theme defines the `--mat-sys-*` tokens. Assert authored CSS through the CSSOM instead of computed values: read the declarations of the style rules an element matches (the `declaredValue()` helper in `checkbox.spec.ts`), and read a compact layout from the rules outside the media query (`table.spec.ts`)",
             "",
             "## Security",
             "",

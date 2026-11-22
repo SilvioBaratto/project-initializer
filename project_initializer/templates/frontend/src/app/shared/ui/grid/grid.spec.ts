@@ -55,6 +55,27 @@ function rulesFor(selector: string, atRule: FoundRule['atRule'], condition = '')
     .map((r) => r.rule.style!);
 }
 
+/**
+ * The value that the top-level style rules matching `el` declare for `property`, as authored (for example
+ * "span var(--app-grid-cell-span)"); the last matching rule in document order wins. getComputedStyle
+ * substitutes var(), so it would report the resolved span instead of the rule that resolves it.
+ */
+function declaredValue(el: Element, property: string): string {
+  let value = '';
+  for (const { rule, atRule } of collectStyleRules()) {
+    if (atRule !== '') continue;
+    let matches = false;
+    try {
+      matches = el.matches(rule.selectorText!);
+    } catch {
+      // A selector this engine cannot evaluate does not apply to this check.
+    }
+    const declared = matches ? rule.style!.getPropertyValue(property).trim() : '';
+    if (declared) value = declared;
+  }
+  return value;
+}
+
 const CELLS = '.app-grid > .app-grid__cells';
 /** Zero-specificity default span rule for every projected cell. */
 const CELL_DEFAULT = ':where(.app-grid > .app-grid__cells) > *';
@@ -319,7 +340,7 @@ describe('GridComponent per-cell span hook', () => {
   it('every projected cell is matched by the default span rule, which resolves the span on the cell itself', () => {
     for (const cell of cellsOf()) {
       expect(cell.matches(CELL_DEFAULT)).toBe(true);
-      expect(normalize(getComputedStyle(cell).getPropertyValue('grid-column'))).toBe(
+      expect(normalize(declaredValue(cell, 'grid-column'))).toBe(
         'span var(--app-grid-cell-span)',
       );
     }

@@ -43,11 +43,38 @@ function readText(el: Element | null): string {
 }
 
 /**
- * The color declaration stat-card.css applies to the element. jsdom matches the component's scoped rules but
- * does not resolve `var()`, so this is the token reference itself, e.g. `var(--app-success)`.
+ * The value that style rules matching `el` declare for `property`, as authored (for example
+ * "var(--app-success)"); the last matching rule in document order wins. CSSOM rule declarations keep
+ * var() references in jsdom and in real browsers alike, whereas getComputedStyle substitutes them.
+ */
+function declaredValue(el: Element, property: string): string {
+  let value = '';
+  for (const sheet of Array.from(document.styleSheets)) {
+    let rules: CSSRule[];
+    try {
+      rules = Array.from(sheet.cssRules);
+    } catch {
+      continue; // cross-origin sheet
+    }
+    for (const rule of rules) {
+      if (!(rule instanceof CSSStyleRule)) continue;
+      try {
+        if (!el.matches(rule.selectorText)) continue;
+      } catch {
+        continue; // selector this engine cannot evaluate
+      }
+      value = rule.style.getPropertyValue(property).trim() || value;
+    }
+  }
+  return value;
+}
+
+/**
+ * The color role stat-card.css gives the element: the token reference itself, e.g. `var(--app-success)`.
+ * No theme defines the tokens in a spec, so the computed color would be the inherited fallback.
  */
 function colorRole(el: Element): string {
-  return getComputedStyle(el).color;
+  return declaredValue(el, 'color');
 }
 
 // ===========================================================================

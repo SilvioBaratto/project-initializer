@@ -100,6 +100,8 @@ _ANGULAR_CEILING = (23, 0, 0)
 _LUCIDE_FLOOR = (1, 77, 0)
 _LUCIDE_CEILING = (2, 0, 0)
 _TYPESCRIPT_RANGE = re.compile(r"~6\.0\.\d+")
+_VITEST_MAJOR = 5
+_JSDOM_FLOOR_MAJOR = 31
 _SHARED_SPECIFIERS = (
     *_ANGULAR_PACKAGES,
     "@lucide/angular",
@@ -546,6 +548,82 @@ def test_when_the_base_lock_is_read_then_it_declares_the_manifest_ranges_and_res
                 f"{name}: manifest {specifier}, lock root {root.get(name)}, resolved {resolved}"
             )
     assert mismatches == []
+
+
+def _in_npm_alternatives(version: str, alternatives: str) -> bool:
+    """Tell whether ``version`` falls inside any caret or tilde range of an ``a || b`` peer range."""
+    return any(
+        _in_npm_range(version, alternative.strip())
+        for alternative in alternatives.split("||")
+    )
+
+
+@pytest.mark.unit
+def test_when_the_frontend_manifests_are_read_then_vitest_is_on_5_and_jsdom_on_31_or_later():
+    """Each manifest declares a Vitest 5 and a jsdom 31-or-later caret range, and the base lock resolves inside them and inside the builder's peers.
+
+    Node 25 and later define a global Web Storage ``localStorage`` that Vitest 4
+    leaves in place over jsdom's, so every spec that clears storage throws; Vitest
+    5 maps jsdom's ``localStorage`` and ``sessionStorage`` over it, and jsdom 31 is
+    what the specs' CSSOM assertions are written against. ``@angular/build``
+    accepts only Vitest 4 or 5, and Vitest 5 turned ``vite`` into a peer that the
+    lock must still resolve through the builder.
+
+    Validates project_initializer/templates/frontend/package.json, project_initializer/templates-supabase-frontend/frontend/package.json, project_initializer/templates-entra-frontend/frontend/package.json and project_initializer/templates/frontend/package-lock.json.
+    """
+    specifiers: dict[str, str] = {}
+    for name in ("vitest", "jsdom"):
+        found = {
+            _repo_relative(m): _manifest_dependencies(m).get(name)
+            for m in _FRONTEND_MANIFESTS
+        }
+        assert len(set(found.values())) == 1, found
+        specifiers[name] = next(iter(found.values())) or ""
+    floors = {name: _RANGE_SPECIFIER.fullmatch(s) for name, s in specifiers.items()}
+    assert all(m and m["operator"] == "^" for m in floors.values()), specifiers
+    assert _version_tuple(floors["vitest"]["version"])[0] == _VITEST_MAJOR, specifiers
+    assert _version_tuple(floors["jsdom"]["version"])[0] >= _JSDOM_FLOOR_MAJOR, (
+        specifiers
+    )
+
+    packages = _lock_packages()
+    root = packages[""]["devDependencies"]
+    for name, specifier in specifiers.items():
+        assert root.get(name) == specifier, f"{name}: lock root {root.get(name)}"
+        resolved = packages[f"node_modules/{name}"]["version"]
+        assert _in_npm_range(resolved, specifier), f"{name} {resolved}"
+    vitest = packages["node_modules/vitest"]
+    builder_peer = packages["node_modules/@angular/build"]["peerDependencies"]["vitest"]
+    assert _in_npm_alternatives(vitest["version"], builder_peer), builder_peer
+    vite = packages.get("node_modules/vite", {}).get("version", "0.0.0")
+    assert _in_npm_alternatives(vite, vitest["peerDependencies"]["vite"]), vite
+
+
+@pytest.mark.unit
+def test_when_the_spec_docs_describe_jsdom_css_then_they_name_its_fixed_window_and_a_cssom_helper_the_template_ships():
+    """The generated frontend CLAUDE.md and the repo CLAUDE.md state how jsdom computes CSS and point at a ``declaredValue()`` helper that exists.
+
+    jsdom evaluates ``@media`` against a fixed 1024x768 window and substitutes
+    ``var()`` in computed styles, so a spec that reads a computed token or a
+    compact layout sees the wide, unthemed result. The docs send readers to the
+    CSSOM helpers in ``checkbox.spec.ts`` and ``table.spec.ts``, which must exist.
+
+    Validates project_initializer/docs_generator.py generate_frontend_claude(), CLAUDE.md, project_initializer/templates/frontend/src/app/shared/ui/checkbox/checkbox.spec.ts and project_initializer/templates/frontend/src/app/shared/ui/table/table.spec.ts.
+    """
+    documents = {
+        "frontend CLAUDE.md": generate_frontend_claude(),
+        "repo CLAUDE.md": _REPO_CLAUDE.read_text(encoding="utf-8"),
+    }
+    for name, text in documents.items():
+        for phrase in ("fixed 1024x768 window", "substitutes `var()`", "CSSOM"):
+            assert phrase in text, f"{name} lacks {phrase!r}"
+        assert "`declaredValue()`" in text and "`checkbox.spec.ts`" in text, name
+
+    ui = _BASE_APP / "shared" / "ui"
+    for spec in (ui / "checkbox" / "checkbox.spec.ts", ui / "table" / "table.spec.ts"):
+        assert "function declaredValue(" in spec.read_text(encoding="utf-8"), (
+            _repo_relative(spec)
+        )
 
 
 @pytest.mark.unit

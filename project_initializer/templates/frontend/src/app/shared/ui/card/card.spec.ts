@@ -60,7 +60,7 @@ class TestCardHeadingHostComponent {}
 })
 class TestCardNestedHostComponent {}
 
-/** jsdom reports logical margins as declared (`0`), so compare them as numbers. */
+/** A zero margin computes to `0` or `0px` depending on the DOM engine, so compare margins as numbers. */
 function marginBlock(el: HTMLElement, side: 'start' | 'end'): number {
   return parseFloat(getComputedStyle(el).getPropertyValue(`margin-block-${side}`));
 }

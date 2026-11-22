@@ -96,6 +96,33 @@ function mediumQueryBody(css: string): string {
 }
 
 /**
+ * The value that the top-level style rules matching `el` declare for `property`, as authored; the
+ * last matching rule in document order wins and '' means none declares it. Rules inside `@media`
+ * blocks are skipped, so this is the mobile-first baseline a compact window gets.
+ */
+function declaredValue(el: Element, property: string): string {
+  let value = '';
+  for (const sheet of Array.from(document.styleSheets)) {
+    let rules: CSSRule[];
+    try {
+      rules = Array.from(sheet.cssRules);
+    } catch {
+      continue; // cross-origin sheet
+    }
+    for (const rule of rules) {
+      if (!(rule instanceof CSSStyleRule)) continue;
+      try {
+        if (!el.matches(rule.selectorText)) continue;
+      } catch {
+        continue; // selector this engine cannot evaluate
+      }
+      value = rule.style.getPropertyValue(property).trim() || value;
+    }
+  }
+  return value;
+}
+
+/**
  * Declarations of the rule for `className` inside a CSS chunk. Emulated encapsulation may append an
  * attribute selector (`.table-data[_ngcontent-abc]`), so anything up to the brace is allowed.
  */
@@ -261,11 +288,12 @@ describe('TableComponent — stacked cards below 600px', () => {
     });
   });
 
-  it('when rendered in a window without media query support (compact baseline), only the cards are displayed', async () => {
-    // jsdom does not evaluate `(min-width: 600px)`, so it computes the mobile-first baseline.
+  it('when the window is below 600px (the mobile-first baseline), only the cards are displayed', async () => {
+    // jsdom evaluates `@media` against a fixed 1024px-wide window, so getComputedStyle always reports
+    // the wide layout; the compact one is what the rules outside the media query declare.
     const { el } = await setup();
-    expect(getComputedStyle(el.querySelector('table')!).display).toBe('none');
-    expect(getComputedStyle(el.querySelector('ul')!).display).not.toBe('none');
+    expect(declaredValue(el.querySelector('table')!, 'display')).toBe('none');
+    expect(declaredValue(el.querySelector('ul')!, 'display')).not.toBe('none');
   });
 
   it('when the stylesheet is loaded, the layout switches at the M3 600px breakpoint, never 768px', async () => {
@@ -276,12 +304,14 @@ describe('TableComponent — stacked cards below 600px', () => {
   });
 
   it('when the window is 600px or wider, the stylesheet shows the table and hides the cards', async () => {
-    // jsdom never applies the media query, so read what the 600px block declares.
-    await setup();
+    // The 600px block is read as text, and jsdom's fixed 1024px-wide window applies it to the elements.
+    const { el } = await setup();
     const medium = mediumQueryBody(componentStyles());
     expect(medium).not.toBe('');
     expect(ruleFor(medium, 'table-data')).toMatch(/display:\s*table\s*(;|$)/);
     expect(ruleFor(medium, 'table-cards')).toMatch(/display:\s*none\s*(;|$)/);
+    expect(getComputedStyle(el.querySelector('table')!).display).toBe('table');
+    expect(getComputedStyle(el.querySelector('ul')!).display).toBe('none');
   });
 });
 

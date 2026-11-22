@@ -23,9 +23,10 @@ class RouteStubComponent {}
 type MediaListener = (event: { matches: boolean; media: string }) => void;
 
 /**
- * MediaMatcher driven by a settable M3 window size class. jsdom evaluates no media
- * queries, so each class is simulated by which WINDOW_SIZE_QUERIES entry matches;
- * setSize() notifies BreakpointObserver like a real resize.
+ * MediaMatcher driven by a settable M3 window size class. jsdom has no
+ * window.matchMedia and evaluates stylesheet media queries only against a fixed
+ * 1024x768 window, so each class is simulated by which WINDOW_SIZE_QUERIES entry
+ * matches; setSize() notifies BreakpointObserver like a real resize.
  */
 class FakeMediaMatcher {
   private readonly notifiers: Array<() => void> = [];

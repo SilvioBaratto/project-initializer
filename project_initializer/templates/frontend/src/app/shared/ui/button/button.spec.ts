@@ -57,6 +57,34 @@ class ButtonFormHost {
   }
 }
 
+/**
+ * The value that style rules matching `el` declare for a custom property, as authored (for example
+ * "var(--mat-sys-error)"); the last matching rule in document order wins. getComputedStyle substitutes
+ * var() and no theme defines the system tokens in a spec, so a computed token that references one is
+ * empty, whereas CSSOM rule declarations keep the reference in jsdom and real browsers alike.
+ */
+function declaredValue(el: Element, property: string): string {
+  let value = '';
+  for (const sheet of Array.from(document.styleSheets)) {
+    let rules: CSSRule[];
+    try {
+      rules = Array.from(sheet.cssRules);
+    } catch {
+      continue; // cross-origin sheet
+    }
+    for (const rule of rules) {
+      if (!(rule instanceof CSSStyleRule)) continue;
+      try {
+        if (!el.matches(rule.selectorText)) continue;
+      } catch {
+        continue; // selector this engine cannot evaluate
+      }
+      value = rule.style.getPropertyValue(property).trim() || value;
+    }
+  }
+  return value;
+}
+
 describe('ButtonComponent', () => {
   let fixture: ComponentFixture<ButtonTestHost>;
   let testHost: ButtonTestHost;
@@ -70,8 +98,9 @@ describe('ButtonComponent', () => {
     return appButton().querySelector('button')!;
   }
 
+  /** The Material token button.css sets on the inner button, as authored ('' when it sets none). */
   function token(name: string): string {
-    return getComputedStyle(button()).getPropertyValue(name).trim();
+    return declaredValue(button(), name);
   }
 
   async function set(changes: Partial<{
