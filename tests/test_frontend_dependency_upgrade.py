@@ -45,7 +45,16 @@ _PINNED_NGINX = re.compile(r"nginx:\d+\.\d+(\.\d+)?-alpine")
 _ACTION_USE = re.compile(r"uses:\s*(?P<action>actions/[\w-]+)@(?P<ref>\S+)")
 _EXACT_VERSION = re.compile(r"\d+\.\d+\.\d+")
 _OLD_ICON_IMPORT = re.compile(r"""from\s+['"]lucide-angular['"]""")
-_SVG_START_TAG = re.compile(r"<svg\b[^>]*>", re.S)
+# A quoted value is consumed whole, so a ">" inside a binding ("n() > 0", "=>") does not
+# end the start tag before the attributes that follow it.
+_ATTRIBUTE_NAME = r"""[^\s"'=<>/]+"""
+_ATTRIBUTE_VALUE = r"""\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+)"""
+_ATTRIBUTE = re.compile(rf"\s+(?P<name>{_ATTRIBUTE_NAME})(?:{_ATTRIBUTE_VALUE})?")
+_SVG_OPENING = re.compile(r"<svg\b")
+_SVG_START_TAG = re.compile(
+    rf"<svg\b(?P<attributes>(?:\s+{_ATTRIBUTE_NAME}(?:{_ATTRIBUTE_VALUE})?)*)\s*/?>"
+)
+_ICON_INPUTS = {"lucideIcon", "[lucideIcon]"}
 # Each of these is marked @deprecated in the @lucide/angular typings in favour of
 # the class named after the icon's current name.
 _DEPRECATED_ICON_CLASSES = re.compile(
@@ -122,20 +131,31 @@ def test_when_the_frontend_manifests_are_read_then_the_deprecated_lucide_package
 
     Validates project_initializer/templates/frontend/package.json, project_initializer/templates-supabase-frontend/frontend/package.json, project_initializer/templates-entra-frontend/frontend/package.json and project_initializer/templates/frontend/package-lock.json.
     """
-    assert len(_FRONTEND_MANIFESTS) == 3, [_repo_relative(m) for m in _FRONTEND_MANIFESTS]
+    assert len(_FRONTEND_MANIFESTS) == 3, [
+        _repo_relative(m) for m in _FRONTEND_MANIFESTS
+    ]
     pins = {}
     for manifest in _FRONTEND_MANIFESTS:
         package = json.loads(manifest.read_text(encoding="utf-8"))
-        declared = {**package.get("dependencies", {}), **package.get("devDependencies", {})}
-        assert "lucide-angular" not in declared, f"{_repo_relative(manifest)} still lists lucide-angular"
-        pins[_repo_relative(manifest)] = package.get("dependencies", {}).get("@lucide/angular")
+        declared = {
+            **package.get("dependencies", {}),
+            **package.get("devDependencies", {}),
+        }
+        assert "lucide-angular" not in declared, (
+            f"{_repo_relative(manifest)} still lists lucide-angular"
+        )
+        pins[_repo_relative(manifest)] = package.get("dependencies", {}).get(
+            "@lucide/angular"
+        )
 
     assert all(pin and _EXACT_VERSION.fullmatch(pin) for pin in pins.values()), pins
     assert len(set(pins.values())) == 1, f"the manifests pin different releases: {pins}"
 
     packages = json.loads(_FRONTEND_LOCK.read_text(encoding="utf-8"))["packages"]
     assert "node_modules/lucide-angular" not in packages
-    assert packages["node_modules/@lucide/angular"]["version"] == next(iter(pins.values()))
+    assert packages["node_modules/@lucide/angular"]["version"] == next(
+        iter(pins.values())
+    )
 
 
 @pytest.mark.unit
@@ -145,7 +165,7 @@ def test_when_the_frontend_sources_are_read_then_no_file_imports_lucide_angular_
     ``<lucide-icon>`` is an unknown element once ``LucideAngularModule`` is gone,
     and a stylesheet that still selects it silently stops styling the icon.
 
-    Validates the src trees of project_initializer/templates/frontend and of the token, supabase and entra frontend overlays.
+    Validates project_initializer/templates/frontend/src, project_initializer/templates-token-frontend/frontend/src, project_initializer/templates-supabase-frontend/frontend/src and project_initializer/templates-entra-frontend/frontend/src.
     """
     offenders = []
     for path in _frontend_sources(".ts", ".html", ".css", ".scss"):
@@ -157,13 +177,46 @@ def test_when_the_frontend_sources_are_read_then_no_file_imports_lucide_angular_
     assert offenders == []
 
 
-def _icon_tags_containing(fragments: tuple[str, ...]) -> list[str]:
-    """List every ``<svg lucideIcon>`` start tag, in templates and inline templates, holding one of ``fragments``."""
+def _icon_tags(text: str) -> list[list[str]]:
+    """Return the attribute names of every ``<svg>`` start tag in ``text`` that renders a lucide icon.
+
+    Raises:
+        ValueError: when an ``<svg`` opening is not a start tag the pattern can read, so
+            no icon escapes the guards unread.
+    """
+    tags = list(_SVG_START_TAG.finditer(text))
+    if len(tags) != len(_SVG_OPENING.findall(text)):
+        raise ValueError("an <svg start tag could not be read")
+    names_per_tag = [
+        [match["name"] for match in _ATTRIBUTE.finditer(tag["attributes"])]
+        for tag in tags
+    ]
+    return [names for names in names_per_tag if _ICON_INPUTS & set(names)]
+
+
+def _frontend_icon_tags() -> list[tuple[str, list[str]]]:
+    """List the attribute names of every icon ``svg`` in the templates and inline templates of the frontend layers."""
     return [
-        f"{_repo_relative(path)}: {' '.join(tag.split())}"
+        (_repo_relative(path), names)
         for path in _frontend_sources(".html", ".ts")
-        for tag in _SVG_START_TAG.findall(path.read_text(encoding="utf-8"))
-        if "lucideIcon" in tag and any(fragment in tag for fragment in fragments)
+        for names in _icon_tags(path.read_text(encoding="utf-8"))
+    ]
+
+
+@pytest.mark.unit
+def test_when_a_binding_holds_a_greater_than_sign_then_the_icon_tag_scan_reads_the_attributes_after_it():
+    """A ``>`` inside a quoted binding does not end the tag, so later attributes are still checked.
+
+    Validates tests/test_frontend_dependency_upgrade.py _icon_tags().
+    """
+    fixture = (
+        "<svg [lucideIcon]=\"count() > 0 ? 'Bell' : 'Inbox'\""
+        ' [attr.data-step]="items().map((item) => item.step)"'
+        ' [class.icon-alert]="urgent()" matListItemIcon />'
+    )
+
+    assert _icon_tags(fixture) == [
+        ["[lucideIcon]", "[attr.data-step]", "[class.icon-alert]", "matListItemIcon"]
     ]
 
 
@@ -175,9 +228,18 @@ def test_when_an_icon_element_is_read_then_it_carries_no_class_property_binding(
     ``[class.x]`` binding, which bypasses that input, is wiped the next time the
     icon re-renders. A static ``class`` or a ``[class]`` binding reaches the input.
 
-    Validates the html templates and inline spec templates of project_initializer/templates/frontend and of the token, supabase and entra frontend overlays.
+    Validates project_initializer/templates/frontend/src/app, project_initializer/templates-token-frontend/frontend/src/app, project_initializer/templates-supabase-frontend/frontend/src/app and project_initializer/templates-entra-frontend/frontend/src/app.
     """
-    assert _icon_tags_containing(("[class.",)) == []
+    icon_tags = _frontend_icon_tags()
+    assert icon_tags, (
+        "no <svg lucideIcon> found: the scan no longer matches the icon element"
+    )
+    offenders = [
+        f"{path}: {names}"
+        for path, names in icon_tags
+        if any(name.startswith("[class.") for name in names)
+    ]
+    assert offenders == []
 
 
 @pytest.mark.unit
@@ -189,9 +251,17 @@ def test_when_an_icon_element_is_read_then_it_carries_no_material_list_slot_dire
     size, spacing and color; on the ``svg`` the icon's own ``class`` attribute
     overwrites them.
 
-    Validates the html templates and inline spec templates of project_initializer/templates/frontend and of the token, supabase and entra frontend overlays.
+    Validates project_initializer/templates/frontend/src/app, project_initializer/templates-token-frontend/frontend/src/app, project_initializer/templates-supabase-frontend/frontend/src/app and project_initializer/templates-entra-frontend/frontend/src/app.
     """
-    assert _icon_tags_containing(("matListItemIcon", "matListItemMeta")) == []
+    icon_tags = _frontend_icon_tags()
+    assert icon_tags, (
+        "no <svg lucideIcon> found: the scan no longer matches the icon element"
+    )
+    slot_directives = {"matListItemIcon", "matListItemMeta"}
+    offenders = [
+        f"{path}: {names}" for path, names in icon_tags if slot_directives & set(names)
+    ]
+    assert offenders == []
 
 
 @pytest.mark.unit
@@ -201,7 +271,7 @@ def test_when_the_frontend_sources_are_read_then_no_file_imports_a_deprecated_ic
     ``LucideCircleAlert``, ``LucideTrash2`` and the like still export, but each is
     marked ``@deprecated`` and can disappear in a later release.
 
-    Validates the TypeScript sources of project_initializer/templates/frontend and of the token, supabase and entra frontend overlays.
+    Validates project_initializer/templates/frontend/src, project_initializer/templates-token-frontend/frontend/src, project_initializer/templates-supabase-frontend/frontend/src and project_initializer/templates-entra-frontend/frontend/src.
     """
     offenders = [
         f"{_repo_relative(path)}: {match}"

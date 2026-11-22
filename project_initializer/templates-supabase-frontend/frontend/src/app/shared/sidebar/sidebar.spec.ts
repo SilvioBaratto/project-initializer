@@ -426,6 +426,19 @@ describe('SidebarComponent (supabase)', () => {
       expect(authSpy.logout).not.toHaveBeenCalled();
     });
 
+    it("when modal, each theme choice icon and the sign out icon sit in Material's leading slot", async () => {
+      const el = await render('modal');
+      const icons = Array.from(el.querySelectorAll('mat-list-option svg.lucide'));
+      expect(icons.map((icon) => icon.classList.contains('lucide-monitor'))).toEqual([true, false, false]);
+      expect(icons.map((icon) => icon.classList.contains('lucide-sun'))).toEqual([false, true, false]);
+      expect(icons.map((icon) => icon.classList.contains('lucide-moon'))).toEqual([false, false, true]);
+      for (const icon of icons) {
+        expect(icon.closest('.mat-mdc-list-item-icon.mdc-list-item__start')).not.toBeNull();
+      }
+      const signOut = el.querySelector('button.sidebar-logout svg.lucide-log-out');
+      expect(signOut?.closest('.mat-mdc-list-item-icon.mdc-list-item__start')).not.toBeNull();
+    });
+
     it('when modal and sign out is activated from the keyboard, it signs out and emits closeSidebar', async () => {
       const el = await render('modal');
       const emitted = vi.fn();
