@@ -449,7 +449,7 @@ Non-supabase variants:
 
 | Service | Host port | Description |
 |---------|-----------|-------------|
-| `db` | `${DB_HOST_PORT:-5433}`:5432 | PostgreSQL 16 |
+| `db` | `${DB_HOST_PORT:-5433}`:5432 | PostgreSQL 19 in NestJS scaffolds, 16 in FastAPI scaffolds until their compose file moves |
 | `adminer` | `${ADMINER_HOST_PORT:-8080}`:8080 | Database management UI |
 | `api` | `${API_HOST_PORT:-8000}`:8000 | Backend with hot reload |
 | `frontend` | `${FRONTEND_HOST_PORT:-4200}`:80 | Angular + nginx (proxies `/api/` to backend) |

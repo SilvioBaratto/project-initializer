@@ -50,7 +50,7 @@ describe('deriveSslOption', () => {
   });
 
   // The compose network case: the API reaches Postgres at the *service name*,
-  // not localhost, and postgres:16-alpine serves no TLS. Requiring TLS here
+  // not localhost, and postgres:19-alpine serves no TLS. Requiring TLS here
   // fails every query with "The server does not support SSL connections", which
   // surfaces as `database: down` in the readiness probe.
   it('when host is the compose service name, no ssl is returned', () => {

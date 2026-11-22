@@ -152,7 +152,7 @@ Entra, and the docs cannot drift from the code.
 
 | Service | Port | Description | Supabase variants |
 |---------|------|-------------|-------------------|
-| `db` | 5433:5432 | PostgreSQL 16 | Omitted (Supabase hosts DB) |
+| `db` | 5433:5432 | PostgreSQL 16 (FastAPI), 19 (NestJS) | Omitted (Supabase hosts DB) |
 | `adminer` | 8080:8080 | DB management UI | Omitted |
 | `api` | 8000:8000 | Backend with hot reload | Present |
 | `frontend` | 4200:80 | Angular + nginx (proxies `/api/` to backend) | Present |

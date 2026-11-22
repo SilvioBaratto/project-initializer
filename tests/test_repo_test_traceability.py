@@ -67,6 +67,8 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
     "test_docker_runtime_invariants.py": frozenset(
         {
             "test_when_the_nestjs_dockerfile_is_read_then_every_stage_is_node_26_alpine",
+            "test_when_the_nestjs_compose_is_read_then_postgres_19_mounts_the_cluster_root_and_no_image_floats",
+            "test_when_the_nestjs_supabase_compose_is_read_then_it_has_no_local_db_and_no_image_floats",
             "test_fastapi_server_does_not_write_the_unstructured_access_log",
             "test_fastapi_image_keeps_the_application_code_root_owned",
             "test_fastapi_entrypoint_waits_on_the_database_the_application_will_use",
@@ -75,6 +77,12 @@ TRACED_FUNCTIONS: dict[str, frozenset[str]] = {
             "test_nestjs_production_image_ships_the_prisma_config_the_entrypoint_needs",
             "test_no_compose_file_hardcodes_container_names",
             "test_every_published_host_port_is_parametrized",
+        }
+    ),
+    "test_docs_generator_selfcheck.py": frozenset(
+        {
+            "test_when_supabase_then_docker_table_omits_local_db",
+            "test_when_non_supabase_then_docker_table_has_local_db",
         }
     ),
     "test_docs_sync_async.py": frozenset(
